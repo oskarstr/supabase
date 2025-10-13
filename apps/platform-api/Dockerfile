@@ -3,6 +3,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 RUN corepack enable pnpm
+ENV CI=true
 
 # Copy workspace metadata
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
@@ -19,6 +20,7 @@ RUN pnpm --filter platform-api... build
 FROM node:22-alpine
 WORKDIR /app
 RUN corepack enable pnpm
+ENV CI=true
 
 # Copy workspace manifests for installing production dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
