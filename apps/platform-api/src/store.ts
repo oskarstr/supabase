@@ -8,7 +8,9 @@ import { config as loadEnv, parse as parseEnv } from 'dotenv'
 import { destroyProjectStack, provisionProjectStack } from './provisioner'
 
 const moduleDir = dirname(fileURLToPath(import.meta.url))
-const repoRoot = resolve(moduleDir, '../../..')
+
+const providedRepoRootRaw = process.env.PLATFORM_API_REPO_ROOT?.trim()
+const repoRoot = providedRepoRootRaw && providedRepoRootRaw.length > 0 ? resolve(providedRepoRootRaw) : resolve(moduleDir, '../../..')
 
 const envFiles = ['.env', 'docker/.env']
 for (const relativePath of envFiles) {
