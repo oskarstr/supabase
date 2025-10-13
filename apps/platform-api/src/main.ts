@@ -1,6 +1,6 @@
 import Fastify from 'fastify'
 
-import platformRoutes from './routes/platform'
+import platformRoutes from './routes/platform.js'
 import cors from '@fastify/cors'
 
 const server = Fastify({

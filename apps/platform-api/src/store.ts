@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import { config as loadEnv, parse as parseEnv } from 'dotenv'
 
-import { destroyProjectStack, provisionProjectStack } from './provisioner'
+import { destroyProjectStack, provisionProjectStack } from './provisioner.js'
 
 const moduleDir = dirname(fileURLToPath(import.meta.url))
 

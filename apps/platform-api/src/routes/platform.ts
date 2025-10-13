@@ -8,7 +8,8 @@ import {
   getSubscriptionForOrg,
   listOrganizationProjects,
   listOrganizations,
-} from '../store'
+} from '../store.js'
+import type { Organization } from '../store.js'
 
 const platformRoutes: FastifyPluginAsync = async (app) => {
   app.get('/platform/profile', async (_request, reply) => {
@@ -33,7 +34,9 @@ const platformRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string } }>(
     '/platform/organizations/:slug/billing/subscription',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = listOrganizations().find(
+        (organization: Organization) => organization.slug === request.params.slug
+      )
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
