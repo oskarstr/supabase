@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { destroyProjectStack, provisionProjectStack } from './provisioner'
+
 type CloudProvider = 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS'
 
 type ComputeSize =
@@ -319,6 +321,65 @@ function saveState(current: State) {
 
 const state = loadState()
 
+function updateProject(ref: string, updater: (project: InternalProject) => InternalProject | void) {
+  const index = state.projects.findIndex((project) => project.ref === ref)
+  if (index === -1) return
+
+  const current = state.projects[index]
+  const updated = updater(current)
+  if (updated) {
+    state.projects[index] = updated
+  }
+  saveState(state)
+}
+
+async function scheduleProvisioning(project: InternalProject, org: Organization, dbPass: string) {
+  try {
+    await provisionProjectStack({
+      ref: project.ref,
+      name: project.name,
+      organizationSlug: org.slug,
+      cloudProvider: project.cloud_provider,
+      region: project.region,
+      databasePassword: dbPass,
+    })
+
+    updateProject(project.ref, (current) => ({
+      ...current,
+      status: 'ACTIVE_HEALTHY',
+      restUrl: current.restUrl || `https://${current.ref}.supabase.local/rest/v1/`,
+    }))
+  } catch (error) {
+    console.error('[platform-api] provisioning failed', project.ref, error)
+    updateProject(project.ref, (current) => ({
+      ...current,
+      status: 'INIT_FAILED',
+    }))
+  }
+}
+
+async function scheduleRemoval(project: InternalProject, org: Organization) {
+  try {
+    await destroyProjectStack({
+      ref: project.ref,
+      name: project.name,
+      organizationSlug: org.slug,
+    })
+
+    const removalIndex = state.projects.findIndex((item) => item.ref === project.ref)
+    if (removalIndex !== -1) {
+      state.projects.splice(removalIndex, 1)
+      saveState(state)
+    }
+  } catch (error) {
+    console.error('[platform-api] destruction failed', project.ref, error)
+    updateProject(project.ref, (current) => ({
+      ...current,
+      status: 'RESTORE_FAILED',
+    }))
+  }
+}
+
 export function getProfile() {
   return state.profile
 }
@@ -422,8 +483,8 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
     organization_id: org.id,
     ref,
     region,
-    restUrl: body.auth_site_url ?? `https://${ref}.supabase.local/rest/v1/`,
-    status: 'ACTIVE_HEALTHY',
+    restUrl: body.auth_site_url ?? '',
+    status: 'COMING_UP',
     subscription_id: randomUUID(),
   }
 
@@ -436,7 +497,7 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
   state.projects.push(project)
   saveState(state)
 
-  return {
+  const response: CreateProjectResponse = {
     anon_key: project.anonKey,
     cloud_provider: project.cloud_provider,
     endpoint: project.restUrl,
@@ -455,14 +516,25 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
     status: detail.status,
     subscription_id: detail.subscription_id,
   }
+
+  scheduleProvisioning(project, org, body.db_pass).catch((error) => {
+    console.error('[platform-api] provisioning task error', error)
+  })
+
+  return response
 }
 
 export function deleteProject(ref: string): RemoveProjectResponse | undefined {
-  const index = state.projects.findIndex((project) => project.ref === ref)
-  if (index === -1) return undefined
+  const project = state.projects.find((item) => item.ref === ref)
+  if (!project) return undefined
 
-  const [project] = state.projects.splice(index, 1)
-  saveState(state)
+  const org = state.organizations.find((item) => item.id === project.organization_id)
+  if (!org) return undefined
+
+  updateProject(ref, (current) => ({ ...current, status: 'GOING_DOWN' }))
+  scheduleRemoval(project, org).catch((error) => {
+    console.error('[platform-api] destruction task error', error)
+  })
 
   return {
     id: project.id,
