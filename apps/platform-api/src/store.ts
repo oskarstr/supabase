@@ -3,7 +3,36 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { config as loadEnv, parse as parseEnv } from 'dotenv'
+
 import { destroyProjectStack, provisionProjectStack } from './provisioner'
+
+const moduleDir = dirname(fileURLToPath(import.meta.url))
+const repoRoot = resolve(moduleDir, '../../..')
+
+const envFiles = ['.env', 'docker/.env']
+for (const relativePath of envFiles) {
+  const envPath = resolve(repoRoot, relativePath)
+  if (existsSync(envPath)) {
+    loadEnv({ path: envPath, override: false })
+  }
+}
+
+const envString = (key: string, fallback?: string) => {
+  const value = process.env[key]
+  if (value === undefined) return fallback
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : fallback
+}
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
+const buildRestUrl = (base: string) => `${trimTrailingSlash(base)}/rest/v1/`
 
 type CloudProvider = 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS'
 
@@ -203,7 +232,7 @@ interface State {
   projectRuntimes: Record<string, ProjectRuntime>
 }
 
-const DATA_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../data')
+const DATA_DIR = resolve(moduleDir, '../data')
 const STATE_FILE = resolve(DATA_DIR, 'state.json')
 const PROJECTS_ROOT = resolve(DATA_DIR, 'projects')
 
@@ -214,39 +243,104 @@ interface ProjectRuntime {
 }
 
 const DEFAULT_ORG_ID = 1
-const DEFAULT_ORG_SLUG = 'local-org'
+const DEFAULT_ORG_NAME = envString('STUDIO_DEFAULT_ORGANIZATION', 'Local Organization') ?? 'Local Organization'
+const DEFAULT_ORG_SLUG =
+  envString('STUDIO_DEFAULT_ORGANIZATION_SLUG', slugify(DEFAULT_ORG_NAME) || 'local-org') ?? 'local-org'
+const DEFAULT_BILLING_EMAIL = envString('STUDIO_DEFAULT_BILLING_EMAIL') ?? null
+const rawBillingPartner = envString('STUDIO_DEFAULT_BILLING_PARTNER')
+const DEFAULT_BILLING_PARTNER =
+  rawBillingPartner === 'fly' || rawBillingPartner === 'aws_marketplace' || rawBillingPartner === 'vercel_marketplace'
+    ? rawBillingPartner
+    : null
+const DEFAULT_PLAN_ID = (envString('STUDIO_DEFAULT_PLAN', 'enterprise') ?? 'enterprise') as Organization['plan']['id']
+const PLAN_LABELS: Record<Organization['plan']['id'], string> = {
+  free: 'Free',
+  pro: 'Pro',
+  team: 'Team',
+  enterprise: 'Enterprise',
+}
+const DEFAULT_PLAN_NAME = PLAN_LABELS[DEFAULT_PLAN_ID]
+const DEFAULT_USAGE_BILLING_ENABLED = envString('STUDIO_USAGE_BILLING_ENABLED', 'false') === 'true'
+const DEFAULT_ORG_REQUIRES_MFA = envString('STUDIO_ORGANIZATION_REQUIRES_MFA', 'false') === 'true'
+const DEFAULT_STRIPE_CUSTOMER_ID = envString('STUDIO_DEFAULT_STRIPE_CUSTOMER_ID') ?? null
+const DEFAULT_SUBSCRIPTION_ID = envString('STUDIO_DEFAULT_SUBSCRIPTION_ID') ?? null
+const DEFAULT_ORG_OPT_IN_TAGS =
+  envString('STUDIO_DEFAULT_ORG_OPT_IN_TAGS')
+    ?.split(',')
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0) ?? []
+
+const DEFAULT_FIRST_NAME = envString('STUDIO_DEFAULT_FIRST_NAME', 'Local') ?? 'Local'
+const DEFAULT_LAST_NAME = envString('STUDIO_DEFAULT_LAST_NAME', 'Admin') ?? 'Admin'
+const DEFAULT_PRIMARY_EMAIL = envString('STUDIO_DEFAULT_PRIMARY_EMAIL', 'admin@example.com') ?? 'admin@example.com'
+const DEFAULT_USERNAME = envString('STUDIO_DEFAULT_USERNAME', 'admin') ?? 'admin'
+const DEFAULT_AUTH0_ID = envString('STUDIO_DEFAULT_AUTH0_ID', 'local|user') ?? 'local|user'
+const DEFAULT_MOBILE = envString('STUDIO_DEFAULT_MOBILE', '') ?? ''
+const DEFAULT_FREE_PROJECT_LIMIT = (() => {
+  const parsed = Number.parseInt(envString('STUDIO_FREE_PROJECT_LIMIT') ?? '', 10)
+  return Number.isFinite(parsed) ? parsed : 10
+})()
+const DEFAULT_IS_ALPHA_USER = envString('STUDIO_DEFAULT_ALPHA_USER', 'false') === 'true'
+const DEFAULT_IS_SSO_USER = envString('STUDIO_DEFAULT_SSO_USER', 'false') === 'true'
+
+const DEFAULT_PROJECT_NAME = envString('STUDIO_DEFAULT_PROJECT', 'Local Project') ?? 'Local Project'
+const DEFAULT_PROJECT_REF =
+  envString('STUDIO_DEFAULT_PROJECT_REF', slugify(DEFAULT_PROJECT_NAME) || 'local-project') ?? 'local-project'
+const DEFAULT_REGION = envString('STUDIO_DEFAULT_REGION', 'local') ?? 'local'
+const DEFAULT_CLOUD_PROVIDER = (envString('STUDIO_DEFAULT_CLOUD_PROVIDER', 'AWS') ?? 'AWS') as CloudProvider
+const DEFAULT_DB_VERSION = envString('STUDIO_DEFAULT_DB_VERSION', '15') ?? '15'
+const DEFAULT_INFRA_SIZE = (envString('STUDIO_DEFAULT_COMPUTE_SIZE', 'micro') ?? 'micro') as ComputeSize
+const defaultDbUrl = envString('SUPABASE_DB_URL', envString('DATABASE_URL')) ?? ''
+const DEFAULT_CONNECTION_STRING = defaultDbUrl.length > 0 ? defaultDbUrl : null
+const DEFAULT_DB_HOST = (() => {
+  if (defaultDbUrl.length > 0) {
+    try {
+      return new URL(defaultDbUrl).hostname
+    } catch {
+      /* noop */
+    }
+  }
+  return envString('POSTGRES_HOST', 'localhost') ?? 'localhost'
+})()
+const defaultRestBase = envString('SUPABASE_PUBLIC_URL', 'http://localhost:54321') ?? 'http://localhost:54321'
+const DEFAULT_REST_URL = buildRestUrl(defaultRestBase)
+const DEFAULT_ANON_KEY = envString('ANON_KEY', randomUUID()) ?? randomUUID()
+const DEFAULT_SERVICE_KEY = envString('SERVICE_ROLE_KEY', randomUUID()) ?? randomUUID()
+const DEFAULT_PROJECT_SUBSCRIPTION_ID = envString('STUDIO_DEFAULT_PROJECT_SUBSCRIPTION_ID') ?? randomUUID()
+const DEFAULT_BRANCH_ENABLED = envString('STUDIO_DEFAULT_BRANCH_ENABLED', 'false') === 'true'
+const DEFAULT_PHYSICAL_BACKUPS = envString('STUDIO_DEFAULT_PHYSICAL_BACKUPS', 'false') === 'true'
 
 const baseProfile: Profile = {
-  auth0_id: 'local|user',
+  auth0_id: DEFAULT_AUTH0_ID,
   disabled_features: [],
-  first_name: 'Local',
-  free_project_limit: 10,
+  first_name: DEFAULT_FIRST_NAME,
+  free_project_limit: DEFAULT_FREE_PROJECT_LIMIT,
   gotrue_id: randomUUID(),
   id: 1,
-  is_alpha_user: false,
-  is_sso_user: false,
-  last_name: 'Admin',
-  mobile: '',
-  primary_email: 'admin@example.com',
-  username: 'admin',
+  is_alpha_user: DEFAULT_IS_ALPHA_USER,
+  is_sso_user: DEFAULT_IS_SSO_USER,
+  last_name: DEFAULT_LAST_NAME,
+  mobile: DEFAULT_MOBILE,
+  primary_email: DEFAULT_PRIMARY_EMAIL,
+  username: DEFAULT_USERNAME,
 }
 
 const baseOrganizations: Organization[] = [
   {
-    billing_email: null,
-    billing_partner: null,
+    billing_email: DEFAULT_BILLING_EMAIL,
+    billing_partner: DEFAULT_BILLING_PARTNER,
     id: DEFAULT_ORG_ID,
     is_owner: true,
-    name: 'Local Organization',
-    opt_in_tags: [],
-    organization_requires_mfa: false,
-    plan: { id: 'enterprise', name: 'Enterprise' },
+    name: DEFAULT_ORG_NAME,
+    opt_in_tags: [...DEFAULT_ORG_OPT_IN_TAGS],
+    organization_requires_mfa: DEFAULT_ORG_REQUIRES_MFA,
+    plan: { id: DEFAULT_PLAN_ID, name: DEFAULT_PLAN_NAME },
     restriction_data: null,
     restriction_status: null,
     slug: DEFAULT_ORG_SLUG,
-    stripe_customer_id: null,
-    subscription_id: null,
-    usage_billing_enabled: false,
+    stripe_customer_id: DEFAULT_STRIPE_CUSTOMER_ID,
+    subscription_id: DEFAULT_SUBSCRIPTION_ID,
+    usage_billing_enabled: DEFAULT_USAGE_BILLING_ENABLED,
   },
 ]
 
@@ -265,25 +359,27 @@ function ensureDataDir() {
 
 function defaultState(): State {
   const defaultProject: InternalProject = {
-    cloud_provider: 'AWS',
-    connectionString: null,
-    db_host: 'localhost',
-    dbVersion: '15',
+    cloud_provider: DEFAULT_CLOUD_PROVIDER,
+    connectionString: DEFAULT_CONNECTION_STRING,
+    db_host: DEFAULT_DB_HOST,
+    dbVersion: DEFAULT_DB_VERSION,
     id: DEFAULT_ORG_ID,
-    infra_compute_size: 'micro',
+    infra_compute_size: DEFAULT_INFRA_SIZE,
     inserted_at: nowIso(),
-    is_branch_enabled: false,
-    is_physical_backups_enabled: false,
-    name: 'Local Project',
+    is_branch_enabled: DEFAULT_BRANCH_ENABLED,
+    is_physical_backups_enabled: DEFAULT_PHYSICAL_BACKUPS,
+    name: DEFAULT_PROJECT_NAME,
     organization_id: DEFAULT_ORG_ID,
-    ref: 'local-project',
-    region: 'local',
-    restUrl: 'http://localhost:54321/rest/v1/',
+    ref: DEFAULT_PROJECT_REF,
+    region: DEFAULT_REGION,
+    restUrl: DEFAULT_REST_URL,
     status: 'ACTIVE_HEALTHY',
-    subscription_id: randomUUID(),
-    anonKey: randomUUID(),
-    serviceKey: randomUUID(),
+    subscription_id: DEFAULT_PROJECT_SUBSCRIPTION_ID,
+    anonKey: DEFAULT_ANON_KEY,
+    serviceKey: DEFAULT_SERVICE_KEY,
   }
+
+  const runtimeRoot = resolve(PROJECTS_ROOT, defaultProject.ref)
 
   return {
     profile: { ...baseProfile },
@@ -293,7 +389,7 @@ function defaultState(): State {
     projectRuntimes: {
       [defaultProject.ref]: {
         ref: defaultProject.ref,
-        rootDir: '',
+        rootDir: runtimeRoot,
         createdAt: nowIso(),
       },
     },
@@ -320,6 +416,24 @@ function loadState(): State {
   const nextProjectId =
     raw.nextProjectId ?? projects.reduce((max, project) => Math.max(max, project.id), 0) + 1
 
+  const projectRuntimes: Record<string, ProjectRuntime> =
+    raw.projectRuntimes && typeof raw.projectRuntimes === 'object'
+      ? (raw.projectRuntimes as Record<string, ProjectRuntime>)
+      : projects.length > 0
+        ? {
+            [projects[0].ref]: {
+              ref: projects[0].ref,
+              rootDir: resolve(PROJECTS_ROOT, projects[0].ref),
+              createdAt: nowIso(),
+            },
+          }
+        : {}
+
+  for (const [ref, runtime] of Object.entries(projectRuntimes)) {
+    runtime.rootDir = runtime.rootDir && runtime.rootDir.length > 0 ? runtime.rootDir : resolve(PROJECTS_ROOT, ref)
+    ensureDir(runtime.rootDir)
+  }
+
   return {
     profile:
       raw.profile && typeof raw.profile === 'object'
@@ -331,18 +445,7 @@ function loadState(): State {
         : baseOrganizations.map((org) => ({ ...org })),
     projects,
     nextProjectId,
-    projectRuntimes:
-      raw.projectRuntimes && typeof raw.projectRuntimes === 'object'
-        ? (raw.projectRuntimes as Record<string, ProjectRuntime>)
-        : projects.length > 0
-          ? {
-              [projects[0].ref]: {
-                ref: projects[0].ref,
-                rootDir: '',
-                createdAt: nowIso(),
-              },
-            }
-          : {},
+    projectRuntimes,
   }
 }
 
@@ -353,12 +456,22 @@ function saveState(current: State) {
 
 const state = loadState()
 
+for (const ref of Object.keys(state.projectRuntimes)) {
+  ensureProjectRuntime(ref)
+}
+
 function ensureProjectRuntime(ref: string): ProjectRuntime {
   const existing = state.projectRuntimes[ref]
-  if (existing) return existing
-
   ensureDir(PROJECTS_ROOT)
   const rootDir = resolve(PROJECTS_ROOT, ref)
+
+  if (existing) {
+    existing.rootDir = existing.rootDir && existing.rootDir.length > 0 ? existing.rootDir : rootDir
+    ensureDir(existing.rootDir)
+    saveState(state)
+    return existing
+  }
+
   ensureDir(rootDir)
 
   const runtime: ProjectRuntime = {
@@ -398,6 +511,8 @@ async function scheduleProvisioning(
   runtime: ProjectRuntime
 ) {
   try {
+    ensureDir(runtime.rootDir)
+
     await provisionProjectStack({
       ref: project.ref,
       name: project.name,
@@ -408,10 +523,53 @@ async function scheduleProvisioning(
       projectRoot: runtime.rootDir,
     })
 
+    let nextAnonKey = project.anonKey
+    let nextServiceKey = project.serviceKey
+    let nextRestUrl = project.restUrl || DEFAULT_REST_URL
+    let nextConnection = project.connectionString
+    let nextDbHost = project.db_host
+    let nextDbVersion = project.dbVersion
+
+    const envPath = resolve(runtime.rootDir, '.env')
+    if (existsSync(envPath)) {
+      const parsed = parseEnv(readFileSync(envPath, 'utf-8'))
+
+      if (parsed.SUPABASE_ANON_KEY) {
+        nextAnonKey = parsed.SUPABASE_ANON_KEY
+      }
+      if (parsed.SUPABASE_SERVICE_KEY) {
+        nextServiceKey = parsed.SUPABASE_SERVICE_KEY
+      }
+
+      const supabaseUrl = parsed.SUPABASE_URL ?? parsed.SUPABASE_PUBLIC_URL
+      if (supabaseUrl) {
+        nextRestUrl = buildRestUrl(supabaseUrl)
+      }
+
+      const dbUrl = parsed.DATABASE_URL ?? parsed.SUPABASE_DB_URL
+      if (dbUrl) {
+        nextConnection = dbUrl
+        try {
+          nextDbHost = new URL(dbUrl).hostname
+        } catch {
+          /* noop */
+        }
+      }
+
+      if (parsed.POSTGRES_VERSION) {
+        nextDbVersion = parsed.POSTGRES_VERSION
+      }
+    }
+
     updateProject(project.ref, (current) => ({
       ...current,
       status: 'ACTIVE_HEALTHY',
-      restUrl: current.restUrl || `https://${current.ref}.supabase.local/rest/v1/`,
+      restUrl: nextRestUrl,
+      connectionString: nextConnection ?? current.connectionString,
+      db_host: nextDbHost,
+      dbVersion: nextDbVersion ?? current.dbVersion,
+      anonKey: nextAnonKey,
+      serviceKey: nextServiceKey,
     }))
   } catch (error) {
     console.error('[platform-api] provisioning failed', project.ref, error)
@@ -533,18 +691,18 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
   const region =
     body.region_selection && 'code' in body.region_selection
       ? body.region_selection.code
-      : body.db_region ?? 'local'
+      : body.db_region ?? DEFAULT_REGION
 
   const detail: ProjectDetail = {
-    cloud_provider: body.cloud_provider,
+    cloud_provider: body.cloud_provider ?? DEFAULT_CLOUD_PROVIDER,
     connectionString: null,
-    db_host: `${ref}.db.local`,
-    dbVersion: body.postgres_engine ?? '15',
+    db_host: DEFAULT_DB_HOST,
+    dbVersion: body.postgres_engine ?? DEFAULT_DB_VERSION,
     id: projectId,
-    infra_compute_size: body.desired_instance_size ?? 'micro',
+    infra_compute_size: body.desired_instance_size ?? DEFAULT_INFRA_SIZE,
     inserted_at: insertedAt,
-    is_branch_enabled: false,
-    is_physical_backups_enabled: false,
+    is_branch_enabled: DEFAULT_BRANCH_ENABLED,
+    is_physical_backups_enabled: DEFAULT_PHYSICAL_BACKUPS,
     name: body.name,
     organization_id: org.id,
     ref,
