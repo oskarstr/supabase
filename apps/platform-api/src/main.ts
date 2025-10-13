@@ -1,5 +1,7 @@
 import Fastify from 'fastify'
 
+import platformRoutes from './routes/platform'
+
 const server = Fastify({
   logger: {
     level: process.env.LOG_LEVEL ?? 'info',
@@ -13,6 +15,7 @@ const host = process.env.HOST ?? '0.0.0.0'
 
 async function start() {
   try {
+    await server.register(platformRoutes)
     await server.listen({ port, host })
     server.log.info(`Platform API listening on http://${host}:${port}`)
   } catch (err) {

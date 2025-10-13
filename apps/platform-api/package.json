@@ -9,6 +9,7 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "api-types": "workspace:*",
     "fastify": "^5.1.0"
   },
   "devDependencies": {
