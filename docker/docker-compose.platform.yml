@@ -1,17 +1,14 @@
 services:
   platform-api:
     build:
-      context: ../apps/platform-api
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-      - ./docker/.env
+      context: ..
+      dockerfile: apps/platform-api/Dockerfile
     environment:
       PORT: "4000"
       HOST: "0.0.0.0"
       PLATFORM_API_REPO_ROOT: /workspace
     volumes:
-      - platform-api-data:/app/data
+      - platform-api-data:/app/apps/platform-api/data
       - ..:/workspace:ro
     depends_on:
       - db
