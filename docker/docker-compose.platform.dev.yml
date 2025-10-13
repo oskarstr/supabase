@@ -1,0 +1,20 @@
+services:
+  platform-api:
+    image: node:22-alpine
+    command: sh -c "corepack enable pnpm && pnpm install --filter platform-api... && pnpm --filter platform-api... dev"
+    working_dir: /workspace
+    environment:
+      PLATFORM_API_REPO_ROOT: /workspace
+      PORT: "4210"
+      HOST: "0.0.0.0"
+    volumes:
+      - ..:/workspace
+      - platform-api-data:/workspace/apps/platform-api/data
+    ports:
+      - "4210:4210"
+    depends_on:
+      - db
+    container_name: platform-dev
+
+volumes:
+  platform-api-data:

@@ -287,7 +287,9 @@ const DEFAULT_IS_SSO_USER = envString('STUDIO_DEFAULT_SSO_USER', 'false') === 't
 
 const DEFAULT_PROJECT_NAME = envString('STUDIO_DEFAULT_PROJECT', 'Local Project') ?? 'Local Project'
 const DEFAULT_PROJECT_REF =
-  envString('STUDIO_DEFAULT_PROJECT_REF', slugify(DEFAULT_PROJECT_NAME) || 'local-project') ?? 'local-project'
+  envString('STUDIO_DEFAULT_PROJECT_REF')
+    ? envString('STUDIO_DEFAULT_PROJECT_REF')!
+    : slugify(DEFAULT_PROJECT_NAME) || 'default'
 const DEFAULT_REGION = envString('STUDIO_DEFAULT_REGION', 'local') ?? 'local'
 const DEFAULT_CLOUD_PROVIDER = (envString('STUDIO_DEFAULT_CLOUD_PROVIDER', 'AWS') ?? 'AWS') as CloudProvider
 const DEFAULT_DB_VERSION = envString('STUDIO_DEFAULT_DB_VERSION', '15') ?? '15'
