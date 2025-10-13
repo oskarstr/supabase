@@ -17,9 +17,11 @@ services:
   studio:
     environment:
       NEXT_PUBLIC_IS_PLATFORM: "true"
-      NEXT_PUBLIC_API_URL: http://platform-api:4000/platform
+      NEXT_PUBLIC_API_URL: http://host.docker.internal:4000/platform
     depends_on:
       - platform-api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   platform-api-data:

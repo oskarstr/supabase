@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 
 import platformRoutes from './routes/platform'
+import cors from '@fastify/cors'
 
 const server = Fastify({
   logger: {
@@ -15,6 +16,10 @@ const host = process.env.HOST ?? '0.0.0.0'
 
 async function start() {
   try {
+    await server.register(cors, {
+      origin: true,
+      credentials: true,
+    })
     await server.register(platformRoutes)
     await server.listen({ port, host })
     server.log.info(`Platform API listening on http://${host}:${port}`)
