@@ -7,6 +7,7 @@ services:
       PLATFORM_API_REPO_ROOT: /workspace
       PORT: "4210"
       HOST: "0.0.0.0"
+      CI: "true"
     volumes:
       - ..:/workspace
       - platform-api-data:/workspace/apps/platform-api/data
