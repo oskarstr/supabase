@@ -200,10 +200,18 @@ interface State {
   organizations: Organization[]
   projects: InternalProject[]
   nextProjectId: number
+  projectRuntimes: Record<string, ProjectRuntime>
 }
 
 const DATA_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../data')
 const STATE_FILE = resolve(DATA_DIR, 'state.json')
+const PROJECTS_ROOT = resolve(DATA_DIR, 'projects')
+
+interface ProjectRuntime {
+  ref: string
+  rootDir: string
+  createdAt: string
+}
 
 const DEFAULT_ORG_ID = 1
 const DEFAULT_ORG_SLUG = 'local-org'
@@ -244,10 +252,15 @@ const baseOrganizations: Organization[] = [
 
 const nowIso = () => new Date().toISOString()
 
-function ensureDataDir() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true })
+function ensureDir(path: string) {
+  if (!existsSync(path)) {
+    mkdirSync(path, { recursive: true })
   }
+}
+
+function ensureDataDir() {
+  ensureDir(DATA_DIR)
+  ensureDir(PROJECTS_ROOT)
 }
 
 function defaultState(): State {
@@ -277,6 +290,13 @@ function defaultState(): State {
     organizations: baseOrganizations.map((org) => ({ ...org })),
     projects: [defaultProject],
     nextProjectId: defaultProject.id + 1,
+    projectRuntimes: {
+      [defaultProject.ref]: {
+        ref: defaultProject.ref,
+        rootDir: '',
+        createdAt: nowIso(),
+      },
+    },
   }
 }
 
@@ -311,6 +331,18 @@ function loadState(): State {
         : baseOrganizations.map((org) => ({ ...org })),
     projects,
     nextProjectId,
+    projectRuntimes:
+      raw.projectRuntimes && typeof raw.projectRuntimes === 'object'
+        ? (raw.projectRuntimes as Record<string, ProjectRuntime>)
+        : projects.length > 0
+          ? {
+              [projects[0].ref]: {
+                ref: projects[0].ref,
+                rootDir: '',
+                createdAt: nowIso(),
+              },
+            }
+          : {},
   }
 }
 
@@ -320,6 +352,32 @@ function saveState(current: State) {
 }
 
 const state = loadState()
+
+function ensureProjectRuntime(ref: string): ProjectRuntime {
+  const existing = state.projectRuntimes[ref]
+  if (existing) return existing
+
+  ensureDir(PROJECTS_ROOT)
+  const rootDir = resolve(PROJECTS_ROOT, ref)
+  ensureDir(rootDir)
+
+  const runtime: ProjectRuntime = {
+    ref,
+    rootDir,
+    createdAt: nowIso(),
+  }
+
+  state.projectRuntimes[ref] = runtime
+  saveState(state)
+  return runtime
+}
+
+function removeProjectRuntime(ref: string) {
+  if (state.projectRuntimes[ref]) {
+    delete state.projectRuntimes[ref]
+    saveState(state)
+  }
+}
 
 function updateProject(ref: string, updater: (project: InternalProject) => InternalProject | void) {
   const index = state.projects.findIndex((project) => project.ref === ref)
@@ -333,7 +391,12 @@ function updateProject(ref: string, updater: (project: InternalProject) => Inter
   saveState(state)
 }
 
-async function scheduleProvisioning(project: InternalProject, org: Organization, dbPass: string) {
+async function scheduleProvisioning(
+  project: InternalProject,
+  org: Organization,
+  dbPass: string,
+  runtime: ProjectRuntime
+) {
   try {
     await provisionProjectStack({
       ref: project.ref,
@@ -342,6 +405,7 @@ async function scheduleProvisioning(project: InternalProject, org: Organization,
       cloudProvider: project.cloud_provider,
       region: project.region,
       databasePassword: dbPass,
+      projectRoot: runtime.rootDir,
     })
 
     updateProject(project.ref, (current) => ({
@@ -358,12 +422,13 @@ async function scheduleProvisioning(project: InternalProject, org: Organization,
   }
 }
 
-async function scheduleRemoval(project: InternalProject, org: Organization) {
+async function scheduleRemoval(project: InternalProject, org: Organization, runtime: ProjectRuntime) {
   try {
     await destroyProjectStack({
       ref: project.ref,
       name: project.name,
       organizationSlug: org.slug,
+      projectRoot: runtime.rootDir,
     })
 
     const removalIndex = state.projects.findIndex((item) => item.ref === project.ref)
@@ -371,6 +436,7 @@ async function scheduleRemoval(project: InternalProject, org: Organization) {
       state.projects.splice(removalIndex, 1)
       saveState(state)
     }
+    removeProjectRuntime(project.ref)
   } catch (error) {
     console.error('[platform-api] destruction failed', project.ref, error)
     updateProject(project.ref, (current) => ({
@@ -497,6 +563,8 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
   state.projects.push(project)
   saveState(state)
 
+  const runtime = ensureProjectRuntime(project.ref)
+
   const response: CreateProjectResponse = {
     anon_key: project.anonKey,
     cloud_provider: project.cloud_provider,
@@ -517,7 +585,7 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
     subscription_id: detail.subscription_id,
   }
 
-  scheduleProvisioning(project, org, body.db_pass).catch((error) => {
+  scheduleProvisioning(project, org, body.db_pass, runtime).catch((error) => {
     console.error('[platform-api] provisioning task error', error)
   })
 
@@ -532,7 +600,8 @@ export function deleteProject(ref: string): RemoveProjectResponse | undefined {
   if (!org) return undefined
 
   updateProject(ref, (current) => ({ ...current, status: 'GOING_DOWN' }))
-  scheduleRemoval(project, org).catch((error) => {
+  const runtime = ensureProjectRuntime(project.ref)
+  scheduleRemoval(project, org, runtime).catch((error) => {
     console.error('[platform-api] destruction task error', error)
   })
 

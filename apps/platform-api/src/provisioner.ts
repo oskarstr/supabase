@@ -7,12 +7,14 @@ export interface ProvisionContext {
   cloudProvider: string
   region: string
   databasePassword: string
+  projectRoot: string
 }
 
 export interface DestroyContext {
   ref: string
   name: string
   organizationSlug: string
+  projectRoot: string
 }
 
 const parseDelay = (value: string | undefined, fallback: number) => {
@@ -23,34 +25,83 @@ const parseDelay = (value: string | undefined, fallback: number) => {
 const PROVISION_DELAY_MS = parseDelay(process.env.PROVISIONING_DELAY_MS, 1_000)
 const DESTRUCTION_DELAY_MS = parseDelay(process.env.DESTRUCTION_DELAY_MS, 1_000)
 
+function renderTemplate(template: string, context: Record<string, string>) {
+  return template.replace(/\{(\w+)\}/g, (_match, key: string) => context[key] ?? '')
+}
+
+async function runCommand(commandTemplate: string, context: Record<string, string>) {
+  const command = renderTemplate(commandTemplate, context)
+  const { spawn } = await import('node:child_process')
+
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(command, {
+      stdio: 'inherit',
+      shell: true,
+      env: {
+        ...process.env,
+        ...context,
+      },
+    })
+
+    child.on('error', reject)
+    child.on('exit', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`Command '${command}' exited with code ${code}`))
+    })
+  })
+}
+
 export async function provisionProjectStack(context: ProvisionContext) {
-  if (process.env.PLATFORM_API_LOG_PROVISIONING === 'true') {
+  const logEnabled = process.env.PLATFORM_API_LOG_PROVISIONING === 'true'
+  if (logEnabled) {
     console.log('[provisioning] start', context)
   }
 
-  await sleep(PROVISION_DELAY_MS)
-
-  if (process.env.FAIL_PROVISIONING === 'true') {
-    throw new Error('Provisioning failed due to FAIL_PROVISIONING flag')
+  const provisionCommand = process.env.PLATFORM_API_PROVISION_CMD
+  if (provisionCommand) {
+    await runCommand(provisionCommand, {
+      PROJECT_REF: context.ref,
+      PROJECT_NAME: context.name,
+      PROJECT_ORG: context.organizationSlug,
+      PROJECT_CLOUD_PROVIDER: context.cloudProvider,
+      PROJECT_REGION: context.region,
+      PROJECT_DB_PASSWORD: context.databasePassword,
+      PROJECT_ROOT: context.projectRoot,
+    })
+  } else {
+    await sleep(PROVISION_DELAY_MS)
+    if (process.env.FAIL_PROVISIONING === 'true') {
+      throw new Error('Provisioning failed due to FAIL_PROVISIONING flag')
+    }
   }
 
-  if (process.env.PLATFORM_API_LOG_PROVISIONING === 'true') {
+  if (logEnabled) {
     console.log('[provisioning] complete', context.ref)
   }
 }
 
 export async function destroyProjectStack(context: DestroyContext) {
-  if (process.env.PLATFORM_API_LOG_PROVISIONING === 'true') {
+  const logEnabled = process.env.PLATFORM_API_LOG_PROVISIONING === 'true'
+  if (logEnabled) {
     console.log('[provisioning] destroy start', context)
   }
 
-  await sleep(DESTRUCTION_DELAY_MS)
-
-  if (process.env.FAIL_DESTRUCTION === 'true') {
-    throw new Error('Destruction failed due to FAIL_DESTRUCTION flag')
+  const destroyCommand = process.env.PLATFORM_API_DESTROY_CMD
+  if (destroyCommand) {
+    await runCommand(destroyCommand, {
+      PROJECT_REF: context.ref,
+      PROJECT_NAME: context.name,
+      PROJECT_ORG: context.organizationSlug,
+      PROJECT_ROOT: context.projectRoot,
+    })
+  } else {
+    await sleep(DESTRUCTION_DELAY_MS)
+    if (process.env.FAIL_DESTRUCTION === 'true') {
+      throw new Error('Destruction failed due to FAIL_DESTRUCTION flag')
+    }
   }
 
-  if (process.env.PLATFORM_API_LOG_PROVISIONING === 'true') {
+  if (logEnabled) {
     console.log('[provisioning] destroy complete', context.ref)
   }
 }
