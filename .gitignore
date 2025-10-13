@@ -125,6 +125,7 @@ next-env.d.ts
 **/supabase/.branches
 **/supabase/.temp
 apps/platform-api/dist
+apps/platform-api/data/
 
 apps/new-docs/*
 

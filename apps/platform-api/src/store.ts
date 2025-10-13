@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 type CloudProvider = 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS'
 
@@ -181,16 +184,29 @@ export interface GetSubscriptionResponse {
     name: string
   }
   project_addons: unknown[]
-  scheduled_plan_change?: unknown
+  scheduled_plan_change: null
   usage_billing_enabled: boolean
 }
 
-const nowIso = () => new Date().toISOString()
+type InternalProject = ProjectDetail & {
+  anonKey: string
+  serviceKey: string
+}
+
+interface State {
+  profile: Profile
+  organizations: Organization[]
+  projects: InternalProject[]
+  nextProjectId: number
+}
+
+const DATA_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../data')
+const STATE_FILE = resolve(DATA_DIR, 'state.json')
 
 const DEFAULT_ORG_ID = 1
 const DEFAULT_ORG_SLUG = 'local-org'
 
-const profile: Profile = {
+const baseProfile: Profile = {
   auth0_id: 'local|user',
   disabled_features: [],
   first_name: 'Local',
@@ -205,7 +221,7 @@ const profile: Profile = {
   username: 'admin',
 }
 
-const organizations: Organization[] = [
+const baseOrganizations: Organization[] = [
   {
     billing_email: null,
     billing_partner: null,
@@ -224,62 +240,104 @@ const organizations: Organization[] = [
   },
 ]
 
-type InternalProject = ProjectDetail & {
-  anonKey: string
-  serviceKey: string
+const nowIso = () => new Date().toISOString()
+
+function ensureDataDir() {
+  if (!existsSync(DATA_DIR)) {
+    mkdirSync(DATA_DIR, { recursive: true })
+  }
 }
 
-const projects = new Map<string, InternalProject>()
-let projectIdCounter = 1
-
-function seedDefaultProject() {
-  const ref = 'local-project'
-  const detail: ProjectDetail = {
+function defaultState(): State {
+  const defaultProject: InternalProject = {
     cloud_provider: 'AWS',
     connectionString: null,
     db_host: 'localhost',
     dbVersion: '15',
-    id: projectIdCounter,
+    id: DEFAULT_ORG_ID,
     infra_compute_size: 'micro',
     inserted_at: nowIso(),
     is_branch_enabled: false,
     is_physical_backups_enabled: false,
     name: 'Local Project',
     organization_id: DEFAULT_ORG_ID,
-    ref,
+    ref: 'local-project',
     region: 'local',
     restUrl: 'http://localhost:54321/rest/v1/',
     status: 'ACTIVE_HEALTHY',
     subscription_id: randomUUID(),
-  }
-
-  const project: InternalProject = {
-    ...detail,
     anonKey: randomUUID(),
     serviceKey: randomUUID(),
   }
 
-  projects.set(ref, project)
+  return {
+    profile: { ...baseProfile },
+    organizations: baseOrganizations.map((org) => ({ ...org })),
+    projects: [defaultProject],
+    nextProjectId: defaultProject.id + 1,
+  }
 }
 
-seedDefaultProject()
+function loadState(): State {
+  ensureDataDir()
+  if (!existsSync(STATE_FILE)) {
+    const initial = defaultState()
+    saveState(initial)
+    return initial
+  }
+
+  const raw = JSON.parse(readFileSync(STATE_FILE, 'utf-8')) as Partial<State>
+
+  const rawProjects = Array.isArray(raw.projects) ? raw.projects : []
+  const projects = rawProjects.map((project) => ({
+    ...project,
+    anonKey: project.anonKey ?? randomUUID(),
+    serviceKey: project.serviceKey ?? randomUUID(),
+  }))
+
+  const nextProjectId =
+    raw.nextProjectId ?? projects.reduce((max, project) => Math.max(max, project.id), 0) + 1
+
+  return {
+    profile:
+      raw.profile && typeof raw.profile === 'object'
+        ? (raw.profile as Profile)
+        : { ...baseProfile },
+    organizations:
+      Array.isArray(raw.organizations) && raw.organizations.length > 0
+        ? raw.organizations.map((org) => ({ ...org }))
+        : baseOrganizations.map((org) => ({ ...org })),
+    projects,
+    nextProjectId,
+  }
+}
+
+function saveState(current: State) {
+  ensureDataDir()
+  writeFileSync(STATE_FILE, JSON.stringify(current, null, 2), 'utf-8')
+}
+
+const state = loadState()
 
 export function getProfile() {
-  return profile
+  return state.profile
 }
 
 export function listOrganizations() {
-  return organizations
+  return state.organizations
 }
 
 export function listProjectDetails(): ProjectDetail[] {
-  return Array.from(projects.values()).map(({ anonKey: _anon, serviceKey: _svc, ...detail }) => detail)
+  return state.projects.map(({ anonKey: _anon, serviceKey: _service, ...detail }) => ({
+    ...detail,
+  }))
 }
 
-export function getSubscription(): GetSubscriptionResponse {
+export function getSubscriptionForOrg(org: Organization): GetSubscriptionResponse {
   return {
     addons: [],
     billing_cycle_anchor: 0,
+    billing_partner: org.billing_partner as GetSubscriptionResponse['billing_partner'],
     billing_via_partner: false,
     cached_egress_enabled: false,
     current_period_end: 0,
@@ -287,17 +345,18 @@ export function getSubscription(): GetSubscriptionResponse {
     customer_balance: 0,
     next_invoice_at: 0,
     payment_method_type: 'card',
-    plan: { id: 'enterprise', name: 'Enterprise' },
+    plan: { ...org.plan },
     project_addons: [],
-    usage_billing_enabled: false,
+    scheduled_plan_change: null,
+    usage_billing_enabled: org.usage_billing_enabled,
   }
 }
 
 export function listOrganizationProjects(slug: string): OrganizationProjectsResponse | undefined {
-  const org = organizations.find((o) => o.slug === slug)
+  const org = state.organizations.find((organization) => organization.slug === slug)
   if (!org) return undefined
 
-  const orgProjects = Array.from(projects.values()).filter((project) => project.organization_id === org.id)
+  const orgProjects = state.projects.filter((project) => project.organization_id === org.id)
 
   return {
     pagination: {
@@ -327,20 +386,21 @@ export function listOrganizationProjects(slug: string): OrganizationProjectsResp
 }
 
 export function getProject(ref: string): ProjectDetail | undefined {
-  const project = projects.get(ref)
+  const project = state.projects.find((item) => item.ref === ref)
   if (!project) return undefined
+
   const { anonKey: _anon, serviceKey: _svc, ...detail } = project
-  return detail
+  return { ...detail }
 }
 
 export function createProject(body: CreateProjectBody): CreateProjectResponse {
-  const org = organizations.find((o) => o.slug === body.organization_slug)
+  const org = state.organizations.find((organization) => organization.slug === body.organization_slug)
   if (!org) {
     throw new Error(`Organization ${body.organization_slug} not found`)
   }
 
-  projectIdCounter += 1
-  const ref = body.name.toLowerCase().replace(/[^a-z0-9-]/g, '-') || `proj-${projectIdCounter}`
+  const projectId = state.nextProjectId++
+  const ref = body.name.toLowerCase().replace(/[^a-z0-9-]/g, '-') || `proj-${projectId}`
   const insertedAt = nowIso()
 
   const region =
@@ -353,7 +413,7 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
     connectionString: null,
     db_host: `${ref}.db.local`,
     dbVersion: body.postgres_engine ?? '15',
-    id: projectIdCounter,
+    id: projectId,
     infra_compute_size: body.desired_instance_size ?? 'micro',
     inserted_at: insertedAt,
     is_branch_enabled: false,
@@ -373,7 +433,8 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
     serviceKey: randomUUID(),
   }
 
-  projects.set(ref, project)
+  state.projects.push(project)
+  saveState(state)
 
   return {
     anon_key: project.anonKey,
@@ -397,10 +458,11 @@ export function createProject(body: CreateProjectBody): CreateProjectResponse {
 }
 
 export function deleteProject(ref: string): RemoveProjectResponse | undefined {
-  const project = projects.get(ref)
-  if (!project) return undefined
+  const index = state.projects.findIndex((project) => project.ref === ref)
+  if (index === -1) return undefined
 
-  projects.delete(ref)
+  const [project] = state.projects.splice(index, 1)
+  saveState(state)
 
   return {
     id: project.id,
