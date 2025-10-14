@@ -1,5 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 
+import { getAuthConfig, updateAuthConfig, updateAuthHooks } from '../store/index.js'
+
 const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '')
 
 const readEnv = (key: string) => {
@@ -28,6 +30,27 @@ type SignUpBody = {
 }
 
 const authRoutes: FastifyPluginAsync = async (app) => {
+  app.get<{ Params: { ref: string } }>(
+    '/:ref/config',
+    async (request, reply) => {
+      return reply.send(getAuthConfig(request.params.ref))
+    }
+  )
+
+  app.patch<{ Params: { ref: string }; Body: unknown }>(
+    '/:ref/config',
+    async (request, reply) => {
+      return reply.send(updateAuthConfig(request.params.ref, request.body))
+    }
+  )
+
+  app.patch<{ Params: { ref: string }; Body: unknown }>(
+    '/:ref/config/hooks',
+    async (request, reply) => {
+      return reply.send(updateAuthHooks(request.params.ref, request.body))
+    }
+  )
+
   app.post<{ Body: SignUpBody }>('/signup', async (request, reply) => {
     const { email, password, redirectTo, hcaptchaToken } = request.body
 

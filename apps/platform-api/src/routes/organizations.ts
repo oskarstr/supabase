@@ -11,6 +11,10 @@ import {
   listAvailableVersionsForOrganization,
   listMembersReachedFreeProjectLimit,
   listOAuthApps,
+  listOrganizationDailyUsage,
+  listOrganizationInvitations,
+  listOrganizationMembers,
+  listOrganizationRoles,
   listOrganizationInvoices,
   listOrganizationPayments,
   listOrganizationProjects,
@@ -21,8 +25,12 @@ import {
 import type {
   CloudProvider,
   CustomerProfileSummary,
+  OrgDailyUsageResponse,
   InvoiceSummary,
   MemberWithFreeProjectLimit,
+  OrganizationInvitationsResponse,
+  OrganizationMember,
+  OrganizationRolesResponse,
   OrgUsageResponse,
   Organization,
   PaymentMethodSummary,
@@ -61,6 +69,42 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
     }
     return reply.send(result)
   })
+
+  app.get<{ Params: { slug: string }; Reply: OrganizationMember[] | { message: string } }>(
+    '/:slug/members',
+    async (request, reply) => {
+      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      if (!org) {
+        return reply.code(404).send({ message: 'Organization not found' })
+      }
+      return reply.send(listOrganizationMembers(request.params.slug))
+    }
+  )
+
+  app.get<{ Params: { slug: string }; Reply: OrganizationRolesResponse | { message: string } }>(
+    '/:slug/roles',
+    async (request, reply) => {
+      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      if (!org) {
+        return reply.code(404).send({ message: 'Organization not found' })
+      }
+      return reply.send(listOrganizationRoles(request.params.slug))
+    }
+  )
+
+  app.get<{
+    Params: { slug: string }
+    Reply: OrganizationInvitationsResponse | { message: string }
+  }>(
+    '/:slug/members/invitations',
+    async (request, reply) => {
+      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      if (!org) {
+        return reply.code(404).send({ message: 'Organization not found' })
+      }
+      return reply.send(listOrganizationInvitations(request.params.slug))
+    }
+  )
 
   app.get<{
     Params: { slug: string }
@@ -108,6 +152,23 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
         return reply.code(404).send({ message: 'Organization not found' })
       }
       return reply.send(usage)
+    }
+  )
+
+  app.get<{
+    Params: { slug: string }
+    Querystring: { start?: string; end?: string }
+    Reply: OrgDailyUsageResponse | { message: string }
+  }>(
+    '/:slug/usage/daily',
+    async (request, reply) => {
+      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      if (!org) {
+        return reply.code(404).send({ message: 'Organization not found' })
+      }
+      return reply.send(
+        listOrganizationDailyUsage(request.params.slug, request.query.start, request.query.end)
+      )
     }
   )
 

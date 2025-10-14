@@ -2,6 +2,8 @@ export * from './types.js'
 
 export { auditAccountLogin, getProfile } from './profile.js'
 
+export { getAuthConfig, updateAuthConfig, updateAuthHooks } from './auth-config.js'
+
 export {
   createOrganization,
   getOrganizationDetail,
@@ -28,7 +30,7 @@ export { listPermissions } from './permissions.js'
 
 export { listProjectResourceWarnings } from './resource-warnings.js'
 
-export { getNotificationsSummary } from './notifications.js'
+export { getNotificationsSummary, listNotifications } from './notifications.js'
 
 export {
   getOrganizationUsage,
@@ -42,6 +44,7 @@ export {
   listOrganizationIntegrations,
   listUserIntegrations,
   getGitHubAuthorization,
+  listGitHubRepositories,
 } from './integrations.js'
 
 export { listAccessTokens, createAccessToken, getAccessToken, deleteAccessToken } from './access-tokens.js'
@@ -59,6 +62,41 @@ export {
   listAvailablePlans,
 } from './org-billing.js'
 
+export { listDatabaseBackups } from './database.js'
+
+export {
+  getProjectPostgrestConfig,
+  getProjectRealtimeConfig,
+  getProjectPgbouncerConfig,
+  getProjectPgbouncerStatus,
+  getProjectStorageConfig,
+  listProjectSupavisorPools,
+  getProjectConnectionString,
+} from './project-config.js'
+
+export {
+  listProjectContent,
+  listProjectContentFolders,
+  getProjectContentCounts,
+} from './project-content.js'
+
+export { getProjectRestDefinition, createTemporaryApiKey } from './project-api.js'
+
+export {
+  listProjectLogs,
+  listProjectLogDrains,
+  listUsageApiCounts,
+  listUsageApiRequests,
+} from './project-analytics.js'
+
+export {
+  getProjectDiskAttributes,
+  getProjectDiskAutoscaleConfig,
+  getProjectDiskUtilization,
+} from './project-disk.js'
+
+export { listProjectLoadBalancers } from './project-load-balancers.js'
+
 export {
   getProjectSettings,
   listProjectAddons,
@@ -67,6 +105,33 @@ export {
   listProjectTables,
   getJwtSecretUpdateStatus,
 } from './project-info.js'
+
+export {
+  listPgMetaColumnPrivileges,
+  listPgMetaExtensions,
+  listPgMetaForeignTables,
+  listPgMetaMaterializedViews,
+  listPgMetaPolicies,
+  listPgMetaPublications,
+  listPgMetaTriggers,
+  listPgMetaTypes,
+  listPgMetaViews,
+  runPgMetaQuery,
+} from './pg-meta.js'
+
+export {
+  listStorageBuckets,
+  getStorageCredentials,
+  listStorageObjects,
+  createStoragePublicUrl,
+} from './storage.js'
+
+export {
+  listOrganizationMembers,
+  listOrganizationRoles,
+  listOrganizationInvitations,
+  listOrganizationDailyUsage,
+} from './organization-members.js'
 
 export {
   getFeatureFlags,
@@ -79,3 +144,7 @@ export {
   recordTelemetryPageLeave,
   resetTelemetry,
 } from './telemetry.js'
+
+export { getPlatformStatus } from './status.js'
+
+export { listReplicationSources } from './replication.js'

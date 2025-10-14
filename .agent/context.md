@@ -13,6 +13,7 @@
   - Introduced a dedicated Studio platform build (`scripts/build-platform-studio.sh`, `apps/studio/.env.platform`, `docker/Dockerfile.studio-platform`) and taught `.dockerignore` to keep the standalone output.
   - Dashboard basic-auth can now be toggled via `PLATFORM_DASHBOARD_BASIC_AUTH_ENABLED`; the compose overlay injects the setting so local installs can disable Kong’s prompt without patching upstream files.
   - Split the monolithic Fastify route module into resource-specific plugins (`routes/profile.ts`, `routes/projects.ts`, etc.) to mirror upstream structure and keep future changes isolated.
+  - Stubbed the remaining Studio-facing `/platform/**` endpoints (analytics, disk, storage, auth, integrations, replication) and added a Vitest harness (`apps/platform-api/tests/platform.routes.test.ts`) so future regressions are caught instead of silently 404ing.
 - Current status / open issues:
   - by logging in you see a random list of projects. 
   - Provisioning currently stubs out CLI execution; Supabase CLI/Docker automation still needs to be wired in so additional projects create full stacks.

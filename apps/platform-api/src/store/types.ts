@@ -312,6 +312,83 @@ export interface NotificationsSummary {
   unread_count: number
 }
 
+export interface NotificationV2 {
+  data: Record<string, unknown> | null
+  id: string
+  inserted_at: string
+  meta: Record<string, unknown> | null
+  name: string
+  priority: 'Critical' | 'Warning' | 'Info'
+  status: 'new' | 'seen' | 'archived'
+}
+
+export type AuthConfig = Record<string, string | boolean | number | null | string[]>
+
+export interface ProjectContentItem {
+  id: string
+  owner_id: number
+  name: string
+  description: string
+  type: string
+  visibility: 'user' | 'project'
+  content: {
+    content_id: string
+    sql: string
+    schema_version: string
+    favorite: boolean
+  }
+  inserted_at: string
+  updated_at: string
+  project_id: number
+  favorite: boolean
+  owner?: {
+    id: number
+    username: string
+  }
+  updated_by?: {
+    id: number
+    username: string
+  }
+}
+
+export interface ProjectContentListResponse {
+  data: ProjectContentItem[]
+}
+
+export interface ProjectContentFoldersResponse {
+  data: {
+    folders: unknown[]
+    contents: ProjectContentItem[]
+  }
+}
+
+export interface ProjectContentCountSummary {
+  shared: number
+  favorites: number
+  private: number
+}
+
+export interface ProjectLogDrainSummary {
+  id: string
+  name: string
+  description: string
+  type: string
+}
+
+export interface ProjectLogsResponse {
+  result: Array<Record<string, unknown>>
+}
+
+export interface UsageApiCountSummary {
+  result: Array<{
+    total_auth_requests: number
+    total_storage_requests: number
+    total_rest_requests: number
+    total_realtime_requests: number
+    timestamp: string
+  }>
+}
+
 export interface OrgUsageMetric {
   available_in_plan: boolean
   capped: boolean
@@ -330,6 +407,102 @@ export interface MemberWithFreeProjectLimit {
   free_project_limit: number
   primary_email: string
   username: string
+}
+
+export interface OrganizationMember {
+  gotrue_id: string
+  is_sso_user: boolean | null
+  metadata: Record<string, unknown>
+  mfa_enabled: boolean
+  primary_email: string | null
+  role_ids: number[]
+  username: string
+}
+
+export interface OrganizationRole {
+  base_role_id: number
+  description: string | null
+  id: number
+  name: string
+  project_ids: number[] | null
+}
+
+export interface OrganizationRolesResponse {
+  org_scoped_roles: OrganizationRole[]
+  project_scoped_roles: OrganizationRole[]
+}
+
+export interface OrganizationInvitationsResponse {
+  invitations: {
+    id: number
+    invited_at: string
+    invited_email: string
+    role_id: number
+  }[]
+}
+
+export interface OrgDailyUsageEntry {
+  metric: string
+  date: string
+  usage: number
+  usage_original: number
+  available_in_plan: boolean
+  capped: boolean
+  cost: number
+  breakdown: Record<string, number> | null
+}
+
+export interface OrgDailyUsageResponse {
+  usages: OrgDailyUsageEntry[]
+}
+
+export interface DiskAttributes {
+  size_gb: number
+  used_bytes: number
+  last_modified_at: string
+  type: string
+}
+
+export interface DiskAutoscaleConfig {
+  enabled: boolean
+  min_disk_size_gb: number | null
+  max_disk_size_gb: number | null
+}
+
+export interface DiskUtilizationSample {
+  period_start: string
+  period_end: string
+  used_bytes: number
+  provisioned_bytes: number
+}
+
+export interface DiskUtilizationResponse {
+  data: DiskUtilizationSample[]
+}
+
+export interface LoadBalancerSummary {
+  endpoint: string
+  databases: Array<{
+    identifier: string
+    status: string
+    type: 'PRIMARY' | 'READ_REPLICA'
+  }>
+}
+
+export interface DatabaseBackupSummary {
+  id: number
+  status: string
+  created_at: string
+}
+
+export interface GithubRepositorySummary {
+  id: number
+  name: string
+  full_name: string
+}
+
+export interface StoragePublicUrlResponse {
+  publicUrl: string
 }
 
 export interface OverdueInvoiceCount {
@@ -487,6 +660,109 @@ export interface ProjectSettingsSummary {
   }[]
   ssl_enforced: boolean
   status: string
+}
+
+export interface PostgrestConfigResponse {
+  db_anon_role: string
+  db_extra_search_path: string
+  db_schema: string
+  jwt_secret: string
+  max_rows: number
+  role_claim_key: string
+}
+
+export interface RealtimeConfigResponse {
+  private_only: boolean | null
+  connection_pool: number | null
+  max_concurrent_users: number | null
+  max_events_per_second: number | null
+  max_bytes_per_second: number | null
+  max_channels_per_client: number | null
+  max_joins_per_second: number | null
+}
+
+export interface PgbouncerConfigResponse {
+  connection_string: string
+  db_dns_name: string
+  db_host: string
+  db_name: string
+  db_port: number
+  db_user: string
+  default_pool_size?: number
+  ignore_startup_parameters?: string
+  inserted_at: string
+  max_client_conn?: number
+  pgbouncer_enabled: boolean
+  pool_mode: 'transaction' | 'session' | 'statement'
+  query_wait_timeout?: number
+  reserve_pool_size?: number
+  server_idle_timeout?: number
+  server_lifetime?: number
+  ssl_enforced: boolean
+}
+
+export interface PgbouncerStatusResponse {
+  active: boolean
+}
+
+export interface StorageConfigResponse {
+  capabilities: {
+    iceberg_catalog: boolean
+    list_v2: boolean
+  }
+  external: {
+    upstreamTarget: 'main' | 'canary'
+  }
+  features: {
+    icebergCatalog?: { enabled: boolean }
+    imageTransformation: { enabled: boolean }
+    s3Protocol: { enabled: boolean }
+  }
+  fileSizeLimit: number
+}
+
+export interface SupavisorConfigResponse {
+  connection_string: string
+  connectionString: string
+  database_type: 'PRIMARY' | 'READ_REPLICA'
+  db_host: string
+  db_name: string
+  db_port: number
+  db_user: string
+  default_pool_size: number | null
+  identifier: string
+  is_using_scram_auth: boolean
+  max_client_conn: number | null
+  pool_mode: 'transaction' | 'session'
+}
+
+export interface StorageBucketSummary {
+  id: string
+  name: string
+  owner: string
+  public: boolean
+  created_at: string
+  updated_at: string
+  allowed_mime_types?: string[]
+  file_size_limit?: number
+  type?: 'STANDARD' | 'ANALYTICS'
+}
+
+export interface StorageCredentialsResponse {
+  data: Array<{
+    id: string
+    description: string
+    created_at: string
+  }>
+}
+
+export interface ReplicationSourceSummary {
+  id: string
+  name: string
+  type: string
+  status: string
+  created_at: string
+  updated_at: string
 }
 
 export interface ProjectAddonVariantSummary {

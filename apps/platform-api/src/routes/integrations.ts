@@ -5,6 +5,7 @@ import {
   listGitHubConnections,
   listOrganizationIntegrations,
   listUserIntegrations,
+  listGitHubRepositories,
 } from '../store/index.js'
 import type { ListGitHubConnectionsResponse } from '../store/index.js'
 
@@ -34,6 +35,10 @@ const integrationsRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ message: 'organization_id must be a number' })
     }
     return reply.send(listGitHubConnections(organizationId))
+  })
+
+  app.get('/github/repositories', async (_request, reply) => {
+    return reply.send(listGitHubRepositories())
   })
 }
 

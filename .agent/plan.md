@@ -18,6 +18,8 @@
 - Routed Studio authentication through Kong (anon consumer patch + `/api/platform/signup` proxy) so UI signup/login now mirrors production.
 - TODO: invoke Supabase CLI / docker compose templates to actually start/stop per-project stacks and manage port allocation.
 - TODO: align `.env` defaults for platform mode—current upstream template misses required variables (`POSTGRES_HOST`, `JWT_SECRET`, etc.). We added `.env.platform.example`, but the base compose still warns when users copy without filling the extra values. Clarify/automate this setup.
+- *Note from Codex (GPT-5, new agent):* Provisioner currently shells out via `PLATFORM_API_PROVISION_CMD`, but the platform-api container lacks the Supabase CLI and Docker socket. Recommend baking the CLI into the image (or mounting it) and wiring the socket so provisioning commands like `supabase init/start` can run in-container for both local and eventual cloud targets. This keeps the hook abstraction while avoiding brittle host-only scripts.
+- *Update (Codex):* Stubbed additional analytics, disk, storage, auth, and integration endpoints so Studio no longer 404s (e.g. `/analytics/log-drains`, `/disk/*`, `/auth/{ref}/config`). Replace these placeholders with real service integrations once available.
 
 ## Phase 5: Docker & Compose Integration ✅ *completed*
 - Production overlay: `docker-compose.platform.yml` adds the platform service (port 4210) and points Studio at it.

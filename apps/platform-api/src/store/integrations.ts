@@ -2,6 +2,7 @@ import type {
   GetOrganizationIntegrationResponse,
   GetUserOrganizationIntegrationResponse,
   ListGitHubConnectionsResponse,
+  GithubRepositorySummary,
 } from './types.js'
 
 export const listUserIntegrations = (): GetUserOrganizationIntegrationResponse[] => []
@@ -21,3 +22,11 @@ export const getGitHubAuthorization = () => ({
   sender_id: 1,
   user_id: 1,
 })
+
+export const listGitHubRepositories = (_query?: string): GithubRepositorySummary[] => [
+  {
+    id: 1,
+    name: 'supabase/platform-api-stub',
+    full_name: 'supabase/platform-api-stub',
+  },
+]
