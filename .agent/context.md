@@ -1,16 +1,24 @@
 # Project Context
 
-- Goal: restore multi-project management to the open-source distribution. Supabase’s hosted platform keeps `/platform` functionality behind their SaaS; we’re rebuilding an equivalent control plane so self-hosted users can create/manage multiple projects via Studio, while still preserving the classic `docker compose up` experience. Also important to note we are trying to preserve ideally all of the upstream code. 
+- Goal: restore multi-project management to the open-source distribution. Supabase’s hosted platform keeps `/platform` functionality behind their SaaS; we’re rebuilding an equivalent control plane so self-hosted users can create/manage multiple projects via Studio, while still preserving the classic `docker compose up` experience. Also important to note we are trying to preserve ideally all of the upstream code while recreating clone of their Saas service. The code should be clean, as little hacks as possible. We have made some changes from upstream by adding new files but the main "server" logic lives in apps/platform-api.
 - Approach to date:
   - Added a new Fastify-based service under `apps/platform-api` that implements the core `/platform/**` routes, persists state, and simulates provisioning.
   - Seed data now comes from `.env` / `docker/.env` so the default org/project mirror upstream config. A new template `docker/.env.platform.example` captures all required variables for platform mode.
   - Background tasks mark new projects `COMING_UP` → `ACTIVE_HEALTHY` (or `INIT_FAILED`) and do the inverse for delete. Generated env files can be read after real provisioning is wired up.
 - Docker integration is handled via `apps/platform-api/Dockerfile` and overlay compose files (`docker/docker-compose.platform.yml` + optional `.platform.dev.yml`). Studio is pointed at the platform API automatically when the overlay is used. We now route all `/api/platform/**` requests through Kong and expose them from Fastify using the `/api/platform` prefix so Studio can talk to the local control plane without source patches.
 - Auth routing mirrors Supabase Cloud: Kong injects the project anon key for `/auth/v1/**` via a startup patch, so Studio’s stock AuthClient works without local modifications. The platform overlay simply appends the `/api/platform` service.
+- Recent updates:
+  - Added a `request-transformer`-less shell patch (pure YAML + entrypoint) so Kong adds the `anonymous: anon` consumer during boot and then merges `kong.platform.yml`.
+  - Restored the platform signup flow end-to-end (`/api/platform/signup` proxy → GoTrue) and confirmed password login works without API headers.
+  - Introduced a dedicated Studio platform build (`scripts/build-platform-studio.sh`, `apps/studio/.env.platform`, `docker/Dockerfile.studio-platform`) and taught `.dockerignore` to keep the standalone output.
+  - Dashboard basic-auth can now be toggled via `PLATFORM_DASHBOARD_BASIC_AUTH_ENABLED`; the compose overlay injects the setting so local installs can disable Kong’s prompt without patching upstream files.
+  - Split the monolithic Fastify route module into resource-specific plugins (`routes/profile.ts`, `routes/projects.ts`, etc.) to mirror upstream structure and keep future changes isolated.
 - Current status / open issues:
+  - by logging in you see a random list of projects. 
   - Provisioning currently stubs out CLI execution; Supabase CLI/Docker automation still needs to be wired in so additional projects create full stacks.
   - Dev overlay (`docker-compose.platform.dev.yml`) runs the API in watch mode but requires the same env file and volume resets as production overlay.
   - Need to codify the Kong patch + Studio build flow in docs so others can reproduce the working login setup quickly.
+  - Platform API still seeds orgs/projects from `apps/platform-api/data/state.json`; long term we’ll migrate that state into a real database so the JSON seed isn’t overloaded.
 - Observations about the collaboration:
   - You prefer the classic docker-compose workflow and want the platform overlay to feel like a seamless “superset” of the usual local setup.
   - You proactively notice mismatches (e.g., default project slug) and press for templates/instructions that keep things ergonomic for future users.
@@ -19,3 +27,7 @@
   - Wire the provisioning hooks to the Supabase CLI (init/start/stop) and capture generated keys/ports.
   - Surface documentation/instructions so users know to build Studio via `pnpm build:studio:platform` (which sources `apps/studio/.env.platform`) and then rebuild the Docker image so the server-side bundle uses Kong-hosted URLs.
   - Investigate aligning Studio’s landing route (e.g. redirect `/` to `/org`) once the default project slug/env are confirmed.
+- how to run: 
+  -pnpm build:studio:platform
+  -docker compose -f docker/docker-compose.yml -f docker/docker-compose.platform.yml build platform-api studio
+  -docker compose -f docker/docker-compose.yml -f docker/docker-compose.platform.yml up -d platform-api studio kong

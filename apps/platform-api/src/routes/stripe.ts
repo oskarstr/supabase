@@ -1,0 +1,12 @@
+import type { FastifyPluginAsync } from 'fastify'
+
+import { listOverdueInvoices } from '../store/index.js'
+import type { OverdueInvoiceCount } from '../store/index.js'
+
+const stripeRoutes: FastifyPluginAsync = async (app) => {
+  app.get<{ Reply: OverdueInvoiceCount[] }>('/invoices/overdue', async (_request, reply) => {
+    return reply.send(listOverdueInvoices())
+  })
+}
+
+export default stripeRoutes
