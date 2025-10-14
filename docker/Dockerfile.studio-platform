@@ -1,0 +1,12 @@
+FROM node:22-slim AS production
+ENV NODE_ENV=production
+WORKDIR /app
+
+# Copy Next.js standalone output (must be built beforehand via `pnpm --filter studio exec next build`)
+COPY apps/studio/.next/standalone ./
+COPY apps/studio/.next/static ./apps/studio/.next/static
+COPY apps/studio/public ./apps/studio/public
+
+EXPOSE 3000
+ENTRYPOINT ["node", "apps/studio/server.js"]
+HEALTHCHECK --interval=5s --timeout=5s --retries=3 CMD node -e "fetch('http://localhost:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"

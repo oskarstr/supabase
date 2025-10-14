@@ -1,0 +1,12 @@
+  # Platform overlay additions for Kong declarative config.
+  - name: platform-api
+    _comment: 'Platform API: /api/platform/* -> http://platform-api:4210/api/platform/*'
+    url: http://platform-api:4210
+    routes:
+      - name: platform-api-all
+        strip_path: false
+        paths:
+          - /api/platform
+          - /api/platform/
+    plugins:
+      - name: cors

@@ -7,6 +7,8 @@ services:
       PORT: "4210"
       HOST: "0.0.0.0"
       PLATFORM_API_REPO_ROOT: /workspace
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_GOTRUE_URL: http://kong:8000/auth/v1
     volumes:
       - platform-api-data:/app/apps/platform-api/data
       - ..:/workspace:ro
@@ -16,13 +18,55 @@ services:
     container_name: platform
 
   studio:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.studio-platform
+      args:
+        STUDIO_IMAGE: 2025.10.01-sha-8460121
+    image: supabase-studio-platform:local
     environment:
       NEXT_PUBLIC_IS_PLATFORM: "true"
-      NEXT_PUBLIC_API_URL: http://host.docker.internal:4210/platform
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/platform
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:8000
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE
+      NEXT_PUBLIC_GOTRUE_URL: http://localhost:8000/auth/v1
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_HCAPTCHA_SITE_KEY: 10000000-ffff-ffff-ffff-000000000001
+      NEXT_PUBLIC_ENVIRONMENT: local
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: http://localhost:8000
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE
+      SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJzZXJ2aWNlX3JvbGUiLAogICAgImlzcyI6ICJzdXBhYmFzZS1kZW1vIiwKICAgICJpYXQiOiAxNjQxNzY5MjAwLAogICAgImV4cCI6IDE3OTk1MzU2MDAKfQ.DaYlNEoUrrEn2Ig7tqibS-PHK5vgusbcbo7X36XVt4Q
+      STUDIO_PG_META_URL: http://kong:8000/pg
+      LOGFLARE_URL: http://analytics:4000
+      LOGFLARE_PRIVATE_ACCESS_TOKEN: your-super-secret-and-long-logflare-key-private
+      DOCKER_SOCKET_LOCATION: /var/run/docker.sock
     depends_on:
       - platform-api
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  kong:
+    volumes:
+      - type: bind
+        source: ./volumes/api/kong.platform.yml
+        target: /platform-overlay/kong.platform.yml
+        read_only: true
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+          set -euo pipefail
+          mkdir -p /platform-overlay /home/kong
+          eval "echo \"$$(cat /home/kong/temp.yml)\"" > /home/kong/kong.work.yml
+          awk 'BEGIN{inserted=0} {print; if(!inserted && $0 ~ /hide_credentials: false/){print "          anonymous: anon"; inserted=1}}' /home/kong/kong.work.yml > /home/kong/kong.tmp
+          mv /home/kong/kong.tmp /home/kong/kong.work.yml
+          if [ -s /platform-overlay/kong.platform.yml ]; then
+            printf '\n' >> /home/kong/kong.work.yml
+            eval "echo \"$$(cat /platform-overlay/kong.platform.yml)\"" >> /home/kong/kong.work.yml
+          fi
+          mv /home/kong/kong.work.yml /home/kong/kong.yml
+          exec /docker-entrypoint.sh kong docker-start
 
 volumes:
   platform-api-data:

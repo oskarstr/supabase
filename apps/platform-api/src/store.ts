@@ -36,7 +36,8 @@ const slugify = (value: string) =>
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
 const buildRestUrl = (base: string) => `${trimTrailingSlash(base)}/rest/v1/`
 
-type CloudProvider = 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS'
+export type CloudProvider = 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS'
+export const CLOUD_PROVIDERS: CloudProvider[] = ['AWS', 'FLY', 'AWS_K8S', 'AWS_NIMBUS']
 
 type ComputeSize =
   | 'pico'
@@ -80,6 +81,42 @@ type ProjectStatus =
 type RegionSelection =
   | { code: string; type: 'specific' }
   | { code: 'americas' | 'emea' | 'apac'; type: 'smartGroup' }
+
+type RegionSmartGroup = {
+  code: 'americas' | 'emea' | 'apac'
+  name: string
+  type: 'smartGroup'
+}
+
+type RegionSpecific = {
+  code: string
+  name: string
+  provider: CloudProvider
+  status?: 'capacity' | 'other'
+  type: 'specific'
+}
+
+export interface RegionsInfo {
+  all: {
+    smartGroup: RegionSmartGroup[]
+    specific: RegionSpecific[]
+  }
+  recommendations: {
+    smartGroup: RegionSmartGroup
+    specific: RegionSpecific[]
+  }
+}
+
+type PostgresEngine = '15' | '17' | '17-oriole'
+type ReleaseChannel = 'ga' | 'beta' | 'preview'
+
+export interface AvailableVersionsResponse {
+  available_versions: {
+    postgres_engine: PostgresEngine
+    release_channel: ReleaseChannel
+    version: string
+  }[]
+}
 
 export interface Profile {
   auth0_id: string
@@ -169,6 +206,17 @@ export interface CreateProjectBody {
   organization_slug: string
   postgres_engine?: string
   region_selection?: RegionSelection
+}
+
+export interface CreateOrganizationBody {
+  name: string
+  tier: 'tier_payg' | 'tier_pro' | 'tier_free' | 'tier_team' | 'tier_enterprise'
+  kind?: string
+  size?: string
+  payment_method?: string
+  billing_name?: string | null
+  address?: Record<string, unknown> | null
+  tax_id?: Record<string, unknown> | null
 }
 
 export interface CreateProjectResponse {
@@ -314,6 +362,78 @@ const DEFAULT_PROJECT_SUBSCRIPTION_ID = envString('STUDIO_DEFAULT_PROJECT_SUBSCR
 const DEFAULT_BRANCH_ENABLED = envString('STUDIO_DEFAULT_BRANCH_ENABLED', 'false') === 'true'
 const DEFAULT_PHYSICAL_BACKUPS = envString('STUDIO_DEFAULT_PHYSICAL_BACKUPS', 'false') === 'true'
 
+const REGION_SMART_GROUPS: RegionSmartGroup[] = [
+  { code: 'americas', name: 'Americas', type: 'smartGroup' },
+  { code: 'emea', name: 'Europe, Middle East, and Africa', type: 'smartGroup' },
+  { code: 'apac', name: 'Asia Pacific', type: 'smartGroup' },
+]
+
+const REGION_SPECIFICS: Record<CloudProvider, RegionSpecific[]> = {
+  AWS: [
+    { code: 'aws-us-east-1', name: 'US East 1 (N. Virginia)', provider: 'AWS', type: 'specific' },
+    { code: 'aws-eu-west-1', name: 'EU West 1 (Ireland)', provider: 'AWS', type: 'specific' },
+  ],
+  FLY: [
+    { code: 'fly-ams', name: 'Amsterdam, NL', provider: 'FLY', type: 'specific' },
+    { code: 'fly-iad', name: 'Ashburn, VA', provider: 'FLY', type: 'specific' },
+  ],
+  AWS_K8S: [
+    { code: 'aws-k8s-us-east-1', name: 'US East 1 (K8S)', provider: 'AWS_K8S', type: 'specific' },
+  ],
+  AWS_NIMBUS: [
+    { code: 'aws-nimbus-us-east-1', name: 'US East 1 (Nimbus)', provider: 'AWS_NIMBUS', type: 'specific' },
+  ],
+}
+
+const DEFAULT_AVAILABLE_VERSIONS: AvailableVersionsResponse['available_versions'] = [
+  { postgres_engine: '15', release_channel: 'ga', version: '15.5.0' },
+  { postgres_engine: '17', release_channel: 'beta', version: '17.0.0' },
+  { postgres_engine: '17-oriole', release_channel: 'preview', version: '0.1.0' },
+]
+
+export type OAuthAppType = 'authorized' | 'published'
+
+export interface OAuthAppSummary {
+  id: string
+  name: string
+  website: string
+  registration_type: 'manual' | 'dynamic'
+  scopes: string[]
+  authorized_at?: string
+  client_id?: string
+  created_at?: string
+  created_by?: string
+  redirect_uris?: string[]
+  icon?: string
+}
+
+const DEFAULT_AUTHORIZED_APPS: OAuthAppSummary[] = [
+  {
+    id: 'authorized-app-1',
+    name: 'Local Studio CLI',
+    website: 'https://supabase.local',
+    registration_type: 'manual',
+    scopes: ['projects:read', 'rest:read'],
+    authorized_at: '2024-01-01T00:00:00.000Z',
+    client_id: 'local-cli-client',
+    icon: 'https://supabase.com/_next/image?url=%2Fimages%2Fsupabase-logo-icon.png&w=256&q=75',
+  },
+]
+
+const DEFAULT_PUBLISHED_APPS: OAuthAppSummary[] = [
+  {
+    id: 'published-app-1',
+    name: 'Supabase Studio',
+    website: 'https://supabase.com',
+    registration_type: 'manual',
+    scopes: ['projects:read', 'projects:write'],
+    created_at: '2024-01-01T00:00:00.000Z',
+    created_by: 'local-admin',
+    redirect_uris: ['https://supabase.local/'],
+    icon: 'https://supabase.com/_next/image?url=%2Fimages%2Fsupabase-logo-icon.png&w=256&q=75',
+  },
+]
+
 const baseProfile: Profile = {
   auth0_id: DEFAULT_AUTH0_ID,
   disabled_features: [],
@@ -359,6 +479,36 @@ function ensureDir(path: string) {
 function ensureDataDir() {
   ensureDir(DATA_DIR)
   ensureDir(PROJECTS_ROOT)
+}
+
+function resolveRuntimeRoot(ref: string, candidate?: string) {
+  const trimmed = candidate?.trim()
+  const fallback = resolve(PROJECTS_ROOT, ref)
+
+  const ensureFallback = () => {
+    ensureDir(fallback)
+    return fallback
+  }
+
+  if (!trimmed) {
+    return ensureFallback()
+  }
+
+  if (!trimmed.startsWith(PROJECTS_ROOT)) {
+    return ensureFallback()
+  }
+
+  try {
+    ensureDir(trimmed)
+    return trimmed
+  } catch (error) {
+    console.warn('[platform-api] falling back to project runtime root', {
+      ref,
+      preferred: trimmed,
+      error: error instanceof Error ? error.message : error,
+    })
+    return ensureFallback()
+  }
 }
 
 function defaultState(): State {
@@ -434,8 +584,7 @@ function loadState(): State {
         : {}
 
   for (const [ref, runtime] of Object.entries(projectRuntimes)) {
-    runtime.rootDir = runtime.rootDir && runtime.rootDir.length > 0 ? runtime.rootDir : resolve(PROJECTS_ROOT, ref)
-    ensureDir(runtime.rootDir)
+    runtime.rootDir = resolveRuntimeRoot(ref, runtime.rootDir)
   }
 
   return {
@@ -466,21 +615,16 @@ for (const ref of Object.keys(state.projectRuntimes)) {
 
 function ensureProjectRuntime(ref: string): ProjectRuntime {
   const existing = state.projectRuntimes[ref]
-  ensureDir(PROJECTS_ROOT)
-  const rootDir = resolve(PROJECTS_ROOT, ref)
 
   if (existing) {
-    existing.rootDir = existing.rootDir && existing.rootDir.length > 0 ? existing.rootDir : rootDir
-    ensureDir(existing.rootDir)
+    existing.rootDir = resolveRuntimeRoot(ref, existing.rootDir)
     saveState(state)
     return existing
   }
 
-  ensureDir(rootDir)
-
   const runtime: ProjectRuntime = {
     ref,
-    rootDir,
+    rootDir: resolveRuntimeRoot(ref),
     createdAt: nowIso(),
   }
 
@@ -614,6 +758,38 @@ export function getProfile() {
 
 export function listOrganizations() {
   return state.organizations
+}
+
+export function listOAuthApps(slug: string, type: OAuthAppType): OAuthAppSummary[] | undefined {
+  const org = state.organizations.find((organization) => organization.slug === slug)
+  if (!org) return undefined
+  const source = type === 'authorized' ? DEFAULT_AUTHORIZED_APPS : DEFAULT_PUBLISHED_APPS
+  return source.map((app) => ({ ...app }))
+}
+
+const TIER_TO_PLAN: Record<CreateOrganizationBody['tier'], Organization['plan']['id']> = {
+  tier_free: 'free',
+  tier_payg: 'pro',
+  tier_pro: 'pro',
+  tier_team: 'team',
+  tier_enterprise: 'enterprise',
+}
+
+function nextOrganizationId() {
+  return (
+    state.organizations.reduce((max, organization) => Math.max(max, organization.id), 0) + 1
+  )
+}
+
+function generateUniqueOrgSlug(name: string) {
+  const base = slugify(name) || `org-${randomUUID().slice(0, 8)}`
+  const existing = new Set(state.organizations.map((organization) => organization.slug))
+  if (!existing.has(base)) return base
+  let suffix = 2
+  while (existing.has(`${base}-${suffix}`)) {
+    suffix += 1
+  }
+  return `${base}-${suffix}`
 }
 
 export function listProjectDetails(): ProjectDetail[] {
@@ -771,5 +947,142 @@ export function deleteProject(ref: string): RemoveProjectResponse | undefined {
     id: project.id,
     name: project.name,
     ref: project.ref,
+  }
+}
+
+export function getAvailableRegions(cloudProvider: CloudProvider, _organizationSlug: string): RegionsInfo {
+  const specificRegions = REGION_SPECIFICS[cloudProvider] ?? []
+  const recommendedSpecific = specificRegions.length > 0 ? [specificRegions[0]] : []
+  const recommendedSmartGroup = REGION_SMART_GROUPS.find((group) => group.code === 'americas') ?? REGION_SMART_GROUPS[0]
+
+  return {
+    all: {
+      smartGroup: REGION_SMART_GROUPS.map((group) => ({ ...group })),
+      specific: specificRegions.map((region) => ({ ...region })),
+    },
+    recommendations: {
+      smartGroup: { ...recommendedSmartGroup },
+      specific: recommendedSpecific.map((region) => ({ ...region })),
+    },
+  }
+}
+
+export function listAvailableVersionsForOrganization(
+  _organizationSlug: string,
+  _provider: CloudProvider,
+  _region: string
+): AvailableVersionsResponse {
+  return {
+    available_versions: DEFAULT_AVAILABLE_VERSIONS.map((entry) => ({ ...entry })),
+  }
+}
+
+export function createOrganization(body: CreateOrganizationBody): Organization {
+  const name = body.name?.trim()
+  if (!name) {
+    throw new Error('Organization name is required')
+  }
+
+  const id = nextOrganizationId()
+  const slug = generateUniqueOrgSlug(name)
+  const planId = TIER_TO_PLAN[body.tier] ?? 'free'
+
+  const organization: Organization = {
+    billing_email: state.profile.primary_email ?? null,
+    billing_partner: null,
+    id,
+    is_owner: true,
+    name,
+    opt_in_tags: [],
+    organization_requires_mfa: DEFAULT_ORG_REQUIRES_MFA,
+    plan: { id: planId, name: PLAN_LABELS[planId] ?? PLAN_LABELS.free },
+    restriction_data: null,
+    restriction_status: null,
+    slug,
+    stripe_customer_id: DEFAULT_STRIPE_CUSTOMER_ID,
+    subscription_id: planId === 'free' ? null : randomUUID(),
+    usage_billing_enabled: DEFAULT_USAGE_BILLING_ENABLED,
+  }
+
+  state.organizations.push(organization)
+  saveState(state)
+
+  return { ...organization }
+}
+
+type OrganizationProjectSummary = {
+  cloud_provider: CloudProvider
+  disk_volume_size_gb?: number
+  engine?: string
+  id: number
+  infra_compute_size?: ComputeSize
+  inserted_at: string | null
+  is_branch_enabled: boolean
+  is_physical_backups_enabled: boolean | null
+  name: string
+  organization_id: number
+  organization_slug: string
+  preview_branch_refs: string[]
+  ref: string
+  region: string
+  status: ProjectStatus
+  subscription_id: string | null
+}
+
+export interface OrganizationDetailResponse {
+  billing_email: string | null
+  billing_partner: Organization['billing_partner']
+  has_oriole_project: boolean
+  id: number
+  name: string
+  opt_in_tags: string[]
+  plan: Organization['plan']
+  projects: OrganizationProjectSummary[]
+  restriction_data: Organization['restriction_data']
+  restriction_status: Organization['restriction_status']
+  slug: string
+  stripe_customer_id: string | null
+  subscription_id: string | null
+  usage_billing_enabled: boolean
+}
+
+export function getOrganizationDetail(slug: string): OrganizationDetailResponse | undefined {
+  const organization = state.organizations.find((org) => org.slug === slug)
+  if (!organization) return undefined
+
+  const projects: OrganizationProjectSummary[] = state.projects
+    .filter((project) => project.organization_id === organization.id)
+    .map((project) => ({
+      cloud_provider: project.cloud_provider,
+      id: project.id,
+      infra_compute_size: project.infra_compute_size,
+      inserted_at: project.inserted_at,
+      is_branch_enabled: project.is_branch_enabled,
+      is_physical_backups_enabled: project.is_physical_backups_enabled,
+      name: project.name,
+      organization_id: project.organization_id,
+      organization_slug: organization.slug,
+      preview_branch_refs: [],
+      ref: project.ref,
+      region: project.region,
+      status: project.status,
+      subscription_id: project.subscription_id,
+    }))
+
+  return {
+    billing_email: organization.billing_email,
+    billing_partner: organization.billing_partner,
+    has_oriole_project: false,
+    id: organization.id,
+    name: organization.name,
+    opt_in_tags: [...organization.opt_in_tags],
+    plan: { ...organization.plan },
+    projects,
+    restriction_data: organization.restriction_data,
+    restriction_status: organization.restriction_status,
+    slug: organization.slug,
+    stripe_customer_id: organization.stripe_customer_id,
+    subscription_id: organization.subscription_id,
+    usage_billing_enabled: organization.usage_billing_enabled,
   }
 }

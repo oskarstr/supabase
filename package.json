@@ -10,6 +10,7 @@
     "build": "turbo run build",
     "build:cms": "turbo run build --filter=cms --parallel",
     "build:studio": "turbo run build --filter=studio",
+    "build:studio:platform": "bash scripts/build-platform-studio.sh",
     "build:design-system": "turbo run build --filter=design-system",
     "build:docs": "turbo run build --filter=docs",
     "clean": "turbo run clean --parallel && rimraf -G node_modules/{*,.bin,.modules.yaml}",

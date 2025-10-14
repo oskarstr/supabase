@@ -12,6 +12,8 @@ supabase
 tests
 
 **/.next
+!apps/studio/.next/standalone/**
+!apps/studio/.next/static/**
 .vercel
 **/.env.*
 
