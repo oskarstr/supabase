@@ -31,6 +31,9 @@ import {
   listProjectLogDrains,
   listUsageApiCounts,
   listUsageApiRequests,
+  listFunctionCombinedStats,
+  listFunctionRequestStats,
+  listFunctionResourceUsage,
 } from '../store/index.js'
 import type {
   CloudProvider,
@@ -349,6 +352,66 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
         return reply.code(404).send({ message: 'Project not found' })
       }
       return reply.send(listUsageApiRequests(project.ref))
+    }
+  )
+
+  app.get<{
+    Params: { ref: string }
+    Querystring: { function_id?: string; interval?: string }
+  }>(
+    '/:ref/analytics/endpoints/functions.combined-stats',
+    async (request, reply) => {
+      const project = getProject(request.params.ref)
+      if (!project) {
+        return reply.code(404).send({ message: 'Project not found' })
+      }
+      const { function_id, interval } = request.query
+      if (!function_id || !interval) {
+        return reply
+          .code(400)
+          .send({ message: 'function_id and interval are required parameters' })
+      }
+      return reply.send(listFunctionCombinedStats(project.ref, function_id, interval))
+    }
+  )
+
+  app.get<{
+    Params: { ref: string }
+    Querystring: { function_id?: string; interval?: string }
+  }>(
+    '/:ref/analytics/endpoints/functions.req-stats',
+    async (request, reply) => {
+      const project = getProject(request.params.ref)
+      if (!project) {
+        return reply.code(404).send({ message: 'Project not found' })
+      }
+      const { function_id, interval } = request.query
+      if (!function_id || !interval) {
+        return reply
+          .code(400)
+          .send({ message: 'function_id and interval are required parameters' })
+      }
+      return reply.send(listFunctionRequestStats(project.ref, function_id, interval))
+    }
+  )
+
+  app.get<{
+    Params: { ref: string }
+    Querystring: { function_id?: string; interval?: string }
+  }>(
+    '/:ref/analytics/endpoints/functions.resource-usage',
+    async (request, reply) => {
+      const project = getProject(request.params.ref)
+      if (!project) {
+        return reply.code(404).send({ message: 'Project not found' })
+      }
+      const { function_id, interval } = request.query
+      if (!function_id || !interval) {
+        return reply
+          .code(400)
+          .send({ message: 'function_id and interval are required parameters' })
+      }
+      return reply.send(listFunctionResourceUsage(project.ref, function_id, interval))
     }
   )
 

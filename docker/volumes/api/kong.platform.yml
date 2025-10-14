@@ -8,5 +8,10 @@
         paths:
           - /api/platform
           - /api/platform/
+      - name: platform-api-v1
+        strip_path: false
+        paths:
+          - /api/v1
+          - /api/v1/
     plugins:
       - name: cors

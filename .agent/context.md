@@ -32,3 +32,21 @@
   -pnpm build:studio:platform
   -docker compose -f docker/docker-compose.yml -f docker/docker-compose.platform.yml build platform-api studio
   -docker compose -f docker/docker-compose.yml -f docker/docker-compose.platform.yml up -d platform-api studio kong
+
+- Platform API notes (Oct 2025 WIP):
+  - `/api/v1/**` requests are temporarily handled inside Fastify (`apps/platform-api/src/routes/api-v1.ts`) to satisfy Studio’s legacy Management API calls. Long term we’ll proxy those routes to real services via Kong, but for now they’re stubbed responses with TODOs and test coverage.
+  - Kong overlay (`docker/volumes/api/kong.platform.yml`) now exposes both `/api/platform` and `/api/v1`. Any Kong change requires rebuilding or restarting the `supabase-kong` container.
+  - The pg-meta stubs must include the fields Studio expects (e.g. schema `name`); integration tests now assert these to avoid silent regressions.
+- Testing philosophy:
+  - Vitest suite under `apps/platform-api/tests/platform.routes.test.ts` asserts both HTTP status and key payload shapes (auth config, analytics, v1 stubs, pg-meta schemas). Keep expanding it when new endpoints or fields are added so UI regressions fail fast.
+  - When data contracts change, update both the stub responders and the tests; then rebuild the platform Docker image so Studio picks up the latest API.
+
+- Additional working instructions:
+  - if there are missing info in existing repo on how things should work, what should be returned or any other things that technically should be probably developed at some point from supabase devs, always query user first since supabase has opensourced a lot of their repos and the answer might be in one of them. same thing applies with docs - you can always query context7 for official supabase docs. Don't make large assumptions not based in truth.
+    - there is a comprehensive documentation also on supabase docs about management api that can reveal a lot of valuable information.
+  - clean code following the already established coding, architecture, phylosophy of the upstream code which is mostly everything but the platform-api app. 
+  - always after doing a large edit, addition or any other diff, run a test, rebuild docker for user to test.
+  - try to explain what you did, why and the consequences. 
+  - when adding dummy data, or stuff that is dependant on future functionality, always comment what needs to be done for future agents to know and quickly find.
+  - we dont want to reinvent the wheel, but create something that most likely is how they built their saas. 
+  - due to the nature of this product it being databases and peoples important data relying on this keep strong thinking on your development efforts, even further in the dev process that it doesnt destroy or introduce bugs that would turn into disaster. 

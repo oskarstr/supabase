@@ -1,3 +1,5 @@
+import type { components } from 'api-types'
+
 export type CloudProvider = 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS'
 
 export const CLOUD_PROVIDERS: CloudProvider[] = ['AWS', 'FLY', 'AWS_K8S', 'AWS_NIMBUS']
@@ -322,7 +324,9 @@ export interface NotificationV2 {
   status: 'new' | 'seen' | 'archived'
 }
 
-export type AuthConfig = Record<string, string | boolean | number | null | string[]>
+export type AuthConfig = components['schemas']['GoTrueConfigResponse']
+export type AuthConfigUpdate = components['schemas']['UpdateGoTrueConfigBody']
+export type AuthHooksUpdate = components['schemas']['UpdateGoTrueConfigHooksBody']
 
 export interface ProjectContentItem {
   id: string
@@ -792,10 +796,23 @@ export interface PostgresTableSummary {
   name: string
   schema: string
   columns?: Array<{
+    id?: string
     name: string
     data_type: string
     default_value?: string | number | null
     is_nullable?: boolean
+    schema?: string
+    table?: string
+    table_id?: number
+    enums?: string[]
+    check?: string | null
+    format?: string
+    identity_generation?: 'BY DEFAULT' | 'ALWAYS' | null
+    is_generated?: boolean
+    is_identity?: boolean
+    is_unique?: boolean
+    is_updatable?: boolean
+    ordinal_position?: number
   }>
   relationships?: Array<{
     constraint_name: string
@@ -809,6 +826,14 @@ export interface PostgresTableSummary {
   comment?: string | null
   bytes?: number
   size?: string
+  dead_rows_estimate?: number
+  live_rows_estimate?: number
+  primary_keys?: Array<{
+    name: string
+    schema: string
+    table_id: number
+    table_name: string
+  }>
 }
 
 export interface DatabaseDetailSummary {

@@ -19,6 +19,15 @@ export {
   listProjectDetails,
 } from './projects.js'
 
+export { listProjectBranches } from './project-branches.js'
+
+export {
+  listProjectApiKeys,
+  listProjectFunctions,
+  getProjectUpgradeStatus,
+  listProjectServiceHealth,
+} from './project-v1.js'
+
 export { listOAuthApps } from './oauth.js'
 
 export {
@@ -87,6 +96,9 @@ export {
   listProjectLogDrains,
   listUsageApiCounts,
   listUsageApiRequests,
+  listFunctionCombinedStats,
+  listFunctionRequestStats,
+  listFunctionResourceUsage,
 } from './project-analytics.js'
 
 export {

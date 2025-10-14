@@ -33,6 +33,7 @@
 - Add telemetry/logging.
 - Provide integration tests (vitest) hitting key routes.
 - Maintain modular Fastify plugins so each resource surface (profile, projects, organizations, telemetry, etc.) can evolve independently without re-touching the monolithic router.
+- *Update (Codex, Oct 2025 WIP):* The Vitest harness now asserts richer payload contracts (auth config, analytics, v1 stubs) but still runs against static fixtures. Longer term we should drive contract tests from `api-types` or snapshot Studio queries so unexpected schema drift is caught automatically.
 
 ## Phase 7: Documentation & Automation
 - Update README with local setup instructions.
@@ -49,4 +50,5 @@
 - Document the Kong overlay behaviour, including the new `PLATFORM_DASHBOARD_BASIC_AUTH_ENABLED` toggle, and ensure tests cover both modes.
 - Document the Studio build flow (`pnpm build:studio:platform` → docker compose build) so new contributors know how to regenerate the `supabase-studio-platform` image after env tweaks.
 - Design the data-driven “Local vs Remote” project creation flow: define the config schema the API will serve, then scope the minimal Studio patch required to render dynamic provider fields.
+- Audit platform-api response shapes against `api-types` and decide how we want to reuse or fork schemas once multi-provider provisioning (local vs cloud) is ready.
 - Investigate optional Studio UX tweaks (e.g. redirecting `/` to `/org`) once default project slug/env alignment is stable.

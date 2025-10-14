@@ -2,11 +2,13 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import platformRoutes from '../src/routes/platform.js'
+import apiV1Routes from '../src/routes/api-v1.js'
 import { state } from '../src/store/state.js'
 
 async function buildApp() {
   const app = Fastify({ logger: false })
   await app.register(platformRoutes, { prefix: '/api/platform' })
+  await app.register(apiV1Routes, { prefix: '/api/v1' })
   await app.ready()
   return app
 }
@@ -349,6 +351,11 @@ describe('platform routes', () => {
       url: `/api/platform/auth/${projectRef}/config`,
     })
     expect(authConfig.statusCode).toBe(200)
+    const authConfigPayload = authConfig.json()
+    expect(typeof authConfigPayload.SITE_URL).toBe('string')
+    expect(authConfigPayload.SITE_URL).toContain(projectRef)
+    expect(typeof authConfigPayload.MAILER_SUBJECTS_INVITE).toBe('string')
+    expect(typeof authConfigPayload.EXTERNAL_EMAIL_ENABLED).toBe('boolean')
 
     const authPatch = await app.inject({
       method: 'PATCH',
@@ -356,6 +363,7 @@ describe('platform routes', () => {
       payload: { DISABLE_SIGNUP: false },
     })
     expect(authPatch.statusCode).toBe(200)
+    expect(authPatch.json().DISABLE_SIGNUP).toBe(false)
 
     const authHooks = await app.inject({
       method: 'PATCH',
@@ -363,6 +371,47 @@ describe('platform routes', () => {
       payload: {},
     })
     expect(authHooks.statusCode).toBe(200)
+
+    const combinedStats = await app.inject({
+      method: 'GET',
+      url: `/api/platform/projects/${projectRef}/analytics/endpoints/functions.combined-stats?function_id=edge-fn&interval=1hr`,
+    })
+    expect(combinedStats.statusCode).toBe(200)
+    const combinedPayload = combinedStats.json()
+    expect(Array.isArray(combinedPayload.result)).toBe(true)
+    expect(combinedPayload.result[0]).toMatchObject({
+      timestamp: expect.any(String),
+      requests_count: expect.any(Number),
+      avg_execution_time: expect.any(Number),
+      avg_cpu_time_used: expect.any(Number),
+    })
+
+    const reqStats = await app.inject({
+      method: 'GET',
+      url: `/api/platform/projects/${projectRef}/analytics/endpoints/functions.req-stats?function_id=edge-fn&interval=1hr`,
+    })
+    expect(reqStats.statusCode).toBe(200)
+    const reqPayload = reqStats.json()
+    expect(Array.isArray(reqPayload.result)).toBe(true)
+    expect(reqPayload.result[0]).toMatchObject({
+      timestamp: expect.any(String),
+      success_count: expect.any(Number),
+      client_err_count: expect.any(Number),
+    })
+
+    const resourceUsage = await app.inject({
+      method: 'GET',
+      url: `/api/platform/projects/${projectRef}/analytics/endpoints/functions.resource-usage?function_id=edge-fn&interval=1hr`,
+    })
+    expect(resourceUsage.statusCode).toBe(200)
+    const resourcePayload = resourceUsage.json()
+    expect(Array.isArray(resourcePayload.result)).toBe(true)
+    expect(resourcePayload.result[0]).toMatchObject({
+      timestamp: expect.any(String),
+      avg_cpu_time_used: expect.any(Number),
+      avg_memory_used: expect.any(Number),
+      max_cpu_time_used: expect.any(Number),
+    })
 
     const backups = await app.inject({
       method: 'GET',
@@ -375,5 +424,89 @@ describe('platform routes', () => {
       url: '/api/platform/integrations/github/repositories',
     })
     expect(repos.statusCode).toBe(200)
+  })
+
+  it('provides branch metadata via legacy v1 route', async () => {
+    const projectRef = state.projects[0]?.ref
+    expect(projectRef).toBeTruthy()
+
+    const branches = await app.inject({
+      method: 'GET',
+      url: `/api/v1/projects/${projectRef}/branches`,
+    })
+    expect(branches.statusCode).toBe(200)
+    const payload = branches.json()
+    expect(Array.isArray(payload)).toBe(true)
+    expect(payload[0]).toMatchObject({
+      project_ref: projectRef,
+      name: expect.any(String),
+      status: expect.any(String),
+    })
+
+    const apiKeys = await app.inject({
+      method: 'GET',
+      url: `/api/v1/projects/${projectRef}/api-keys?reveal=false`,
+    })
+    expect(apiKeys.statusCode).toBe(200)
+    const keysPayload = apiKeys.json()
+    expect(Array.isArray(keysPayload)).toBe(true)
+    expect(keysPayload[0]).toMatchObject({
+      name: expect.any(String),
+      api_key: expect.any(String),
+      type: expect.any(String),
+    })
+
+    const functions = await app.inject({
+      method: 'GET',
+      url: `/api/v1/projects/${projectRef}/functions`,
+    })
+    expect(functions.statusCode).toBe(200)
+    const functionsPayload = functions.json()
+    expect(Array.isArray(functionsPayload)).toBe(true)
+    expect(functionsPayload[0]).toMatchObject({
+      slug: expect.any(String),
+      status: 'ACTIVE',
+    })
+
+    const upgradeStatus = await app.inject({
+      method: 'GET',
+      url: `/api/v1/projects/${projectRef}/upgrade/status`,
+    })
+    expect(upgradeStatus.statusCode).toBe(200)
+    expect(upgradeStatus.json()).toMatchObject({
+      databaseUpgradeStatus: expect.objectContaining({
+        status: expect.any(Number),
+        target_version: expect.any(Number),
+      }),
+    })
+
+    const health = await app.inject({
+      method: 'GET',
+      url: `/api/v1/projects/${projectRef}/health?services=auth,realtime`,
+    })
+    expect(health.statusCode).toBe(200)
+    const healthPayload = health.json()
+    expect(Array.isArray(healthPayload)).toBe(true)
+    expect(healthPayload[0]).toMatchObject({
+      name: 'auth',
+      healthy: true,
+    })
+  })
+
+  it('returns schema metadata with names for pg-meta queries', async () => {
+    const projectRef = state.projects[0]?.ref
+    expect(projectRef).toBeTruthy()
+
+    const schemas = await app.inject({
+      method: 'POST',
+      url: `/api/platform/pg-meta/${projectRef}/query?key=schemas`,
+    })
+    expect(schemas.statusCode).toBe(201)
+    const payload = schemas.json()
+    expect(Array.isArray(payload)).toBe(true)
+    expect(payload[0]).toMatchObject({
+      schema: expect.any(String),
+      name: expect.any(String),
+    })
   })
 })

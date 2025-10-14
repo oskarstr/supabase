@@ -22,6 +22,7 @@ const PG_META_QUERY_DATA: Record<string, unknown> = {
     {
       id: 2200,
       schema: 'public',
+      name: 'public',
       owner: 'postgres',
       comment: null,
       security_classification: null,
@@ -29,6 +30,7 @@ const PG_META_QUERY_DATA: Record<string, unknown> = {
     {
       id: 2201,
       schema: 'auth',
+      name: 'auth',
       owner: 'postgres',
       comment: null,
       security_classification: null,

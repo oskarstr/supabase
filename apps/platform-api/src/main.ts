@@ -1,7 +1,8 @@
 import Fastify from 'fastify'
 
-import platformRoutes from './routes/platform.js'
 import cors from '@fastify/cors'
+import platformRoutes from './routes/platform.js'
+import apiV1Routes from './routes/api-v1.js'
 
 const server = Fastify({
   logger: {
@@ -24,6 +25,7 @@ async function start() {
       origin: true,
       credentials: true,
     })
+    await server.register(apiV1Routes, { prefix: '/api/v1' })
     await server.register(platformRoutes, { prefix: '/api/platform' })
     await server.listen({ port, host })
     server.log.info(`Platform API listening on http://${host}:${port}`)
