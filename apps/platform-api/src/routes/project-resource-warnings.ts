@@ -7,7 +7,8 @@ const projectResourceWarningsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Reply: ProjectResourceWarningsResponse[] }>(
     '/projects-resource-warnings',
     async (_request, reply) => {
-      return reply.send(listProjectResourceWarnings())
+      const warnings = await listProjectResourceWarnings()
+      return reply.send(warnings)
     }
   )
 }

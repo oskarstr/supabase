@@ -31,6 +31,7 @@ RUN pnpm install --filter platform-api... --prod
 
 # Copy build output
 COPY --from=builder /app/apps/platform-api/dist apps/platform-api/dist
+COPY --from=builder /app/apps/platform-api/migrations apps/platform-api/migrations
 
 WORKDIR /app/apps/platform-api
 RUN mkdir -p data/projects

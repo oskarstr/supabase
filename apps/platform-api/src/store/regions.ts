@@ -2,7 +2,7 @@ import {
   DEFAULT_AVAILABLE_VERSIONS,
   REGION_SMART_GROUPS,
   REGION_SPECIFICS,
-} from './state.js'
+} from '../config/defaults.js'
 import type { AvailableVersionsResponse, CloudProvider, RegionsInfo } from './types.js'
 
 export const getAvailableRegions = (

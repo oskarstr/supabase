@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
-import { state, saveState } from './state.js'
+import { getPlatformDb } from '../db/client.js'
+import { toAccessToken } from '../db/mappers.js'
 import type { AccessToken, AccessTokenWithSecret } from './types.js'
 
 const ACCESS_TOKEN_PREFIX = 'platform'
@@ -11,63 +12,53 @@ const generateAlias = () => randomInt(100000, 999999).toString()
 
 const withPrefix = (alias: string) => `${ACCESS_TOKEN_PREFIX}_${alias}`
 
-export const listAccessTokens = (): AccessToken[] => {
-  if (!state.accessTokens) {
-    state.accessTokens = []
-  }
-  return state.accessTokens.map(({ access_token: _value, token_digest, token_alias, ...token }) => ({
-    ...token,
-    token_alias,
-  }))
+const db = getPlatformDb()
+
+export const listAccessTokens = async (): Promise<AccessToken[]> => {
+  const rows = await db.selectFrom('access_tokens').selectAll().orderBy('created_at', 'desc').execute()
+  return rows.map((row) => toAccessToken(row) as AccessToken)
 }
 
-export const createAccessToken = (name: string): AccessTokenWithSecret => {
-  if (!state.accessTokens) {
-    state.accessTokens = []
+const generateUniqueAlias = async (): Promise<string> => {
+  // TODO(platform-api): Hash and store token digests prior to production shipping.
+  for (let attempts = 0; attempts < 5; attempts += 1) {
+    const alias = withPrefix(generateAlias())
+    const existing = await db
+      .selectFrom('access_tokens')
+      .select(['id'])
+      .where('token_alias', '=', alias)
+      .executeTakeFirst()
+    if (!existing) return alias
   }
-
-  const alias = generateAlias()
-  const createdAt = new Date().toISOString()
-
-  const token: AccessTokenWithSecret = {
-    id: randomInt(1, 10_000),
-    name,
-    created_at: createdAt,
-    expires_at: null,
-    last_used_at: null,
-    scope: 'V0',
-    token_alias: withPrefix(alias),
-    access_token: randomUUID().replace(/-/g, ''),
-    token_digest: randomUUID().replace(/-/g, ''),
-  }
-
-  state.accessTokens.push(token)
-  saveState(state)
-
-  return token
+  throw new Error('Failed to generate unique token alias')
 }
 
-export const getAccessToken = (id: number): AccessToken | undefined => {
-  if (!state.accessTokens) {
-    state.accessTokens = []
-  }
+export const createAccessToken = async (name: string): Promise<AccessTokenWithSecret> => {
+  const token_alias = await generateUniqueAlias()
+  const access_token = randomUUID().replace(/-/g, '')
+  const token_digest = randomUUID().replace(/-/g, '')
 
-  const found = state.accessTokens.find((token) => token.id === id)
-  if (!found) return undefined
+  const inserted = await db
+    .insertInto('access_tokens')
+    .values({
+      name,
+      token_alias,
+      access_token,
+      token_digest,
+      scope: 'V0',
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
 
-  const { access_token: _value, token_digest: _digest, ...rest } = found
-  return rest
+  return toAccessToken(inserted, true) as AccessTokenWithSecret
 }
 
-export const deleteAccessToken = (id: number) => {
-  if (!state.accessTokens) {
-    state.accessTokens = []
-  }
+export const getAccessToken = async (id: number): Promise<AccessToken | undefined> => {
+  const row = await db.selectFrom('access_tokens').selectAll().where('id', '=', id).executeTakeFirst()
+  return row ? (toAccessToken(row) as AccessToken) : undefined
+}
 
-  const index = state.accessTokens.findIndex((token) => token.id === id)
-  if (index === -1) return false
-
-  state.accessTokens.splice(index, 1)
-  saveState(state)
-  return true
+export const deleteAccessToken = async (id: number) => {
+  const result = await db.deleteFrom('access_tokens').where('id', '=', id).returning('id').executeTakeFirst()
+  return Boolean(result?.id)
 }

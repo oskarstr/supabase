@@ -61,7 +61,7 @@ import type {
 
 const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', async (_request, reply) => {
-    const projects = listProjectDetails()
+    const projects = await listProjectDetails()
     return reply.send({
       pagination: {
         count: projects.length,
@@ -87,7 +87,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
 
   app.post<{ Body: Parameters<typeof createProject>[0] }>('/', async (request, reply) => {
     try {
-      const response = createProject(request.body)
+      const response = await createProject(request.body)
       return reply.code(201).send(response)
     } catch (error) {
       request.log.error({ err: error }, 'Failed to create project')
@@ -96,7 +96,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   })
 
   app.delete<{ Params: { ref: string } }>('/:ref', async (request, reply) => {
-    const removed = deleteProject(request.params.ref)
+    const removed = await deleteProject(request.params.ref)
     if (!removed) {
       return reply.code(404).send({ message: 'Project not found' })
     }
@@ -104,7 +104,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   })
 
   app.get<{ Params: { ref: string } }>('/:ref', async (request, reply) => {
-    const project = getProject(request.params.ref)
+    const project = await getProject(request.params.ref)
     if (!project) {
       return reply.code(404).send({ message: 'Project not found' })
     }
@@ -139,7 +139,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: DiskAttributes | { message: string } }>(
     '/:ref/disk',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -150,7 +150,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { ref: string }; Body: unknown }>(
     '/:ref/disk',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -161,7 +161,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: DiskAutoscaleConfig | { message: string } }>(
     '/:ref/disk/custom-config',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -172,7 +172,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { ref: string }; Body: unknown }>(
     '/:ref/disk/custom-config',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -183,7 +183,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: DiskUtilizationResponse | { message: string } }>(
     '/:ref/disk/util',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -194,7 +194,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: { status: string } | { message: string } }>(
     '/:ref/status',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -208,7 +208,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/config/postgrest',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -222,7 +222,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/config/realtime',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -236,7 +236,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/config/pgbouncer',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -250,7 +250,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/config/pgbouncer/status',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -264,7 +264,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/config/storage',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -278,7 +278,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/config/supavisor',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -289,7 +289,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: LoadBalancerSummary[] | { message: string } }>(
     '/:ref/load-balancers',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -300,7 +300,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: ProjectLogDrainSummary[] | { message: string } }>(
     '/:ref/analytics/log-drains',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -311,7 +311,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string } }>(
     '/:ref/analytics/endpoints/logs.all',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -322,7 +322,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { ref: string }; Body: Record<string, unknown> }>(
     '/:ref/analytics/endpoints/logs.all',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -336,7 +336,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/analytics/endpoints/usage.api-counts',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -347,7 +347,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string } }>(
     '/:ref/analytics/endpoints/usage.api-requests-count',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -361,7 +361,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/analytics/endpoints/functions.combined-stats',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -381,7 +381,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/analytics/endpoints/functions.req-stats',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -401,7 +401,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:ref/analytics/endpoints/functions.resource-usage',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -439,18 +439,19 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: ProjectSettingsSummary | { message: string } }>(
     '/:ref/settings',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
-      return reply.send(getProjectSettings(request.params.ref))
+      const settings = await getProjectSettings(request.params.ref)
+      return reply.send(settings)
     }
   )
 
   app.get<{ Params: { ref: string }; Reply: ProjectAddonsResponseSummary | { message: string } }>(
     '/:ref/billing/addons',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -461,7 +462,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: DatabaseDetailSummary[] | { message: string } }>(
     '/:ref/databases',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }
@@ -472,7 +473,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: JwtSecretUpdateStatusSummary | { message: string } }>(
     '/:ref/config/secrets/update-status',
     async (request, reply) => {
-      const project = getProject(request.params.ref)
+      const project = await getProject(request.params.ref)
       if (!project) {
         return reply.code(404).send({ message: 'Project not found' })
       }

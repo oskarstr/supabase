@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { components } from 'api-types'
 
-import { nowIso } from './state.js'
+const nowIso = () => new Date().toISOString()
 
 type BranchResponse = components['schemas']['BranchResponse']
 

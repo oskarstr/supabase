@@ -1,8 +1,9 @@
-import { nowIso } from './state.js'
 import type {
   ProjectLogDrainSummary,
   UsageApiCountSummary,
 } from './types.js'
+
+const nowIso = () => new Date().toISOString()
 
 type ProjectLogsResponse = {
   result: Array<Record<string, unknown>>

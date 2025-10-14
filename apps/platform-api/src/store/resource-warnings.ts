@@ -1,8 +1,9 @@
-import { state } from './state.js'
+import { listProjectDetails } from './projects.js'
 import type { ProjectResourceWarningsResponse } from './types.js'
 
-export const listProjectResourceWarnings = (): ProjectResourceWarningsResponse[] =>
-  state.projects.map((project) => ({
+export const listProjectResourceWarnings = async (): Promise<ProjectResourceWarningsResponse[]> => {
+  const projects = await listProjectDetails()
+  return projects.map((project) => ({
     auth_email_offender: null,
     auth_rate_limit_exhaustion: null,
     auth_restricted_email_sending: null,
@@ -14,3 +15,4 @@ export const listProjectResourceWarnings = (): ProjectResourceWarningsResponse[]
     need_pitr: null,
     project: project.ref,
   }))
+}

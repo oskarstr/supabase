@@ -1,8 +1,9 @@
+import { getPlatformDb } from '../db/client.js'
 import {
+  baseProfile,
   DEFAULT_PRIMARY_EMAIL,
   DEFAULT_USERNAME,
-  state,
-} from './state.js'
+} from '../config/defaults.js'
 import type {
   OrganizationInvitationsResponse,
   OrganizationMember,
@@ -10,118 +11,153 @@ import type {
   OrgDailyUsageResponse,
 } from './types.js'
 
+const db = getPlatformDb()
+
 const nowIso = () => new Date().toISOString()
 
-const DEFAULT_MEMBERS: OrganizationMember[] = [
-  {
-    gotrue_id: 'local-user-1',
-    is_sso_user: false,
-    metadata: {},
-    mfa_enabled: false,
-    primary_email: DEFAULT_PRIMARY_EMAIL,
-    role_ids: [1],
-    username: DEFAULT_USERNAME,
-  },
-]
+export const listOrganizationMembers = async (slug: string): Promise<OrganizationMember[]> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['id'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+  if (!organization) return []
 
-const DEFAULT_ROLES: OrganizationRolesResponse = {
-  org_scoped_roles: [
-    {
-      base_role_id: 1,
-      description: 'Full access to organization management features.',
-      id: 1,
-      name: 'Owner',
-      project_ids: null,
-    },
-    {
-      base_role_id: 2,
-      description: 'Manage projects and members.',
-      id: 2,
-      name: 'Administrator',
-      project_ids: null,
-    },
-    {
-      base_role_id: 3,
-      description: 'Developer access to project resources.',
-      id: 3,
-      name: 'Developer',
-      project_ids: null,
-    },
-    {
-      base_role_id: 4,
-      description: 'Read-only access to project resources.',
-      id: 4,
-      name: 'Read-only',
-      project_ids: null,
-    },
-  ],
-  project_scoped_roles: [],
-}
+  const rows = await db
+    .selectFrom('organization_members')
+    .innerJoin('profiles', 'profiles.id', 'organization_members.profile_id')
+    .select([
+      'organization_members.role_ids',
+      'organization_members.metadata',
+      'organization_members.mfa_enabled',
+      'profiles.gotrue_id',
+      'profiles.primary_email',
+      'profiles.username',
+      'profiles.is_sso_user',
+    ])
+    .where('organization_members.organization_id', '=', organization.id)
+    .execute()
 
-const DEFAULT_INVITATIONS: OrganizationInvitationsResponse = {
-  invitations: [
-    {
-      id: 1,
-      invited_at: nowIso(),
-      invited_email: 'new-contributor@example.com',
-      role_id: 3,
-    },
-  ],
-}
-
-const DEFAULT_DAILY_USAGE: OrgDailyUsageResponse = {
-  usages: [
-    {
-      metric: 'EGRESS',
-      date: nowIso(),
-      usage: 0,
-      usage_original: 0,
-      available_in_plan: true,
-      capped: false,
-      cost: 0,
-      breakdown: {
-        egress_function: 0,
-        egress_graphql: 0,
-        egress_logdrain: 0,
-        egress_realtime: 0,
-        egress_rest: 0,
-        egress_storage: 0,
-        egress_supavisor: 0,
+  if (rows.length === 0) {
+    return [
+      {
+        gotrue_id: baseProfile.gotrue_id,
+        is_sso_user: baseProfile.is_sso_user,
+        metadata: {},
+        mfa_enabled: false,
+        primary_email: baseProfile.primary_email ?? DEFAULT_PRIMARY_EMAIL,
+        role_ids: [1],
+        username: baseProfile.username ?? DEFAULT_USERNAME,
       },
-    },
-  ],
+    ]
+  }
+
+  return rows.map((row) => ({
+    gotrue_id: row.gotrue_id,
+    is_sso_user: row.is_sso_user,
+    metadata: (row.metadata as Record<string, unknown>) ?? {},
+    mfa_enabled: row.mfa_enabled,
+    primary_email: row.primary_email ?? DEFAULT_PRIMARY_EMAIL,
+    role_ids: row.role_ids ?? [],
+    username: row.username ?? DEFAULT_USERNAME,
+  }))
 }
 
-const matchesKnownOrg = (slug: string) => state.organizations.some((org) => org.slug === slug)
+export const listOrganizationRoles = async (
+  slug: string
+): Promise<OrganizationRolesResponse> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['id'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+  if (!organization) {
+    return { org_scoped_roles: [], project_scoped_roles: [] }
+  }
 
-// TODO(platform-api): Back these organization helpers with real persistence.
-export const listOrganizationMembers = (slug: string): OrganizationMember[] =>
-  matchesKnownOrg(slug) ? DEFAULT_MEMBERS.map((member) => ({ ...member })) : []
+  const roles = await db
+    .selectFrom('organization_roles')
+    .select(['id', 'base_role_id', 'name', 'description', 'project_ids'])
+    .where('organization_id', '=', organization.id)
+    .execute()
 
-export const listOrganizationRoles = (slug: string): OrganizationRolesResponse =>
-  matchesKnownOrg(slug)
-    ? {
-        org_scoped_roles: DEFAULT_ROLES.org_scoped_roles.map((role) => ({ ...role })),
-        project_scoped_roles: [],
-      }
-    : { org_scoped_roles: [], project_scoped_roles: [] }
+  return {
+    org_scoped_roles: roles.map((role) => ({
+      base_role_id: role.base_role_id,
+      description: role.description ?? '',
+      id: role.id,
+      name: role.name,
+      project_ids: role.project_ids ?? null,
+    })),
+    project_scoped_roles: [],
+  }
+}
 
-export const listOrganizationInvitations = (slug: string): OrganizationInvitationsResponse =>
-  matchesKnownOrg(slug)
-    ? {
-        invitations: DEFAULT_INVITATIONS.invitations.map((invitation) => ({ ...invitation })),
-      }
-    : { invitations: [] }
+export const listOrganizationInvitations = async (
+  slug: string
+): Promise<OrganizationInvitationsResponse> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['id'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+  if (!organization) {
+    return { invitations: [] }
+  }
 
-export const listOrganizationDailyUsage = (
+  const invitations = await db
+    .selectFrom('organization_invitations')
+    .select(['id', 'invited_email', 'role_id', 'invited_at'])
+    .where('organization_id', '=', organization.id)
+    .execute()
+
+  const filtered = invitations.filter((invitation) => invitation.role_id !== null)
+
+  return {
+    invitations: filtered.map((invitation) => ({
+      id: invitation.id,
+      invited_at: invitation.invited_at.toISOString(),
+      invited_email: invitation.invited_email,
+      role_id: invitation.role_id as number,
+    })),
+  }
+}
+
+export const listOrganizationDailyUsage = async (
   slug: string,
   _start?: string,
   _end?: string
-): OrgDailyUsageResponse =>
-  matchesKnownOrg(slug)
-    ? {
-        usages: DEFAULT_DAILY_USAGE.usages.map((entry) => ({
-          ...entry,
-        })),
-      }
-    : { usages: [] }
+): Promise<OrgDailyUsageResponse | undefined> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['id'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+
+  if (!organization) {
+    return undefined
+  }
+
+  return {
+    usages: [
+      {
+        metric: 'EGRESS',
+        date: nowIso(),
+        usage: 0,
+        usage_original: 0,
+        available_in_plan: true,
+        capped: false,
+        cost: 0,
+        breakdown: {
+          egress_function: 0,
+          egress_graphql: 0,
+          egress_logdrain: 0,
+          egress_realtime: 0,
+          egress_rest: 0,
+          egress_storage: 0,
+          egress_supavisor: 0,
+        },
+      },
+    ],
+  }
+}

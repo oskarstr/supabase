@@ -3,7 +3,8 @@ import type {
   DiskAttributes,
   DiskUtilizationResponse,
 } from './types.js'
-import { nowIso } from './state.js'
+
+const nowIso = () => new Date().toISOString()
 
 // TODO(platform-api): Surface real disk attributes from the Postgres service.
 export const getProjectDiskAttributes = (_ref: string): DiskAttributes => ({

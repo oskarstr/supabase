@@ -55,6 +55,7 @@
     "rimraf": "^6.0.0",
     "sass": "^1.72.0",
     "supabase": "^2.50.3",
+    "tsconfig": "^7.0.0",
     "supports-color": "^8.0.0",
     "turbo": "2.3.3",
     "typescript": "catalog:"

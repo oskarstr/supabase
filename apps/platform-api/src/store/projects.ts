@@ -1,11 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { parse as parseEnv } from 'dotenv'
 
-import { destroyProjectStack, provisionProjectStack } from '../provisioner.js'
-import { buildRestUrl } from './env.js'
 import {
   DEFAULT_BRANCH_ENABLED,
   DEFAULT_CLOUD_PROVIDER,
@@ -15,15 +13,13 @@ import {
   DEFAULT_PHYSICAL_BACKUPS,
   DEFAULT_REGION,
   DEFAULT_REST_URL,
-  ensureProjectRuntime,
-  InternalProject,
-  nowIso,
-  ProjectRuntime,
-  removeProjectRuntime,
-  saveState,
-  state,
-  updateProject,
-} from './state.js'
+} from '../config/defaults.js'
+import { getPlatformDb } from '../db/client.js'
+import { toOrganization, toProjectDetail } from '../db/mappers.js'
+import type { ProjectsTable } from '../db/schema.js'
+import { destroyProjectStack, provisionProjectStack } from '../provisioner.js'
+import { buildRestUrl } from './env.js'
+import { ensureProjectRuntime, removeProjectRuntime } from './project-runtimes.js'
 import type {
   CreateProjectBody,
   CreateProjectResponse,
@@ -32,40 +28,50 @@ import type {
   RemoveProjectResponse,
 } from './types.js'
 
-const ensureDir = (path: string) => {
-  mkdirSync(path, { recursive: true })
-}
+const db = getPlatformDb()
 
-const ensureOrganization = (slug: string): Organization => {
-  const org = state.organizations.find((organization) => organization.slug === slug)
-  if (!org) {
-    throw new Error(`Organization ${slug} not found`)
+const sanitizeRef = (value: string) => value.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+
+const generateUniqueRef = async (name: string) => {
+  const base = sanitizeRef(name) || `proj-${randomUUID().slice(0, 8)}`
+  let candidate = base
+  let attempt = 1
+
+  while (attempt < 100) {
+    const existing = await db.selectFrom('projects').select('id').where('ref', '=', candidate).executeTakeFirst()
+    if (!existing) return candidate
+    attempt += 1
+    candidate = `${base}-${attempt}`
   }
-  return org
+  throw new Error('Failed to generate unique project ref')
 }
 
-export const listProjectDetails = (): ProjectDetail[] =>
-  state.projects.map(({ anonKey: _anon, serviceKey: _service, ...detail }) => ({
-    ...detail,
-  }))
+type ProjectUpdate = Partial<Pick<ProjectsTable, 'status' | 'rest_url' | 'connection_string' | 'db_host' | 'db_version' | 'anon_key' | 'service_key'>>
 
-export const getProject = (ref: string): ProjectDetail | undefined => {
-  const project = state.projects.find((item) => item.ref === ref)
-  if (!project) return undefined
+const updateProject = async (ref: string, values: ProjectUpdate) => {
+  await db
+    .updateTable('projects')
+    .set({
+      ...values,
+      updated_at: new Date(),
+    })
+    .where('ref', '=', ref)
+    .execute()
+}
 
-  const { anonKey: _anon, serviceKey: _svc, ...detail } = project
-  return { ...detail }
+const readProvisionedEnv = (runtimeRoot: string) => {
+  const envPath = resolve(runtimeRoot, '.env')
+  if (!existsSync(envPath)) return null
+  return parseEnv(readFileSync(envPath, 'utf-8'))
 }
 
 const scheduleProvisioning = async (
-  project: InternalProject,
+  project: ProjectDetail,
   org: Organization,
   dbPass: string,
-  runtime: ProjectRuntime
+  runtimeRoot: string
 ) => {
   try {
-    ensureDir(runtime.rootDir)
-
     await provisionProjectStack({
       ref: project.ref,
       name: project.name,
@@ -73,175 +79,193 @@ const scheduleProvisioning = async (
       cloudProvider: project.cloud_provider,
       region: project.region,
       databasePassword: dbPass,
-      projectRoot: runtime.rootDir,
+      projectRoot: runtimeRoot,
     })
 
-    let nextAnonKey = project.anonKey
-    let nextServiceKey = project.serviceKey
-    let nextRestUrl = project.restUrl || DEFAULT_REST_URL
-    let nextConnection = project.connectionString
-    let nextDbHost = project.db_host
-    let nextDbVersion = project.dbVersion
+    const parsedEnv = readProvisionedEnv(runtimeRoot)
+    const updates: ProjectUpdate = {
+      status: 'ACTIVE_HEALTHY',
+    }
 
-    const envPath = resolve(runtime.rootDir, '.env')
-    if (existsSync(envPath)) {
-      const parsed = parseEnv(readFileSync(envPath, 'utf-8'))
+    if (parsedEnv?.SUPABASE_ANON_KEY) {
+      updates.anon_key = parsedEnv.SUPABASE_ANON_KEY
+    }
+    if (parsedEnv?.SUPABASE_SERVICE_KEY) {
+      updates.service_key = parsedEnv.SUPABASE_SERVICE_KEY
+    }
 
-      if (parsed.SUPABASE_ANON_KEY) {
-        nextAnonKey = parsed.SUPABASE_ANON_KEY
-      }
-      if (parsed.SUPABASE_SERVICE_KEY) {
-        nextServiceKey = parsed.SUPABASE_SERVICE_KEY
-      }
+    const supabaseUrl = parsedEnv?.SUPABASE_URL ?? parsedEnv?.SUPABASE_PUBLIC_URL
+    if (supabaseUrl) {
+      updates.rest_url = buildRestUrl(supabaseUrl)
+    }
 
-      const supabaseUrl = parsed.SUPABASE_URL ?? parsed.SUPABASE_PUBLIC_URL
-      if (supabaseUrl) {
-        nextRestUrl = buildRestUrl(supabaseUrl)
-      }
-
-      const dbUrl = parsed.DATABASE_URL ?? parsed.SUPABASE_DB_URL
-      if (dbUrl) {
-        nextConnection = dbUrl
-        try {
-          nextDbHost = new URL(dbUrl).hostname
-        } catch {
-          /* noop */
-        }
-      }
-
-      if (parsed.POSTGRES_VERSION) {
-        nextDbVersion = parsed.POSTGRES_VERSION
+    const dbUrl = parsedEnv?.DATABASE_URL ?? parsedEnv?.SUPABASE_DB_URL
+    if (dbUrl) {
+      updates.connection_string = dbUrl
+      try {
+          updates.db_host = new URL(dbUrl).hostname
+      } catch {
+        /* noop */
       }
     }
 
-    updateProject(project.ref, (current) => ({
-      ...current,
-      status: 'ACTIVE_HEALTHY',
-      restUrl: nextRestUrl,
-      connectionString: nextConnection ?? current.connectionString,
-      db_host: nextDbHost,
-      dbVersion: nextDbVersion ?? current.dbVersion,
-      anonKey: nextAnonKey,
-      serviceKey: nextServiceKey,
-    }))
+    if (parsedEnv?.POSTGRES_VERSION) {
+      updates.db_version = parsedEnv.POSTGRES_VERSION
+    }
+
+    await updateProject(project.ref, updates)
   } catch (error) {
     console.error('[platform-api] provisioning failed', project.ref, error)
-    updateProject(project.ref, (current) => ({
-      ...current,
-      status: 'INIT_FAILED',
-    }))
+    await updateProject(project.ref, { status: 'INIT_FAILED' })
   }
 }
 
-const scheduleRemoval = async (project: InternalProject, org: Organization, runtime: ProjectRuntime) => {
+const scheduleRemoval = async (project: ProjectDetail, org: Organization, runtimeRoot: string) => {
   try {
     await destroyProjectStack({
       ref: project.ref,
       name: project.name,
       organizationSlug: org.slug,
-      projectRoot: runtime.rootDir,
+      projectRoot: runtimeRoot,
     })
 
-    const removalIndex = state.projects.findIndex((item) => item.ref === project.ref)
-    if (removalIndex !== -1) {
-      state.projects.splice(removalIndex, 1)
-      saveState(state)
-    }
-    removeProjectRuntime(project.ref)
+    await db.deleteFrom('projects').where('ref', '=', project.ref).execute()
+    await removeProjectRuntime(project.id)
   } catch (error) {
     console.error('[platform-api] destruction failed', project.ref, error)
-    updateProject(project.ref, (current) => ({
-      ...current,
-      status: 'RESTORE_FAILED',
-    }))
+    await updateProject(project.ref, { status: 'RESTORE_FAILED' })
   }
 }
 
-export const createProject = (body: CreateProjectBody): CreateProjectResponse => {
-  const org = ensureOrganization(body.organization_slug)
+export const listProjectDetails = async (): Promise<ProjectDetail[]> => {
+  const rows = await db.selectFrom('projects').selectAll().orderBy('inserted_at', 'asc').execute()
+  return rows.map((row) => toProjectDetail(row))
+}
 
-  const projectId = state.nextProjectId++
-  const ref = body.name.toLowerCase().replace(/[^a-z0-9-]/g, '-') || `proj-${projectId}`
-  const insertedAt = nowIso()
+export const getProject = async (ref: string): Promise<ProjectDetail | undefined> => {
+  const row = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
+  return row ? toProjectDetail(row) : undefined
+}
 
+export const createProject = async (body: CreateProjectBody): Promise<CreateProjectResponse> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .selectAll()
+    .where('slug', '=', body.organization_slug)
+    .executeTakeFirst()
+
+  if (!organization) {
+    throw new Error(`Organization ${body.organization_slug} not found`)
+  }
+
+  const ref = await generateUniqueRef(body.name)
   const region =
     body.region_selection && 'code' in body.region_selection
       ? body.region_selection.code
       : body.db_region ?? DEFAULT_REGION
 
-  const detail: ProjectDetail = {
-    cloud_provider: body.cloud_provider ?? DEFAULT_CLOUD_PROVIDER,
-    connectionString: null,
-    db_host: DEFAULT_DB_HOST,
-    dbVersion: body.postgres_engine ?? DEFAULT_DB_VERSION,
-    id: projectId,
-    infra_compute_size: body.desired_instance_size ?? DEFAULT_INFRA_SIZE,
-    inserted_at: insertedAt,
-    is_branch_enabled: DEFAULT_BRANCH_ENABLED,
-    is_physical_backups_enabled: DEFAULT_PHYSICAL_BACKUPS,
-    name: body.name,
-    organization_id: org.id,
-    ref,
-    region,
-    restUrl: body.auth_site_url ?? '',
-    status: 'COMING_UP',
-    subscription_id: randomUUID(),
-  }
+  const insertResult = await db
+    .insertInto('projects')
+    .values({
+      organization_id: organization.id,
+      ref,
+      name: body.name,
+      region,
+      cloud_provider: body.cloud_provider ?? DEFAULT_CLOUD_PROVIDER,
+      status: 'COMING_UP',
+      infra_compute_size: body.desired_instance_size ?? DEFAULT_INFRA_SIZE,
+      db_host: DEFAULT_DB_HOST,
+      db_version: body.postgres_engine ?? DEFAULT_DB_VERSION,
+      connection_string: null,
+      rest_url: body.auth_site_url ?? '',
+      is_branch_enabled: DEFAULT_BRANCH_ENABLED,
+      is_physical_backups_enabled: DEFAULT_PHYSICAL_BACKUPS,
+      subscription_id: randomUUID(),
+      preview_branch_refs: [],
+      anon_key: randomUUID(),
+      service_key: randomUUID(),
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
 
-  const project: InternalProject = {
-    ...detail,
-    anonKey: randomUUID(),
-    serviceKey: randomUUID(),
-  }
+  const runtime = await ensureProjectRuntime(insertResult.ref, insertResult.id)
 
-  state.projects.push(project)
-  saveState(state)
-
-  const runtime = ensureProjectRuntime(project.ref)
-
-  const response: CreateProjectResponse = {
-    anon_key: project.anonKey,
-    cloud_provider: project.cloud_provider,
-    endpoint: project.restUrl,
-    id: project.id,
-    infra_compute_size: project.infra_compute_size,
-    inserted_at: detail.inserted_at,
-    is_branch_enabled: detail.is_branch_enabled,
-    is_physical_backups_enabled: detail.is_physical_backups_enabled,
-    name: detail.name,
-    organization_id: detail.organization_id,
-    organization_slug: org.slug,
-    preview_branch_refs: [],
-    ref: detail.ref,
-    region: detail.region,
-    service_key: project.serviceKey,
-    status: detail.status,
-    subscription_id: detail.subscription_id,
-  }
-
-  scheduleProvisioning(project, org, body.db_pass, runtime).catch((error) => {
-    console.error('[platform-api] provisioning task error', error)
+  const organizationSummary = toOrganization({
+    organization,
+    membership: {
+      id: 0,
+      organization_id: organization.id,
+      profile_id: organization.id,
+      role_ids: [],
+      metadata: {},
+      mfa_enabled: false,
+      is_owner: true,
+      inserted_at: new Date(),
+      updated_at: new Date(),
+    },
   })
 
-  return response
-}
+  const detail = toProjectDetail(insertResult)
 
-export const deleteProject = (ref: string): RemoveProjectResponse | undefined => {
-  const project = state.projects.find((item) => item.ref === ref)
-  if (!project) return undefined
-
-  const org = state.organizations.find((item) => item.id === project.organization_id)
-  if (!org) return undefined
-
-  updateProject(ref, (current) => ({ ...current, status: 'GOING_DOWN' }))
-  const runtime = ensureProjectRuntime(project.ref)
-  scheduleRemoval(project, org, runtime).catch((error) => {
-    console.error('[platform-api] destruction task error', error)
-  })
+  void scheduleProvisioning(detail, organizationSummary, body.db_pass, runtime.root_dir)
 
   return {
-    id: project.id,
-    name: project.name,
-    ref: project.ref,
+    anon_key: insertResult.anon_key,
+    cloud_provider: insertResult.cloud_provider,
+    endpoint: insertResult.rest_url ?? DEFAULT_REST_URL,
+    id: insertResult.id,
+    infra_compute_size: insertResult.infra_compute_size,
+    inserted_at: insertResult.inserted_at.toISOString(),
+    is_branch_enabled: insertResult.is_branch_enabled,
+    is_physical_backups_enabled: insertResult.is_physical_backups_enabled,
+    name: insertResult.name,
+    organization_id: insertResult.organization_id,
+    organization_slug: organization.slug,
+    preview_branch_refs: [],
+    ref: insertResult.ref,
+    region: insertResult.region,
+    service_key: insertResult.service_key,
+    status: insertResult.status,
+    subscription_id: insertResult.subscription_id,
+  }
+}
+
+export const deleteProject = async (ref: string): Promise<RemoveProjectResponse | undefined> => {
+  const projectRow = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
+  if (!projectRow) return undefined
+
+  const organization = await db
+    .selectFrom('organizations')
+    .selectAll()
+    .where('id', '=', projectRow.organization_id)
+    .executeTakeFirst()
+  if (!organization) return undefined
+
+  const organizationSummary = toOrganization({
+    organization,
+    membership: {
+      id: 0,
+      organization_id: organization.id,
+      profile_id: organization.id,
+      role_ids: [],
+      metadata: {},
+      mfa_enabled: false,
+      is_owner: true,
+      inserted_at: new Date(),
+      updated_at: new Date(),
+    },
+  })
+
+  await updateProject(ref, { status: 'GOING_DOWN' })
+
+  const runtime = await ensureProjectRuntime(projectRow.ref, projectRow.id)
+
+  const detail = toProjectDetail(projectRow)
+  void scheduleRemoval(detail, organizationSummary, runtime.root_dir)
+
+  return {
+    id: projectRow.id,
+    name: projectRow.name,
+    ref: projectRow.ref,
   }
 }

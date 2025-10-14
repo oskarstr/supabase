@@ -41,12 +41,13 @@ import type {
 
 const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', async (_request, reply) => {
-    return reply.send(listOrganizations())
+    const organizations = await listOrganizations()
+    return reply.send(organizations)
   })
 
   app.post<{ Body: Parameters<typeof createOrganization>[0] }>('/', async (request, reply) => {
     try {
-      const org = createOrganization(request.body)
+      const org = await createOrganization(request.body)
       return reply.code(201).send(org)
     } catch (error) {
       request.log.error({ err: error }, 'Failed to create organization')
@@ -55,7 +56,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   })
 
   app.get<{ Params: { slug: string } }>('/:slug', async (request, reply) => {
-    const org = getOrganizationDetail(request.params.slug)
+    const org = await getOrganizationDetail(request.params.slug)
     if (!org) {
       return reply.code(404).send({ message: 'Organization not found' })
     }
@@ -63,7 +64,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   })
 
   app.get<{ Params: { slug: string } }>('/:slug/projects', async (request, reply) => {
-    const result = listOrganizationProjects(request.params.slug)
+    const result = await listOrganizationProjects(request.params.slug)
     if (!result) {
       return reply.code(404).send({ message: 'Organization not found' })
     }
@@ -73,22 +74,24 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string }; Reply: OrganizationMember[] | { message: string } }>(
     '/:slug/members',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
-      return reply.send(listOrganizationMembers(request.params.slug))
+      const members = await listOrganizationMembers(request.params.slug)
+      return reply.send(members)
     }
   )
 
   app.get<{ Params: { slug: string }; Reply: OrganizationRolesResponse | { message: string } }>(
     '/:slug/roles',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
-      return reply.send(listOrganizationRoles(request.params.slug))
+      const roles = await listOrganizationRoles(request.params.slug)
+      return reply.send(roles)
     }
   )
 
@@ -98,11 +101,12 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:slug/members/invitations',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
-      return reply.send(listOrganizationInvitations(request.params.slug))
+      const invitations = await listOrganizationInvitations(request.params.slug)
+      return reply.send(invitations)
     }
   )
 
@@ -115,7 +119,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
     if (!['authorized', 'published'].includes(type)) {
       return reply.code(400).send({ message: `Unsupported oauth app type: ${type}` })
     }
-    const apps = listOAuthApps(slug, type)
+    const apps = await listOAuthApps(slug, type)
     if (!apps) {
       return reply.code(404).send({ message: 'Organization not found' })
     }
@@ -147,7 +151,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string }; Reply: OrgUsageResponse | { message: string } }>(
     '/:slug/usage',
     async (request, reply) => {
-      const usage = getOrganizationUsage(request.params.slug)
+      const usage = await getOrganizationUsage(request.params.slug)
       if (!usage) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
@@ -162,13 +166,15 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:slug/usage/daily',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
-      if (!org) {
+      const usage = await listOrganizationDailyUsage(
+        request.params.slug,
+        request.query.start,
+        request.query.end
+      )
+      if (!usage) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
-      return reply.send(
-        listOrganizationDailyUsage(request.params.slug, request.query.start, request.query.end)
-      )
+      return reply.send(usage)
     }
   )
 
@@ -178,7 +184,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:slug/members/reached-free-project-limit',
     async (request, reply) => {
-      const members = listMembersReachedFreeProjectLimit(request.params.slug)
+      const members = await listMembersReachedFreeProjectLimit(request.params.slug)
       if (!members) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
@@ -189,7 +195,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string }; Reply: CustomerProfileSummary | { message: string } }>(
     '/:slug/customer',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
@@ -200,7 +206,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string }; Reply: PaymentMethodSummary[] | { message: string } }>(
     '/:slug/payments',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
@@ -211,7 +217,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string }; Reply: TaxIdSummary | { message: string } }>(
     '/:slug/tax-ids',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
@@ -226,7 +232,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   }>(
     '/:slug/billing/invoices',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
@@ -249,7 +255,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string }; Reply: UpcomingInvoiceSummary | { message: string } }>(
     '/:slug/billing/invoices/upcoming',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
@@ -260,7 +266,7 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string }; Reply: ReturnType<typeof listAvailablePlans> | { message: string } }>(
     '/:slug/billing/plans',
     async (request, reply) => {
-      const org = listOrganizations().find((organization) => organization.slug === request.params.slug)
+      const org = await getOrganizationDetail(request.params.slug)
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }
@@ -271,7 +277,9 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { slug: string } }>(
     '/:slug/billing/subscription',
     async (request, reply) => {
-      const org = listOrganizations().find((organization: Organization) => organization.slug === request.params.slug)
+      const org = (await listOrganizations()).find(
+        (organization: Organization) => organization.slug === request.params.slug
+      )
       if (!org) {
         return reply.code(404).send({ message: 'Organization not found' })
       }

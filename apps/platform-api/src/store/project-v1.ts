@@ -1,5 +1,3 @@
-import { nowIso } from './state.js'
-
 import type { components } from 'api-types'
 
 // TODO(platform-api): Replace these legacy v1 stubs with real Management API handlers
@@ -90,3 +88,4 @@ export const listProjectServiceHealth = (
     error: undefined,
   }))
 }
+const nowIso = () => new Date().toISOString()

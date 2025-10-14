@@ -1,33 +1,42 @@
-import { state, saveState } from './state.js'
+import { getPlatformDb } from '../db/client.js'
+import { toAuditLogEntry } from '../db/mappers.js'
 import type { AuditLogEntry } from './types.js'
 
-const ensureAuditLogs = () => {
-  if (!state.auditLogs) {
-    state.auditLogs = []
-  }
-  return state.auditLogs
+const db = getPlatformDb()
+
+const toDate = (value?: string) => {
+  if (!value) return undefined
+  const timestamp = new Date(value)
+  return Number.isNaN(timestamp.getTime()) ? undefined : timestamp
 }
 
-export const listAuditLogs = (start?: string, end?: string): AuditLogEntry[] => {
-  const logs = ensureAuditLogs()
-  if (!start && !end) return [...logs]
+export const listAuditLogs = async (start?: string, end?: string): Promise<AuditLogEntry[]> => {
+  let query = db.selectFrom('audit_logs').selectAll()
 
-  const startDate = start ? new Date(start).getTime() : undefined
-  const endDate = end ? new Date(end).getTime() : undefined
+  const startDate = toDate(start)
+  const endDate = toDate(end)
 
-  return logs.filter((log) => {
-    const created = new Date(log.created_at).getTime()
-    if (startDate !== undefined && created < startDate) return false
-    if (endDate !== undefined && created > endDate) return false
-    return true
-  })
+  if (startDate) {
+    query = query.where('created_at', '>=', startDate)
+  }
+  if (endDate) {
+    query = query.where('created_at', '<=', endDate)
+  }
+
+  const rows = await query.orderBy('created_at', 'desc').execute()
+  return rows.map(toAuditLogEntry)
 }
 
-export const appendAuditLog = (entry: AuditLogEntry) => {
-  const logs = ensureAuditLogs()
-  logs.push(entry)
-  if (logs.length > 1000) {
-    logs.splice(0, logs.length - 1000)
-  }
-  saveState(state)
+export const appendAuditLog = async (entry: AuditLogEntry) => {
+  await db
+    .insertInto('audit_logs')
+    .values({
+      organization_id: null,
+      project_id: null,
+      event_message: entry.event_message,
+      ip_address: entry.ip_address ?? null,
+      payload: entry.payload ?? null,
+      created_at: toDate(entry.created_at) ?? new Date(),
+    })
+    .execute()
 }

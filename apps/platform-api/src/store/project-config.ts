@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { envString } from './env.js'
-import { state } from './state.js'
+import { getProject } from './projects.js'
 import type {
   PgbouncerConfigResponse,
   PgbouncerStatusResponse,
@@ -121,10 +121,13 @@ export const listProjectSupavisorPools = (ref: string): SupavisorConfigResponse[
   },
 ]
 
-export const getProjectConnectionString = (ref: string) => {
-  const project = state.projects.find((item) => item.ref === ref)
+export const getProjectConnectionString = async (ref: string) => {
+  const project = await getProject(ref)
   if (!project) {
     return `postgresql://${DEFAULT_DB_USER}@${DEFAULT_DB_HOST}:${DEFAULT_DB_PORT}/${DEFAULT_DB_NAME}`
   }
-  return project.connectionString ?? `postgresql://${DEFAULT_DB_USER}@${DEFAULT_DB_HOST}:${DEFAULT_DB_PORT}/${DEFAULT_DB_NAME}`
+  return (
+    project.connectionString ??
+    `postgresql://${DEFAULT_DB_USER}@${DEFAULT_DB_HOST}:${DEFAULT_DB_PORT}/${DEFAULT_DB_NAME}`
+  )
 }

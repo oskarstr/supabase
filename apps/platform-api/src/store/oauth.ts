@@ -1,15 +1,17 @@
+import { getPlatformDb } from '../db/client.js'
 import {
   DEFAULT_AUTHORIZED_APPS,
   DEFAULT_PUBLISHED_APPS,
-  state,
-} from './state.js'
+} from '../config/defaults.js'
 import type { OAuthAppSummary, OAuthAppType } from './types.js'
 
-export const listOAuthApps = (
+const db = getPlatformDb()
+
+export const listOAuthApps = async (
   slug: string,
   type: OAuthAppType
-): OAuthAppSummary[] | undefined => {
-  const org = state.organizations.find((organization) => organization.slug === slug)
+): Promise<OAuthAppSummary[] | undefined> => {
+  const org = await db.selectFrom('organizations').select('id').where('slug', '=', slug).executeTakeFirst()
   if (!org) return undefined
   const source = type === 'authorized' ? DEFAULT_AUTHORIZED_APPS : DEFAULT_PUBLISHED_APPS
   return source.map((app) => ({ ...app }))

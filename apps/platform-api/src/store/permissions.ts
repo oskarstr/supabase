@@ -1,5 +1,7 @@
-import { state } from './state.js'
+import { getPlatformDb } from '../db/client.js'
 import type { AccessControlPermission } from './types.js'
+
+const db = getPlatformDb()
 
 const basePermission = (
   organization_slug: string,
@@ -15,5 +17,7 @@ const basePermission = (
   restrictive: false,
 })
 
-export const listPermissions = (): AccessControlPermission[] =>
-  state.organizations.map((organization) => basePermission(organization.slug, organization.id))
+export const listPermissions = async (): Promise<AccessControlPermission[]> => {
+  const organizations = await db.selectFrom('organizations').select(['id', 'slug']).execute()
+  return organizations.map((organization) => basePermission(organization.slug, organization.id))
+}

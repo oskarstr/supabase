@@ -20,11 +20,12 @@ import type {
 
 const profileRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', async (_request, reply) => {
-    return reply.send(getProfile())
+    const profile = await getProfile()
+    return reply.send(profile)
   })
 
   app.post('/audit-login', async (_request, reply) => {
-    auditAccountLogin()
+    await auditAccountLogin()
     return reply.code(201).send()
   })
 
@@ -33,18 +34,21 @@ const profileRoutes: FastifyPluginAsync = async (app) => {
     Reply: AuditLogEntry[]
   }>('/audit', async (request, reply) => {
     const { iso_timestamp_start, iso_timestamp_end } = request.query
-    return reply.send(listAuditLogs(iso_timestamp_start, iso_timestamp_end))
+    const logs = await listAuditLogs(iso_timestamp_start, iso_timestamp_end)
+    return reply.send(logs)
   })
 
   app.get<{ Reply: AccessToken[] }>('/access-tokens', async (_request, reply) => {
-    return reply.send(listAccessTokens())
+    const tokens = await listAccessTokens()
+    return reply.send(tokens)
   })
 
   app.post<{ Body: { name: string }; Reply: AccessTokenWithSecret }>(
     '/access-tokens',
     async (request, reply) => {
       const name = request.body?.name?.trim() || 'Personal Token'
-      return reply.code(201).send(createAccessToken(name))
+      const token = await createAccessToken(name)
+      return reply.code(201).send(token)
     }
   )
 
@@ -55,7 +59,7 @@ const profileRoutes: FastifyPluginAsync = async (app) => {
       if (!Number.isFinite(id)) {
         return reply.code(400).send({ message: 'Invalid access token id' })
       }
-      const token = getAccessToken(id)
+      const token = await getAccessToken(id)
       if (!token) {
         return reply.code(404).send({ message: 'Access token not found' })
       }
@@ -70,7 +74,7 @@ const profileRoutes: FastifyPluginAsync = async (app) => {
       if (!Number.isFinite(id)) {
         return reply.code(400).send({ message: 'Invalid access token id' })
       }
-      const removed = deleteAccessToken(id)
+      const removed = await deleteAccessToken(id)
       if (!removed) {
         return reply.code(404).send({ message: 'Access token not found' })
       }
@@ -85,7 +89,8 @@ const profileRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Reply: AccessControlPermission[] }>(
     '/permissions',
     async (_request, reply) => {
-      return reply.send(listPermissions())
+      const permissions = await listPermissions()
+      return reply.send(permissions)
     }
   )
 }

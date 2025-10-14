@@ -1,5 +1,7 @@
 # Platform API Plan
 
+# From now on add current date and time when you add items here. 
+
 ## Phase 1: Scaffolding ✅ *completed*
 - Created `apps/platform-api` workspace with Fastify + TypeScript.
 - Added tsconfig, scripts, Dockerfile scaffolding, and workspace registration.
@@ -44,6 +46,15 @@
 - Expose deployment-mode metadata (local vs remote cloud providers) via API/custom-content so Studio can render new options without diverging hard-coded JSX.
 - Rely on feature flags/custom content to hide upstream-only features (e.g., billing) and surface platform-specific UX safely.
 - Keep Studio changes minimal and data-driven so upstream updates continue to merge cleanly.
+
+## Phase 9: Persistent Control Plane (WIP)
+- Inventory every `/api/platform/**` and `/api/v1/**` surface currently backed by stubs; classify which payloads become first-class tables (organizations, members, projects, auth config, API keys).
+- Stand up a dedicated Postgres schema for the platform service (reuse the bundled database for now) and scaffold migrations via Supabase CLI so the control plane survives container restarts.
+- Introduce a data-access layer in Fastify (Kysely/Drizzle/pg) that maps handlers to SQL models instead of `state.json`, keeping schemas aligned with `packages/api-types`.
+- Replace JSON seed/state with migration-driven fixtures for local dev & Vitest; update tests to load known rows and assert responses match the Management API contract.
+- Plan how project provisioning writes back generated secrets/endpoints to the platform schema, so Studio’s analytics/auth/storage views reflect real data once provisioning is wired up.
+- *Update 2025-10-14 17:31 MDT:* Platform API now auto-applies migrations and seeds against Postgres on boot (no manual CLI step). Kysely-backed stores cover profiles, organizations, projects, access tokens, audit logs, billing, permissions, usage, etc., and the Vitest suite drives project/org creation against pg-mem to catch sequence regressions.
+  - NEXT: wire Supabase CLI/Unix socket into the platform-api container so provisioning hooks can call `supabase init/start`; extend the data layer for remaining stubs (analytics detail, org billing) and persist provisioning artefacts.
 
 ### Next Immediate Tasks
 - Finish Phase 4 by wiring provisioning hooks to Supabase CLI (`supabase init/start/stop`) and persisting generated keys/ports.

@@ -2,9 +2,14 @@
 
 - Goal: restore multi-project management to the open-source distribution. Supabase’s hosted platform keeps `/platform` functionality behind their SaaS; we’re rebuilding an equivalent control plane so self-hosted users can create/manage multiple projects via Studio, while still preserving the classic `docker compose up` experience. Also important to note we are trying to preserve ideally all of the upstream code while recreating clone of their Saas service. The code should be clean, as little hacks as possible. We have made some changes from upstream by adding new files but the main "server" logic lives in apps/platform-api.
 - Approach to date:
-  - Added a new Fastify-based service under `apps/platform-api` that implements the core `/platform/**` routes, persists state, and simulates provisioning.
-  - Seed data now comes from `.env` / `docker/.env` so the default org/project mirror upstream config. A new template `docker/.env.platform.example` captures all required variables for platform mode.
-  - Background tasks mark new projects `COMING_UP` → `ACTIVE_HEALTHY` (or `INIT_FAILED`) and do the inverse for delete. Generated env files can be read after real provisioning is wired up.
+- Added a new Fastify-based service under `apps/platform-api` that implements the core `/platform/**` routes, persists state, and simulates provisioning.
+- Seed data now comes from `.env` / `docker/.env` so the default org/project mirror upstream config. A new template `docker/.env.platform.example` captures all required variables for platform mode.
+- Background tasks mark new projects `COMING_UP` → `ACTIVE_HEALTHY` (or `INIT_FAILED`) and do the inverse for delete. Generated env files can be read after real provisioning is wired up.
+- 2025-10-14 17:31 MDT update:
+  - Platform API now auto-applies SQL migrations (`apps/platform-api/migrations`) on boot and seeds the `platform` schema into the shared Postgres, using the connection string already provided via `SUPABASE_DB_URL`. No manual CLI commands are required.
+  - The JSON-backed store is gone. All core stores (profile, organizations, projects, access-tokens, audit logs, billing, permissions, usage, etc.) now use Kysely against the platform schema, with sequences reset after seeding to avoid duplicate key errors when creating new orgs/projects.
+  - Docker image copies migrations, and tests run against `pg-mem` with migrations + seeds applied. A Vitest case exercises POST `/api/platform/organizations` to guard against sequence regressions.
+  - Key env knobs: `SUPABASE_DB_URL` (already in `docker/.env`) is used by platform via fallback; `PLATFORM_APPLY_MIGRATIONS=false` or `PLATFORM_SKIP_SEQUENCE_RESET=true` can disable auto-migration/reset during tests.
 - Docker integration is handled via `apps/platform-api/Dockerfile` and overlay compose files (`docker/docker-compose.platform.yml` + optional `.platform.dev.yml`). Studio is pointed at the platform API automatically when the overlay is used. We now route all `/api/platform/**` requests through Kong and expose them from Fastify using the `/api/platform` prefix so Studio can talk to the local control plane without source patches.
 - Auth routing mirrors Supabase Cloud: Kong injects the project anon key for `/auth/v1/**` via a startup patch, so Studio’s stock AuthClient works without local modifications. The platform overlay simply appends the `/api/platform` service.
 - Recent updates:

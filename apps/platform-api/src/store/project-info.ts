@@ -1,3 +1,4 @@
+import { getPlatformDb } from '../db/client.js'
 import type {
   DatabaseDetailSummary,
   JwtSecretUpdateStatusSummary,
@@ -24,31 +25,69 @@ export const listProjectLints = (_ref: string): ProjectLintSummary[] => [
   },
 ]
 
-export const getProjectSettings = (ref: string): ProjectSettingsSummary => ({
-  app_config: {
-    db_schema: 'public',
-    endpoint: `https://${ref}.supabase.local`,
-    storage_endpoint: `https://${ref}.supabase.local/storage/v1`,
-  },
-  cloud_provider: 'AWS',
-  db_dns_name: `${ref}.db.supabase.local`,
-  db_host: 'localhost',
-  db_ip_addr_config: 'ipv4',
-  db_name: `${ref}_db`,
-  db_port: 5432,
-  db_user: 'postgres',
-  inserted_at: nowIso(),
-  is_sensitive: false,
-  name: `${ref} project`,
-  ref,
-  region: 'local',
-  service_api_keys: [
-    { api_key: 'service_key', name: 'Service Key', tags: 'service_role' },
-    { api_key: 'anon_key', name: 'Anon Key', tags: 'anon' },
-  ],
-  ssl_enforced: true,
-  status: 'ACTIVE_HEALTHY',
-})
+const db = getPlatformDb()
+
+export const getProjectSettings = async (ref: string): Promise<ProjectSettingsSummary> => {
+  const row = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
+
+  const now = nowIso()
+  if (!row) {
+    return {
+      app_config: {
+        db_schema: 'public',
+        endpoint: `https://${ref}.supabase.local`,
+        storage_endpoint: `https://${ref}.supabase.local/storage/v1`,
+      },
+      cloud_provider: 'AWS',
+      db_dns_name: `${ref}.db.supabase.local`,
+      db_host: 'localhost',
+      db_ip_addr_config: 'ipv4',
+      db_name: `${ref}_db`,
+      db_port: 5432,
+      db_user: 'postgres',
+      inserted_at: now,
+      is_sensitive: false,
+      name: `${ref} project`,
+      ref,
+      region: 'local',
+      service_api_keys: [
+        { api_key: 'service_key', name: 'Service Key', tags: 'service_role' },
+        { api_key: 'anon_key', name: 'Anon Key', tags: 'anon' },
+      ],
+      ssl_enforced: true,
+      status: 'ACTIVE_HEALTHY',
+    }
+  }
+
+  const defaultBase = `https://${ref}.supabase.local`
+  const baseUrl = (row.rest_url ?? `${defaultBase}/rest/v1/`).replace(/\/rest\/v1\/?$/, '')
+
+  return {
+    app_config: {
+      db_schema: 'public',
+      endpoint: `${baseUrl}/rest/v1/`,
+      storage_endpoint: `${baseUrl}/storage/v1`,
+    },
+    cloud_provider: row.cloud_provider,
+    db_dns_name: `${ref}.db.supabase.local`,
+    db_host: row.db_host,
+    db_ip_addr_config: 'ipv4',
+    db_name: `${ref}_db`,
+    db_port: 5432,
+    db_user: 'postgres',
+    inserted_at: row.inserted_at.toISOString(),
+    is_sensitive: false,
+    name: row.name,
+    ref: row.ref,
+    region: row.region,
+    service_api_keys: [
+      { api_key: row.service_key, name: 'Service Key', tags: 'service_role' },
+      { api_key: row.anon_key, name: 'Anon Key', tags: 'anon' },
+    ],
+    ssl_enforced: true,
+    status: row.status,
+  }
+}
 
 export const listProjectAddons = (ref: string): ProjectAddonsResponseSummary => ({
   available_addons: [

@@ -1,0 +1,8 @@
+project_id = "platform-api"
+
+[db]
+url = "env(PLATFORM_DB_URL)"
+
+[migrations]
+schema = "platform"
+dir = "apps/platform-api/migrations"

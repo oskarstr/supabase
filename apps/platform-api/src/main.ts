@@ -1,6 +1,9 @@
+import cors from '@fastify/cors'
 import Fastify from 'fastify'
 
-import cors from '@fastify/cors'
+import { destroyDb } from './db/client.js'
+import { applyMigrations } from './db/migrate.js'
+import { seedDefaults } from './db/seed.js'
 import platformRoutes from './routes/platform.js'
 import apiV1Routes from './routes/api-v1.js'
 
@@ -19,8 +22,17 @@ server.addHook('onRequest', async (request) => {
   request.log.info({ method: request.method, url: request.url }, 'incoming request')
 })
 
+server.addHook('onClose', async () => {
+  await destroyDb()
+})
+
 async function start() {
   try {
+    if (process.env.PLATFORM_APPLY_MIGRATIONS !== 'false') {
+      await applyMigrations()
+    }
+    await seedDefaults()
+
     await server.register(cors, {
       origin: true,
       credentials: true,

@@ -1,11 +1,15 @@
 import Fastify, { type FastifyInstance } from 'fastify'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import platformRoutes from '../src/routes/platform.js'
-import apiV1Routes from '../src/routes/api-v1.js'
-import { state } from '../src/store/state.js'
+import { DataType, newDb } from 'pg-mem'
+import { randomUUID } from 'node:crypto'
+import { DEFAULT_ORG_SLUG } from '../src/config/defaults.js'
 
 async function buildApp() {
+  const platformRoutes = (await import('../src/routes/platform.js')).default
+  const apiV1Routes = (await import('../src/routes/api-v1.js')).default
   const app = Fastify({ logger: false })
   await app.register(platformRoutes, { prefix: '/api/platform' })
   await app.register(apiV1Routes, { prefix: '/api/v1' })
@@ -15,6 +19,45 @@ async function buildApp() {
 
 describe('platform routes', () => {
   let app: FastifyInstance
+  let defaultProjectRef = ''
+  let defaultOrganizationSlug = ''
+
+  beforeAll(async () => {
+    process.env.PLATFORM_DB_URL = 'pg-mem'
+    process.env.PLATFORM_API_REPO_ROOT = process.cwd()
+    process.env.PLATFORM_APPLY_MIGRATIONS = 'false'
+
+    const memDb = newDb()
+    const migrationPath = resolve(process.cwd(), 'migrations/0001_initial.sql')
+    memDb.public.registerFunction({
+      name: 'gen_random_uuid',
+      returns: DataType.uuid,
+      implementation: () => randomUUID(),
+    })
+
+    const migrationSql = await readFile(migrationPath, 'utf-8')
+    const sanitizedSql = migrationSql
+      .replace(/CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\s*/g, '')
+      .replace(/CREATE EXTENSION IF NOT EXISTS "pgcrypto";\s*/g, '')
+      .replace(/COMMENT ON SCHEMA platform IS 'Supabase platform control-plane schema.';\s*/g, '')
+    memDb.public.none(sanitizedSql)
+
+    const { Pool: MemPool } = memDb.adapters.createPg()
+    globalThis.__PLATFORM_TEST_POOL__ = new MemPool()
+
+    const { seedDefaults } = await import('../src/db/seed.js')
+    await seedDefaults()
+    const { listProjectDetails } = await import('../src/store/projects.js')
+    const projects = await listProjectDetails()
+    defaultProjectRef = projects[0]?.ref ?? ''
+    defaultOrganizationSlug = DEFAULT_ORG_SLUG
+  })
+
+  afterAll(async () => {
+    delete (globalThis as any).__PLATFORM_TEST_POOL__
+    const { destroyDb } = await import('../src/db/client.js')
+    await destroyDb()
+  })
 
   beforeEach(async () => {
     process.env.PLATFORM_API_REPO_ROOT = process.cwd()
@@ -63,7 +106,7 @@ describe('platform routes', () => {
   })
 
   it('runs pg-meta query stub', async () => {
-    const projectRef = state.projects[0]?.ref
+    const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
     const response = await app.inject({
@@ -80,7 +123,7 @@ describe('platform routes', () => {
   })
 
   it('serves project configuration endpoints for known projects', async () => {
-    const projectRef = state.projects[0]?.ref
+    const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
     const postgrest = await app.inject({
@@ -141,7 +184,7 @@ describe('platform routes', () => {
   })
 
   it('exposes storage buckets and credentials', async () => {
-    const projectRef = state.projects[0]?.ref
+    const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
     const buckets = await app.inject({
@@ -186,7 +229,7 @@ describe('platform routes', () => {
   })
 
   it('returns project content data and counts', async () => {
-    const projectRef = state.projects[0]?.ref
+    const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
     const content = await app.inject({
@@ -212,7 +255,7 @@ describe('platform routes', () => {
   })
 
   it('provides project API helpers', async () => {
-    const projectRef = state.projects[0]?.ref
+    const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
     const rest = await app.inject({
@@ -237,7 +280,7 @@ describe('platform routes', () => {
   })
 
   it('returns organization metadata and usage', async () => {
-    const organizationSlug = state.organizations[0]?.slug
+    const organizationSlug = defaultOrganizationSlug
     expect(organizationSlug).toBeTruthy()
 
     const members = await app.inject({
@@ -269,8 +312,27 @@ describe('platform routes', () => {
     expect(Array.isArray(usage.json().usages)).toBe(true)
   })
 
+  it('creates a new organization', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/platform/organizations',
+      payload: {
+        name: 'Seeded Test Org',
+        tier: 'tier_free',
+      },
+    })
+
+    const payload = response.json()
+    expect(response.statusCode).toBe(201)
+    const org = payload
+    expect(org).toMatchObject({
+      name: 'Seeded Test Org',
+      plan: { id: 'free' },
+    })
+  })
+
   it('lists replication sources', async () => {
-    const projectRef = state.projects[0]?.ref
+    const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
     const replication = await app.inject({
@@ -282,8 +344,8 @@ describe('platform routes', () => {
   })
 
   it('serves disk, analytics, auth, and integration stubs', async () => {
-    const projectRef = state.projects[0]?.ref
-    const organizationSlug = state.organizations[0]?.slug
+    const projectRef = defaultProjectRef
+    const organizationSlug = defaultOrganizationSlug
     expect(projectRef).toBeTruthy()
     expect(organizationSlug).toBeTruthy()
 
@@ -427,7 +489,7 @@ describe('platform routes', () => {
   })
 
   it('provides branch metadata via legacy v1 route', async () => {
-    const projectRef = state.projects[0]?.ref
+    const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
     const branches = await app.inject({
@@ -494,7 +556,7 @@ describe('platform routes', () => {
   })
 
   it('returns schema metadata with names for pg-meta queries', async () => {
-    const projectRef = state.projects[0]?.ref
+    const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
     const schemas = await app.inject({

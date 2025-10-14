@@ -1,8 +1,15 @@
-import { state } from './state.js'
+import { getPlatformDb } from '../db/client.js'
 import type { MemberWithFreeProjectLimit, OrgUsageResponse } from './types.js'
 
-export const getOrganizationUsage = (slug: string): OrgUsageResponse | undefined => {
-  const organization = state.organizations.find((org) => org.slug === slug)
+const db = getPlatformDb()
+
+export const getOrganizationUsage = async (slug: string): Promise<OrgUsageResponse | undefined> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['usage_billing_enabled'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+
   if (!organization) return undefined
 
   return {
@@ -11,10 +18,14 @@ export const getOrganizationUsage = (slug: string): OrgUsageResponse | undefined
   }
 }
 
-export const listMembersReachedFreeProjectLimit = (
+export const listMembersReachedFreeProjectLimit = async (
   slug: string
-): MemberWithFreeProjectLimit[] | undefined => {
-  const organization = state.organizations.find((org) => org.slug === slug)
+): Promise<MemberWithFreeProjectLimit[] | undefined> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['id'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
   if (!organization) return undefined
 
   return []
