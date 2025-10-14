@@ -3,6 +3,8 @@ services:
     build:
       context: ..
       dockerfile: apps/platform-api/Dockerfile
+    env_file:
+      - .env
     environment:
       PORT: "4210"
       HOST: "0.0.0.0"

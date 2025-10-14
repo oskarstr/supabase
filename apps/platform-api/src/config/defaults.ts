@@ -65,6 +65,11 @@ export const DEFAULT_FREE_PROJECT_LIMIT = (() => {
 export const DEFAULT_IS_ALPHA_USER = envString('STUDIO_DEFAULT_ALPHA_USER', 'false') === 'true'
 export const DEFAULT_IS_SSO_USER = envString('STUDIO_DEFAULT_SSO_USER', 'false') === 'true'
 
+export const DEFAULT_ADMIN_EMAIL =
+  envString('PLATFORM_ADMIN_EMAIL', DEFAULT_PRIMARY_EMAIL) ?? DEFAULT_PRIMARY_EMAIL
+export const DEFAULT_ADMIN_PASSWORD =
+  envString('PLATFORM_ADMIN_PASSWORD', 'supabase') ?? 'supabase'
+
 export const DEFAULT_PROJECT_NAME =
   envString('STUDIO_DEFAULT_PROJECT', 'Local Project') ?? 'Local Project'
 const rawProjectRef = envString('STUDIO_DEFAULT_PROJECT_REF')

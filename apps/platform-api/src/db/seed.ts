@@ -3,6 +3,8 @@ import { resolve } from 'node:path'
 import {
   baseOrganizations,
   baseProfile,
+  DEFAULT_ADMIN_EMAIL,
+  DEFAULT_ADMIN_PASSWORD,
   DEFAULT_ANON_KEY,
   DEFAULT_BRANCH_ENABLED,
   DEFAULT_CLOUD_PROVIDER,
@@ -302,5 +304,102 @@ export const seedDefaults = async () => {
     }
   })
 
+  await ensureAdminAuthUser(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD)
+
   console.log('[platform-db] default seed complete')
+}
+
+const ensureAdminAuthUser = async (email: string, password: string) => {
+  const gotrueUrl = process.env.SUPABASE_GOTRUE_URL?.trim() || process.env.GOTRUE_URL?.trim()
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_KEY?.trim() || process.env.SERVICE_ROLE_KEY?.trim()
+  const apiKey =
+    process.env.SUPABASE_ANON_KEY?.trim() || process.env.ANON_KEY?.trim() || serviceKey
+
+  if (!gotrueUrl || !serviceKey || !email || !password) {
+    return
+  }
+
+  const adminEndpoint = `${gotrueUrl.replace(/\/?$/, '')}/admin/users`
+
+  try {
+    const response = await fetch(adminEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: apiKey ?? '',
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+      }),
+    })
+
+    if (response.status === 409) {
+      await updateAdminPassword(gotrueUrl, serviceKey, apiKey, email, password)
+      return
+    }
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      console.warn('[platform-db] failed to ensure admin user', {
+        status: response.status,
+        body: text,
+      })
+    }
+  } catch (error) {
+    console.warn('[platform-db] error ensuring admin user', error)
+  }
+}
+
+const updateAdminPassword = async (
+  gotrueUrl: string,
+  serviceKey: string,
+  apiKey: string | undefined,
+  email: string,
+  password: string
+) => {
+  const baseUrl = gotrueUrl.replace(/\/?$/, '')
+  const headers = {
+    'Content-Type': 'application/json',
+    apikey: apiKey ?? serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+  }
+
+  try {
+    const lookup = await fetch(`${baseUrl}/admin/users?email=${encodeURIComponent(email)}`, {
+      headers,
+    })
+
+    if (!lookup.ok) {
+      return
+    }
+
+    const users = (await lookup.json().catch(() => [])) as Array<{ id: string }> | undefined
+    const userId = users?.[0]?.id
+    if (!userId) {
+      return
+    }
+
+    const update = await fetch(`${baseUrl}/admin/users/${userId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        password,
+        email_confirm: true,
+      }),
+    })
+
+    if (!update.ok) {
+      const text = await update.text().catch(() => '')
+      console.warn('[platform-db] failed to update admin password', {
+        status: update.status,
+        body: text,
+      })
+    }
+  } catch (error) {
+    console.warn('[platform-db] error updating admin password', error)
+  }
 }
