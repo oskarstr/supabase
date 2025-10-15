@@ -6,6 +6,7 @@ services:
       SUPABASE_TELEMETRY_DISABLED: "true"
       PLATFORM_API_REPO_ROOT: /workspace
       PLATFORM_PROJECTS_ROOT: ${PWD}/platform-projects
+      PLATFORM_ORCHESTRATOR_URL: http://runtime-agent:8085
       PORT: "4210"
       HOST: "0.0.0.0"
       CI: "true"
@@ -34,7 +35,23 @@ services:
       - "4210:4210"
     depends_on:
       - db
+      - runtime-agent
     container_name: platform-dev
+
+  runtime-agent:
+    build:
+      context: ..
+      dockerfile: apps/runtime-agent/Dockerfile
+    environment:
+      RUNTIME_AGENT_LISTEN_ADDR: ":8085"
+      RUNTIME_AGENT_COMMAND_TIMEOUT: 15m
+      RUNTIME_AGENT_SUPABASE_CLI_PATH: supabase
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}/platform-projects:${PWD}/platform-projects
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 
 volumes:
   platform-api-data:

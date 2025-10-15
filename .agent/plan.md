@@ -67,6 +67,7 @@
 
 ## Change Log
 - **2025-10-15 15:10 UTC · codex** – Runtime agent now invokes the Supabase CLI synchronously for provision/stop/destroy, platform API sends network metadata, docs note the CLI path env, and the CLI’s internal packages are mirrored under the agent for future in-process orchestration. Agent responses now surface stdout/stderr/duration metadata and the platform logs those results when debug logging is enabled.
+- **2025-10-15 15:55 UTC · codex** – Added runtime-agent service to platform compose overlays, introduced container build (`apps/runtime-agent/Dockerfile`), and wired default `PLATFORM_ORCHESTRATOR_URL` env so platform-api talks to the agent by default.
 - **2025-10-15 12:45 UTC** – Added provisioning/test readiness checklist and Studio local/remote alignment guidance (Codex).
 - **2025-10-15 06:55 UTC · 12c266ec81** – Provisioner now uses Supabase CLI on shared compose network; runtime dirs moved under `platform-projects/`; added `LOCAL` provider enum.
 - **2025-10-15 07:28 UTC · d4e4dcfc16** – Added local runtime health polling, pause/resume endpoints, and persisted service exclusions for CLI-based project stacks.
