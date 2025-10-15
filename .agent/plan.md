@@ -21,6 +21,7 @@
 - TODO: invoke Supabase CLI / docker compose templates to actually start/stop per-project stacks and manage port allocation.
 - TODO: align `.env` defaults for platform mode—current upstream template misses required variables (`POSTGRES_HOST`, `JWT_SECRET`, etc.). We added `.env.platform.example`, but the base compose still warns when users copy without filling the extra values. Clarify/automate this setup.
 - *Note from Codex (GPT-5, new agent):* Provisioner currently shells out via `PLATFORM_API_PROVISION_CMD`, but the platform-api container lacks the Supabase CLI and Docker socket. Recommend baking the CLI into the image (or mounting it) and wiring the socket so provisioning commands like `supabase init/start` can run in-container for both local and eventual cloud targets. This keeps the hook abstraction while avoiding brittle host-only scripts.
+- *Update (b5ca522836, 2025-10-15 05:33 UTC):* Platform API image now bundles the Supabase CLI + Docker client and mounts the host socket by default. Provision hooks generate per-project configs, allocate deterministic ports, and call `supabase start/stop`. Failures still leave project status as TODO (validate service health, capture outputs).
 - *Update (Codex):* Stubbed additional analytics, disk, storage, auth, and integration endpoints so Studio no longer 404s (e.g. `/analytics/log-drains`, `/disk/*`, `/auth/{ref}/config`). Replace these placeholders with real service integrations once available.
 
 ## Phase 5: Docker & Compose Integration ✅ *completed*
@@ -63,7 +64,8 @@
 - Preserve the generated contract test harness under `apps/platform-api/tests/auto-generated` when adding behavioral assertions.
 
 ### Next Immediate Tasks
-- Finish Phase 4 by wiring provisioning hooks to Supabase CLI (`supabase init/start/stop`) and persisting generated keys/ports.
+- QA the new Supabase CLI provisioning flow (b5ca522836) on macOS/Linux; capture logs and surface generated env details back to API responses.
+- Stabilize Studio deployment-target toggle (remote/local) and document rebuild steps so contributors know to enable `NEXT_PUBLIC_PLATFORM_ENABLE_LOCAL_TARGET` before building.
 - Document the Kong overlay behaviour, including the new `PLATFORM_DASHBOARD_BASIC_AUTH_ENABLED` toggle, and ensure tests cover both modes.
 - Document the Studio build flow (`pnpm build:studio:platform` → docker compose build) so new contributors know how to regenerate the `supabase-studio-platform` image after env tweaks.
 - Design the data-driven “Local vs Remote” project creation flow: define the config schema the API will serve, then scope the minimal Studio patch required to render dynamic provider fields.
