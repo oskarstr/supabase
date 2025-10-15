@@ -21,7 +21,7 @@ type Server struct {
 func New(cfg Config) *Server {
 	s := &Server{
 		cfg:      cfg,
-		executor: newCLIExecutor(cfg.CLIBinary),
+		executor: newLocalExecutor(),
 	}
 	s.router = s.routes()
 	s.server = &http.Server{
