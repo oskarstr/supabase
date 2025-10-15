@@ -19,6 +19,8 @@
 - Prefer `rg` for repo searches; avoid custom scripts unless they provide clear wins.
 - Keep test data deterministic (seed helpers, sequence resets) so pg-mem and Postgres behave consistently.
 - Keep commit messages clear and descriptive—skip `(chore)/(feat)` prefixes unless explicitly requested.
+- Minimize upstream Studio/infra edits: prefer data-driven overrides (custom content, env flags) and only touch upstream components when absolutely unavoidable—document any divergence.
+- Custom Studio UI tweaks should be driven by custom content keys (e.g. `project_creation:deployment_targets`, `project_creation:local_runtime_services`) plus platform guards (`NEXT_PUBLIC_IS_PLATFORM`). Keep JSX additions minimal and gated so upstream builds remain unchanged when the content keys are absent.
 
 ## Gotchas & Quick Tips
 - Project creation requires `organization_slug` and assumes async provisioning; the API intentionally ignores raw `organization_id`. Tests must inject slugs or create orgs first.
