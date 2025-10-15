@@ -56,6 +56,12 @@
 - *Update 2025-10-14 17:31 MDT:* Platform API now auto-applies migrations and seeds against Postgres on boot (no manual CLI step). Kysely-backed stores cover profiles, organizations, projects, access tokens, audit logs, billing, permissions, usage, etc., and the Vitest suite drives project/org creation against pg-mem to catch sequence regressions.
   - NEXT: wire Supabase CLI/Unix socket into the platform-api container so provisioning hooks can call `supabase init/start`; extend the data layer for remaining stubs (analytics detail, org billing) and persist provisioning artefacts.
 
+## Phase 10: Pg-meta Integration & Contract Tests (2025-10-15 02:40 UTC | commit c7a83d305c)
+- Proxy `/pg-meta/**` calls through Kong with `PG_META_CRYPTO_KEY` re-encryption and fall back to direct SQL in tests.
+- Reuse seeded anon/service keys so the platform project appears in Studio when `PLATFORM_DEBUG=true`.
+- Added `crypto-js` dependency; rebuilding the platform/studio containers is required after config changes.
+- Preserve the generated contract test harness under `apps/platform-api/tests/auto-generated` when adding behavioral assertions.
+
 ### Next Immediate Tasks
 - Finish Phase 4 by wiring provisioning hooks to Supabase CLI (`supabase init/start/stop`) and persisting generated keys/ports.
 - Document the Kong overlay behaviour, including the new `PLATFORM_DASHBOARD_BASIC_AUTH_ENABLED` toggle, and ensure tests cover both modes.
@@ -63,3 +69,4 @@
 - Design the data-driven “Local vs Remote” project creation flow: define the config schema the API will serve, then scope the minimal Studio patch required to render dynamic provider fields.
 - Audit platform-api response shapes against `api-types` and decide how we want to reuse or fork schemas once multi-provider provisioning (local vs cloud) is ready.
 - Investigate optional Studio UX tweaks (e.g. redirecting `/` to `/org`) once default project slug/env alignment is stable.
+- Coordinate with the auto-generated test harness: capture target behaviors per endpoint, add assertions without breaking generation scripts, and note any required seed data or cleanup.

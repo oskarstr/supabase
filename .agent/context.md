@@ -12,7 +12,9 @@
   - Key env knobs: `SUPABASE_DB_URL` (already in `docker/.env`) is used by platform via fallback; `PLATFORM_APPLY_MIGRATIONS=false` or `PLATFORM_SKIP_SEQUENCE_RESET=true` can disable auto-migration/reset during tests.
 - Docker integration is handled via `apps/platform-api/Dockerfile` and overlay compose files (`docker/docker-compose.platform.yml` + optional `.platform.dev.yml`). Studio is pointed at the platform API automatically when the overlay is used. We now route all `/api/platform/**` requests through Kong and expose them from Fastify using the `/api/platform` prefix so Studio can talk to the local control plane without source patches.
 - Auth routing mirrors Supabase Cloud: Kong injects the project anon key for `/auth/v1/**` via a startup patch, so Studio’s stock AuthClient works without local modifications. The platform overlay simply appends the `/api/platform` service.
-- Recent updates:
+- Recent updates (new entries include commit IDs):
+  - [c7a83d305c] Swapped the pg-meta stubs for a live proxy that re-encrypts connection strings with `PG_META_CRYPTO_KEY` before hitting Kong, with a direct Postgres fallback used by Vitest. Seeds now reuse the primary anon/service keys so the platform project shows data in Studio when `PLATFORM_DEBUG=true`.
+- Earlier updates (pre-tracking):
   - Added a `request-transformer`-less shell patch (pure YAML + entrypoint) so Kong adds the `anonymous: anon` consumer during boot and then merges `kong.platform.yml`.
   - Restored the platform signup flow end-to-end (`/api/platform/signup` proxy → GoTrue) and confirmed password login works without API headers.
   - Introduced a dedicated Studio platform build (`scripts/build-platform-studio.sh`, `apps/studio/.env.platform`, `docker/Dockerfile.studio-platform`) and taught `.dockerignore` to keep the standalone output.
@@ -25,6 +27,7 @@
   - Dev overlay (`docker-compose.platform.dev.yml`) runs the API in watch mode but requires the same env file and volume resets as production overlay.
   - Need to codify the Kong patch + Studio build flow in docs so others can reproduce the working login setup quickly.
   - Platform API still seeds orgs/projects from `apps/platform-api/data/state.json`; long term we’ll migrate that state into a real database so the JSON seed isn’t overloaded.
+  - Auto-generated test harness (`apps/platform-api/tests/auto-generated`) is in place; endpoint-specific behavioral assertions still need to be filled in manually—preserve the generated structure when expanding coverage.
 - Observations about the collaboration:
   - You prefer the classic docker-compose workflow and want the platform overlay to feel like a seamless “superset” of the usual local setup.
   - You proactively notice mismatches (e.g., default project slug) and press for templates/instructions that keep things ergonomic for future users.
