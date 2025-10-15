@@ -1,66 +1,40 @@
 # Project Context
 
-# This file is meant to track knowledge base and context of the project, you should refer to this if you run into issues and bring yourself up to speed and share items here that you think would be helpful that you have discovered that you wish you knew before starting to work on this. your entry should include timestamp when you added it and you can refer to commit id. 
+> First-time agents: start with **Current Focus**, then skim the sections below. Whenever you uncover behaviour that wasn’t obvious going in—especially tricky provisioning behaviours or upstream contracts—add a concise note (with timestamp/commit) under **Gotchas & Quick Tips** so the next agent can skip that discovery loop.
 
+## Current Focus
+- Define and document the local provisioning contract (state transitions, returned metadata, failure semantics) so Studio and tests have a shared target.
+- Introduce test seams: dependency-injected provisioner/destroyer and deterministic failure toggles to enable mocked provisioning in contract tests.
+- Align Studio’s project wizard with the control plane by serving deployment targets via API/custom content, clamping LOCAL defaults, and surfacing user guidance.
 
-- Goal: restore multi-project management to the open-source distribution. Supabase’s hosted platform keeps `/platform` functionality behind their SaaS; we’re rebuilding an equivalent control plane so self-hosted users can create/manage multiple projects via Studio, while still preserving the classic `docker compose up` experience. Also important to note we are trying to preserve ideally all of the upstream code while recreating clone of their Saas service. The code should be clean, as little hacks as possible. We have made some changes from upstream by adding new files but the main "server" logic lives in apps/platform-api.
-- Approach to date:
-- Added a new Fastify-based service under `apps/platform-api` that implements the core `/platform/**` routes, persists state, and simulates provisioning.
-- Seed data now comes from `.env` / `docker/.env` so the default org/project mirror upstream config. A new template `docker/.env.platform.example` captures all required variables for platform mode.
-- Background tasks mark new projects `COMING_UP` → `ACTIVE_HEALTHY` (or `INIT_FAILED`) and do the inverse for delete. Generated env files can be read after real provisioning is wired up.
-- 2025-10-14 17:31 MDT update:
-  - Platform API now auto-applies SQL migrations (`apps/platform-api/migrations`) on boot and seeds the `platform` schema into the shared Postgres, using the connection string already provided via `SUPABASE_DB_URL`. No manual CLI commands are required.
-  - The JSON-backed store is gone. All core stores (profile, organizations, projects, access-tokens, audit logs, billing, permissions, usage, etc.) now use Kysely against the platform schema, with sequences reset after seeding to avoid duplicate key errors when creating new orgs/projects.
-  - Docker image copies migrations, and tests run against `pg-mem` with migrations + seeds applied. A Vitest case exercises POST `/api/platform/organizations` to guard against sequence regressions.
-  - Key env knobs: `SUPABASE_DB_URL` (already in `docker/.env`) is used by platform via fallback; `PLATFORM_APPLY_MIGRATIONS=false` or `PLATFORM_SKIP_SEQUENCE_RESET=true` can disable auto-migration/reset during tests.
-- 2025-10-15 06:55 UTC update (12c266ec81): platform-api shells out to `supabase start --network-id <compose>` so local projects launch on the shared docker network without host port shims. Runtime files now live under a host-visible `platform-projects/` directory (configurable via `PLATFORM_PROJECTS_ROOT`), and a migration adds the `LOCAL` cloud provider enum.
-- Docker integration is handled via `apps/platform-api/Dockerfile` and overlay compose files (`docker/docker-compose.platform.yml` + optional `.platform.dev.yml`). Studio is pointed at the platform API automatically when the overlay is used. We now route all `/api/platform/**` requests through Kong and expose them from Fastify using the `/api/platform` prefix so Studio can talk to the local control plane without source patches.
-- Auth routing mirrors Supabase Cloud: Kong injects the project anon key for `/auth/v1/**` via a startup patch, so Studio’s stock AuthClient works without local modifications. The platform overlay simply appends the `/api/platform` service.
-- Recent updates (new entries include commit IDs):
-  - [b5ca522836] (2025-10-15 05:33 UTC) Baked Supabase CLI + Docker client into the platform-api image and added provisioning helpers that generate per-project config/port ranges before calling `supabase start/stop`. Studio now exposes a deployment-target toggle (local vs remote) gated by `NEXT_PUBLIC_PLATFORM_ENABLE_LOCAL_TARGET`; routing stays through Kong at `localhost:8000`. Outstanding: surface CLI output back into project metadata and finish automating remote target validation so cloud providers rehydrate correctly after mode switches.
-  - [c7a83d305c] Swapped the pg-meta stubs for a live proxy that re-encrypts connection strings with `PG_META_CRYPTO_KEY` before hitting Kong, with a direct Postgres fallback used by Vitest. Seeds now reuse the primary anon/service keys so the platform project shows data in Studio when `PLATFORM_DEBUG=true`.
-- Earlier updates (pre-tracking):
-  - Added a `request-transformer`-less shell patch (pure YAML + entrypoint) so Kong adds the `anonymous: anon` consumer during boot and then merges `kong.platform.yml`.
-  - Restored the platform signup flow end-to-end (`/api/platform/signup` proxy → GoTrue) and confirmed password login works without API headers.
-  - Introduced a dedicated Studio platform build (`scripts/build-platform-studio.sh`, `apps/studio/.env.platform`, `docker/Dockerfile.studio-platform`) and taught `.dockerignore` to keep the standalone output.
-  - Dashboard basic-auth can now be toggled via `PLATFORM_DASHBOARD_BASIC_AUTH_ENABLED`; the compose overlay injects the setting so local installs can disable Kong’s prompt without patching upstream files.
-  - Split the monolithic Fastify route module into resource-specific plugins (`routes/profile.ts`, `routes/projects.ts`, etc.) to mirror upstream structure and keep future changes isolated.
-  - Stubbed the remaining Studio-facing `/platform/**` endpoints (analytics, disk, storage, auth, integrations, replication) and added a Vitest harness (`apps/platform-api/tests/platform.routes.test.ts`) so future regressions are caught instead of silently 404ing.
-- Current status / open issues:
-  - by logging in you see a random list of projects. 
-  - Provisioning currently stubs out CLI execution; Supabase CLI/Docker automation still needs to be wired in so additional projects create full stacks.
-  - Dev overlay (`docker-compose.platform.dev.yml`) runs the API in watch mode but requires the same env file and volume resets as production overlay.
-  - Need to codify the Kong patch + Studio build flow in docs so others can reproduce the working login setup quickly.
-  - Platform API still seeds orgs/projects from `apps/platform-api/data/state.json`; long term we’ll migrate that state into a real database so the JSON seed isn’t overloaded.
-  - Auto-generated test harness (`apps/platform-api/tests/auto-generated`) is in place; endpoint-specific behavioral assertions still need to be filled in manually—preserve the generated structure when expanding coverage.
-- Observations about the collaboration:
-  - You prefer the classic docker-compose workflow and want the platform overlay to feel like a seamless “superset” of the usual local setup.
-  - You proactively notice mismatches (e.g., default project slug) and press for templates/instructions that keep things ergonomic for future users.
-  - Personality-wise you’re direct, pragmatic, and keep a strong focus on developer experience—expect future contributors to match that energy and communicate clearly.
-- Immediate next steps (see plan.md for detail):
-  - Wire the provisioning hooks to the Supabase CLI (init/start/stop) and capture generated keys/ports.
-  - Surface documentation/instructions so users know to build Studio via `pnpm build:studio:platform` (which sources `apps/studio/.env.platform`) and then rebuild the Docker image so the server-side bundle uses Kong-hosted URLs.
-  - Investigate aligning Studio’s landing route (e.g. redirect `/` to `/org`) once the default project slug/env are confirmed.
-- how to run: 
-  -pnpm build:studio:platform
-  -docker compose -f docker/docker-compose.yml -f docker/docker-compose.platform.yml build platform-api studio
-  -docker compose -f docker/docker-compose.yml -f docker/docker-compose.platform.yml up -d platform-api studio kong
+## Key Facts
+- **Goal**: restore multi-project management to the open-source distribution without forking upstream Studio; the control plane lives in `apps/platform-api`.
+- **Architecture**: Fastify + TypeScript service backed by Postgres (Kysely). Boot runs migrations (`apps/platform-api/migrations`) and seeds core data (`db/seed.ts`).
+- **Provisioning**: Supabase CLI is bundled in the platform-api image (`b5ca522836`) and runs against a host-visible `platform-projects/` directory with shared Docker networking (`12c266ec81`).
+- **Studio integration**: Docker compose overlays route `/api/platform/**` via Kong. The project wizard can expose local/remote deployment targets, currently gated by `NEXT_PUBLIC_PLATFORM_ENABLE_LOCAL_TARGET`.
+- **Auth/Kong**: Kong entrypoint injects the anonymous consumer, preserving Studio’s stock AuthClient flow (`/auth/v1/**` mirrors Supabase Cloud).
 
-- Platform API notes (Oct 2025 WIP):
-  - `/api/v1/**` requests are temporarily handled inside Fastify (`apps/platform-api/src/routes/api-v1.ts`) to satisfy Studio’s legacy Management API calls. Long term we’ll proxy those routes to real services via Kong, but for now they’re stubbed responses with TODOs and test coverage.
-  - Kong overlay (`docker/volumes/api/kong.platform.yml`) now exposes both `/api/platform` and `/api/v1`. Any Kong change requires rebuilding or restarting the `supabase-kong` container.
-  - The pg-meta stubs must include the fields Studio expects (e.g. schema `name`); integration tests now assert these to avoid silent regressions.
-- Testing philosophy:
-  - Vitest suite under `apps/platform-api/tests/platform.routes.test.ts` asserts both HTTP status and key payload shapes (auth config, analytics, v1 stubs, pg-meta schemas). Keep expanding it when new endpoints or fields are added so UI regressions fail fast.
-  - When data contracts change, update both the stub responders and the tests; then rebuild the platform Docker image so Studio picks up the latest API.
+## Working Conventions & Tooling
+- Always fetch upstream Supabase docs/CLI references via **Context7** before recreating functionality—several documented CLI helpers (e.g., provisioning commands) and other resources of general functionality exist and should be reused instead of rebuilt.
+- Prefer `rg` for repo searches; avoid custom scripts unless they provide clear wins.
+- Keep test data deterministic (seed helpers, sequence resets) so pg-mem and Postgres behave consistently.
 
-- Additional working instructions:
-  - if there are missing info in existing repo on how things should work, what should be returned or any other things that technically should be probably developed at some point from supabase devs, always query user first since supabase has opensourced a lot of their repos and the answer might be in one of them. same thing applies with docs - you can always query context7 for official supabase docs. Don't make large assumptions not based in truth.
-    - there is a comprehensive documentation also on supabase docs about management api that can reveal a lot of valuable information.
-  - clean code following the already established coding, architecture, phylosophy of the upstream code which is mostly everything but the platform-api app. 
-  - always after doing a large edit, addition or any other diff, run a test, rebuild docker for user to test.
-  - try to explain what you did, why and the consequences. 
-  - when adding dummy data, or stuff that is dependant on future functionality, always comment what needs to be done for future agents to know and quickly find.
-  - we dont want to reinvent the wheel, but create something that most likely is how they built their saas. 
-  - due to the nature of this product it being databases and peoples important data relying on this keep strong thinking on your development efforts, even further in the dev process that it doesnt destroy or introduce bugs that would turn into disaster. 
-  - when you add new commits, dont use the formatting of (feat), (chore) etc. Keep informative but straight to the point commit messages, some of you are mixing the formatting and its pissing me off. 
+## Gotchas & Quick Tips
+- Project creation requires `organization_slug` and assumes async provisioning; the API intentionally ignores raw `organization_id`. Tests must inject slugs or create orgs first.
+- Provisioner runs inside the container—ensure Docker socket and Supabase CLI paths are available when running locally. Use the new fail-toggles instead of ad-hoc env hacking for error scenarios.
+- Studio wizard toggles `LOCAL` via feature flag, but the long-term source of truth should be platform API custom content; don’t hardcode local-only logic in React components.
+- Kong patch auto-injects the anonymous consumer; avoid editing upstream Kong templates directly.
+
+## Recent Milestones
+- **2025-10-15 06:55 UTC · 12c266ec81** – Provisioner shells out to `supabase start --network-id <compose>`, runtime dirs live under `platform-projects/`, and the `LOCAL` cloud provider enum was added.
+- **2025-10-15 07:28 UTC · d4e4dcfc16** – Added pause/resume endpoints, runtime health polling, and persisted service exclusions so local stacks report accurate status and optional containers can be skipped.
+- **2025-10-15 05:33 UTC · b5ca522836** – Supabase CLI + Docker client baked into the image; provisioning helpers handle port allocation and config scaffolding. Studio wizard toggle for local vs remote added (feature-flagged).
+- **2025-10-14 17:31 MDT** – Migrated from JSON store to Postgres-backed schema. Auto-migrations, seeds, and pg-mem test harness landed; sequences reset after seeding to avoid ID collisions.
+- **Pg-meta proxy · c7a83d305c** – `/pg-meta/**` now re-encrypts connection strings with `PG_META_CRYPTO_KEY` before proxying via Kong; seeds reuse anon/service keys for debug visibility.
+
+## Historical Notes
+- Early iterations persisted state to JSON under `apps/platform-api/data`; retained here for context but superseded by the Postgres schema.
+- Added request-transformer-free Kong patch to merge `kong.platform.yml` at boot.
+- Restored `/api/platform/signup` proxy to GoTrue to match hosted platform behaviour.
+- Built dedicated Studio platform image (`scripts/build-platform-studio.sh`, `docker/Dockerfile.studio-platform`) and compose overlays for platform/dev.
+- Dashboard basic-auth toggle exposed via `PLATFORM_DASHBOARD_BASIC_AUTH_ENABLED`.
