@@ -57,6 +57,7 @@
   "infra:aws_nimbus_label": "AWS Nimbus",
 
   "project_creation:deployment_targets": ["remote"],
+  "project_creation:local_runtime_services": null,
 
   "ssl:certificate_url": "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/${env}/ssl/${env}-ca-2021.crt"
 }

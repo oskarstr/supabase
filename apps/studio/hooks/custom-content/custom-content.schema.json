@@ -98,6 +98,22 @@
       }
     },
 
+    "project_creation:local_runtime_services": {
+      "type": ["array", "null"],
+      "description": "Optional services surfaced when provisioning a local project",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "defaultEnabled": { "type": "boolean" }
+        },
+        "required": ["id", "label"],
+        "additionalProperties": false
+      }
+    },
+
     "ssl:certificate_url": {
       "type": "string",
       "description": "The URL of the SSL certificate"
