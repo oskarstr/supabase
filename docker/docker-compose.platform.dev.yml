@@ -28,6 +28,8 @@ services:
       - platform-api-data:/workspace/apps/platform-api/data
       - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}/platform-projects:${PWD}/platform-projects
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "4210:4210"
     depends_on:

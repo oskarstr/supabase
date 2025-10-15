@@ -13,6 +13,7 @@ export interface ProvisionContext {
   region: string
   databasePassword: string
   projectRoot: string
+  excludedServices: string[]
 }
 
 export interface DestroyContext {
@@ -149,6 +150,9 @@ export async function provisionProjectStack(context: ProvisionContext) {
     // platform-api container. We skip that built-in probe and run platform-managed health checks
     // instead so the future orchestrator can plug into the same lifecycle.
     const startArgs = ['start', '--ignore-health-check', '--yes', '--network-id', networkId]
+    if (context.excludedServices.length > 0) {
+      startArgs.push('-x', context.excludedServices.join(','))
+    }
 
     await runSupabaseCli(startArgs, {
       cwd: context.projectRoot,
@@ -204,5 +208,24 @@ export async function destroyProjectStack(context: DestroyContext) {
 
   if (logEnabled) {
     console.log('[provisioning] destroy complete', context.ref)
+  }
+}
+
+export interface StopContext {
+  projectRoot: string
+}
+
+export async function stopProjectStack(context: StopContext) {
+  const logEnabled = process.env.PLATFORM_API_LOG_PROVISIONING === 'true'
+  if (logEnabled) {
+    console.log('[provisioning] pause start', context)
+  }
+
+  await runSupabaseCli(['stop', '--yes'], {
+    cwd: context.projectRoot,
+  })
+
+  if (logEnabled) {
+    console.log('[provisioning] pause complete')
   }
 }

@@ -19,9 +19,16 @@ import {
 import { getPlatformDb } from '../db/client.js'
 import { toOrganization, toProjectDetail } from '../db/mappers.js'
 import type { ProjectsTable } from '../db/schema.js'
-import { destroyProjectStack, provisionProjectStack } from '../provisioner.js'
+import { destroyProjectStack, provisionProjectStack, stopProjectStack } from '../provisioner.js'
+import { waitForRuntimeHealth } from '../provisioning/health.js'
+import { normalizeExcludedServices } from '../provisioning/services.js'
 import { buildRestUrl } from './env.js'
-import { ensureProjectRuntime, removeProjectRuntime } from './project-runtimes.js'
+import {
+  ensureProjectRuntime,
+  getProjectRuntime,
+  removeProjectRuntime,
+} from './project-runtimes.js'
+import type { ProjectRuntimeRecord } from './project-runtimes.js'
 import type {
   CreateProjectBody,
   CreateProjectResponse,
@@ -80,10 +87,17 @@ const readProvisionedEnv = (runtimeRoot: string) => {
 const scheduleProvisioning = async (
   project: ProjectDetail,
   org: Organization,
-  dbPass: string,
-  runtimeRoot: string
+  options: {
+    runtime: ProjectRuntimeRecord
+    dbPassword?: string
+  }
 ) => {
-  const databasePassword = dbPass && dbPass.length > 0 ? dbPass : randomUUID()
+  const runtimeRoot = options.runtime.root_dir
+  const excludedServices = options.runtime.excluded_services ?? []
+  const existingEnv = readProvisionedEnv(runtimeRoot)
+  const databasePassword = options.dbPassword && options.dbPassword.length > 0
+    ? options.dbPassword
+    : existingEnv?.SUPABASE_DB_PASSWORD ?? existingEnv?.POSTGRES_PASSWORD ?? randomUUID()
   try {
     await provisionProjectStack({
       projectId: project.id,
@@ -94,12 +108,11 @@ const scheduleProvisioning = async (
       region: project.region,
       databasePassword,
       projectRoot: runtimeRoot,
+      excludedServices,
     })
 
     const parsedEnv = readProvisionedEnv(runtimeRoot)
-    const updates: ProjectUpdate = {
-      status: 'ACTIVE_HEALTHY',
-    }
+    const updates: ProjectUpdate = {}
 
     if (parsedEnv?.SUPABASE_ANON_KEY) {
       updates.anon_key = parsedEnv.SUPABASE_ANON_KEY
@@ -127,6 +140,12 @@ const scheduleProvisioning = async (
       updates.db_version = parsedEnv.POSTGRES_VERSION
     }
 
+    await waitForRuntimeHealth({
+      projectId: project.id,
+      excludedServices,
+    })
+
+    updates.status = 'ACTIVE_HEALTHY'
     await updateProject(project.ref, updates)
   } catch (error) {
     console.error('[platform-api] provisioning failed', project.ref, error)
@@ -152,10 +171,16 @@ const scheduleRemoval = async (project: ProjectDetail, org: Organization, runtim
 }
 
 export const listProjectDetails = async (): Promise<ProjectDetail[]> => {
-  const rows = await db.selectFrom('projects').selectAll().orderBy('inserted_at', 'asc').execute()
-  return rows
+  const [projectRows, runtimeRows] = await Promise.all([
+    db.selectFrom('projects').selectAll().orderBy('inserted_at', 'asc').execute(),
+    db.selectFrom('project_runtimes').selectAll().execute(),
+  ])
+
+  const runtimeByProjectId = new Map(runtimeRows.map((runtime) => [runtime.project_id, runtime]))
+
+  return projectRows
     .filter((row) => PLATFORM_DEBUG_ENABLED || !isPlatformProjectRef(row.ref))
-    .map((row) => toProjectDetail(row))
+    .map((row) => toProjectDetail(row, runtimeByProjectId.get(row.id) ?? null))
 }
 
 export const getProject = async (ref: string): Promise<ProjectDetail | undefined> => {
@@ -164,7 +189,10 @@ export const getProject = async (ref: string): Promise<ProjectDetail | undefined
   if (!PLATFORM_DEBUG_ENABLED && isPlatformProjectRef(row.ref)) {
     return undefined
   }
-  return toProjectDetail(row)
+
+  const runtime = await getProjectRuntime(row.id)
+
+  return toProjectDetail(row, runtime)
 }
 
 export const createProject = async (body: CreateProjectBody): Promise<CreateProjectResponse> => {
@@ -178,6 +206,7 @@ export const createProject = async (body: CreateProjectBody): Promise<CreateProj
     throw new Error(`Organization ${body.organization_slug} not found`)
   }
 
+  const excludedServices = normalizeExcludedServices(body.local_runtime?.exclude_services)
   const ref = await generateUniqueRef(body.name)
   const region =
     body.region_selection && 'code' in body.region_selection
@@ -208,7 +237,9 @@ export const createProject = async (body: CreateProjectBody): Promise<CreateProj
     .returningAll()
     .executeTakeFirstOrThrow()
 
-  const runtime = await ensureProjectRuntime(insertResult.ref, insertResult.id)
+  const runtime = await ensureProjectRuntime(insertResult.ref, insertResult.id, {
+    excludedServices,
+  })
 
   const organizationSummary = toOrganization({
     organization,
@@ -225,9 +256,12 @@ export const createProject = async (body: CreateProjectBody): Promise<CreateProj
     },
   })
 
-  const detail = toProjectDetail(insertResult)
+  const detail = toProjectDetail(insertResult, runtime)
 
-  void scheduleProvisioning(detail, organizationSummary, body.db_pass, runtime.root_dir)
+  void scheduleProvisioning(detail, organizationSummary, {
+    runtime,
+    dbPassword: body.db_pass,
+  })
 
   return {
     anon_key: insertResult.anon_key,
@@ -238,6 +272,9 @@ export const createProject = async (body: CreateProjectBody): Promise<CreateProj
     inserted_at: insertResult.inserted_at.toISOString(),
     is_branch_enabled: insertResult.is_branch_enabled,
     is_physical_backups_enabled: insertResult.is_physical_backups_enabled,
+    local_runtime: {
+      exclude_services: excludedServices,
+    },
     name: insertResult.name,
     organization_id: insertResult.organization_id,
     organization_slug: organization.slug,
@@ -288,4 +325,76 @@ export const deleteProject = async (ref: string): Promise<RemoveProjectResponse 
     name: projectRow.name,
     ref: projectRow.ref,
   }
+}
+
+export const pauseProject = async (ref: string): Promise<ProjectDetail | undefined> => {
+  const projectRow = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
+  if (!projectRow) return undefined
+  if (!PLATFORM_DEBUG_ENABLED && isPlatformProjectRef(projectRow.ref)) {
+    return undefined
+  }
+
+  const runtime = await getProjectRuntime(projectRow.id)
+
+  await updateProject(ref, { status: 'PAUSING' })
+
+  if (runtime) {
+    try {
+      await stopProjectStack({ projectRoot: runtime.root_dir })
+      await updateProject(ref, { status: 'INACTIVE' })
+    } catch (error) {
+      await updateProject(ref, { status: 'PAUSE_FAILED' })
+      throw error
+    }
+  } else {
+    await updateProject(ref, { status: 'INACTIVE' })
+  }
+
+  return getProject(ref)
+}
+
+export const resumeProject = async (ref: string): Promise<ProjectDetail | undefined> => {
+  const projectRow = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
+  if (!projectRow) return undefined
+  if (!PLATFORM_DEBUG_ENABLED && isPlatformProjectRef(projectRow.ref)) {
+    return undefined
+  }
+
+  const runtime = await ensureProjectRuntime(projectRow.ref, projectRow.id)
+
+  const organization = await db
+    .selectFrom('organizations')
+    .selectAll()
+    .where('id', '=', projectRow.organization_id)
+    .executeTakeFirst()
+
+  if (!organization) {
+    throw new Error(`Organization ${projectRow.organization_id} not found for project ${ref}`)
+  }
+
+  const organizationSummary = toOrganization({
+    organization,
+    membership: {
+      id: 0,
+      organization_id: organization.id,
+      profile_id: organization.id,
+      role_ids: [],
+      metadata: {},
+      mfa_enabled: false,
+      is_owner: true,
+      inserted_at: new Date(),
+      updated_at: new Date(),
+    },
+  })
+
+  await updateProject(ref, { status: 'COMING_UP' })
+  const currentDetail = await getProject(ref)
+
+  if (!currentDetail) return undefined
+
+  void scheduleProvisioning(currentDetail, organizationSummary, {
+    runtime,
+  })
+
+  return currentDetail
 }

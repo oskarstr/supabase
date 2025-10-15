@@ -132,6 +132,7 @@ export interface ProjectsTable {
 export interface ProjectRuntimesTable {
   project_id: number
   root_dir: string
+  excluded_services: StringArray
   created_at: Timestamp
   updated_at: Timestamp
 }

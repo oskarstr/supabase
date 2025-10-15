@@ -128,6 +128,9 @@ export interface ProjectDetail {
   inserted_at: string
   is_branch_enabled: boolean
   is_physical_backups_enabled: boolean
+  local_runtime?: {
+    exclude_services: string[]
+  }
   name: string
   organization_id: number
   ref: string
@@ -167,6 +170,9 @@ export interface CreateProjectBody {
   db_pass: string
   db_region?: string
   desired_instance_size?: ComputeSize
+  local_runtime?: {
+    exclude_services?: string[]
+  }
   name: string
   organization_slug: string
   postgres_engine?: string
@@ -193,6 +199,9 @@ export interface CreateProjectResponse {
   inserted_at: string | null
   is_branch_enabled: boolean
   is_physical_backups_enabled: boolean
+  local_runtime?: {
+    exclude_services: string[]
+  }
   name: string
   organization_id: number
   organization_slug: string

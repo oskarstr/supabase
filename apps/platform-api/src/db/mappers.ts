@@ -69,7 +69,10 @@ export const toOrganization = ({ organization, membership }: OrganizationWithMem
   usage_billing_enabled: organization.usage_billing_enabled,
 })
 
-export const toProjectDetail = (row: Selectable<ProjectsTable>): ProjectDetail => ({
+export const toProjectDetail = (
+  row: Selectable<ProjectsTable>,
+  runtime?: { excluded_services?: string[] } | null
+): ProjectDetail => ({
   cloud_provider: row.cloud_provider,
   connectionString: row.connection_string,
   db_host: row.db_host,
@@ -79,6 +82,11 @@ export const toProjectDetail = (row: Selectable<ProjectsTable>): ProjectDetail =
   inserted_at: toIso(row.inserted_at) ?? nowIsoString(),
   is_branch_enabled: row.is_branch_enabled,
   is_physical_backups_enabled: row.is_physical_backups_enabled,
+  local_runtime: runtime
+    ? {
+        exclude_services: runtime.excluded_services ?? [],
+      }
+    : undefined,
   name: row.name,
   organization_id: row.organization_id,
   ref: row.ref,

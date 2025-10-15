@@ -15,6 +15,8 @@ export {
 export {
   createProject,
   deleteProject,
+  pauseProject,
+  resumeProject,
   getProject,
   listProjectDetails,
 } from './projects.js'

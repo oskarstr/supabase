@@ -29,6 +29,8 @@ import {
   createTemporaryApiKey,
   listProjectLogs,
   listProjectLogDrains,
+  pauseProject,
+  resumeProject,
   listUsageApiCounts,
   listUsageApiRequests,
   listFunctionCombinedStats,
@@ -201,6 +203,32 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ status: project.status })
     }
   )
+
+  app.post<{ Params: { ref: string } }>('/:ref/pause', async (request, reply) => {
+    try {
+      const project = await pauseProject(request.params.ref)
+      if (!project) {
+        return reply.code(404).send({ message: 'Project not found' })
+      }
+      return reply.send(project)
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to pause project')
+      return reply.code(500).send({ message: 'Failed to pause project' })
+    }
+  })
+
+  app.post<{ Params: { ref: string } }>('/:ref/resume', async (request, reply) => {
+    try {
+      const project = await resumeProject(request.params.ref)
+      if (!project) {
+        return reply.code(404).send({ message: 'Project not found' })
+      }
+      return reply.send(project)
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to resume project')
+      return reply.code(500).send({ message: 'Failed to resume project' })
+    }
+  })
 
   app.get<{
     Params: { ref: string }
