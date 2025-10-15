@@ -114,22 +114,8 @@ export {
   listProjectAddons,
   listProjectDatabases,
   listProjectLints,
-  listProjectTables,
   getJwtSecretUpdateStatus,
 } from './project-info.js'
-
-export {
-  listPgMetaColumnPrivileges,
-  listPgMetaExtensions,
-  listPgMetaForeignTables,
-  listPgMetaMaterializedViews,
-  listPgMetaPolicies,
-  listPgMetaPublications,
-  listPgMetaTriggers,
-  listPgMetaTypes,
-  listPgMetaViews,
-  runPgMetaQuery,
-} from './pg-meta.js'
 
 export {
   listStorageBuckets,

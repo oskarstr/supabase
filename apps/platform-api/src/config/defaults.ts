@@ -110,6 +110,30 @@ export const DEFAULT_BRANCH_ENABLED =
 export const DEFAULT_PHYSICAL_BACKUPS =
   envString('STUDIO_DEFAULT_PHYSICAL_BACKUPS', 'false') === 'true'
 
+const envBoolean = (key: string, fallback = false) => {
+  const raw = envString(key)
+  if (raw === undefined) return fallback
+  const normalized = raw.trim().toLowerCase()
+  if (normalized.length === 0) return fallback
+  return ['1', 'true', 't', 'yes', 'y', 'on'].includes(normalized)
+}
+
+const defaultPlatformSchema = envString('PLATFORM_DB_SCHEMA', 'platform') ?? 'platform'
+export const PLATFORM_PROJECT_SCHEMA =
+  envString('PLATFORM_PROJECT_SCHEMA', defaultPlatformSchema)?.trim() || defaultPlatformSchema
+export const PLATFORM_PROJECT_REF =
+  envString('PLATFORM_PROJECT_REF', 'platform')?.trim() || 'platform'
+export const PLATFORM_PROJECT_NAME =
+  envString('PLATFORM_PROJECT_NAME', 'Platform Control Plane')?.trim() ||
+  'Platform Control Plane'
+export const PLATFORM_PROJECT_SUBSCRIPTION_ID =
+  envString('PLATFORM_PROJECT_SUBSCRIPTION_ID') ?? randomUUID()
+export const PLATFORM_PROJECT_ANON_KEY =
+  envString('PLATFORM_PROJECT_ANON_KEY') ?? DEFAULT_ANON_KEY
+export const PLATFORM_PROJECT_SERVICE_KEY =
+  envString('PLATFORM_PROJECT_SERVICE_KEY') ?? DEFAULT_SERVICE_KEY
+export const PLATFORM_DEBUG_ENABLED = envBoolean('PLATFORM_DEBUG', false)
+
 export const REGION_SMART_GROUPS: RegionSmartGroup[] = [
   { code: 'americas', name: 'Americas', type: 'smartGroup' },
   { code: 'emea', name: 'Europe, Middle East, and Africa', type: 'smartGroup' },

@@ -21,6 +21,12 @@ import {
   DEFAULT_REGION,
   DEFAULT_REST_URL,
   DEFAULT_SERVICE_KEY,
+  PLATFORM_DEBUG_ENABLED,
+  PLATFORM_PROJECT_ANON_KEY,
+  PLATFORM_PROJECT_NAME,
+  PLATFORM_PROJECT_REF,
+  PLATFORM_PROJECT_SERVICE_KEY,
+  PLATFORM_PROJECT_SUBSCRIPTION_ID,
   nowIso,
 } from '../config/defaults.js'
 import { PROJECTS_ROOT } from '../store/state.js'
@@ -261,6 +267,77 @@ export const seedDefaults = async () => {
           root_dir: rootDir,
         })
         .execute()
+    }
+
+    const platformProject = await trx
+      .selectFrom('projects')
+      .selectAll()
+      .where('ref', '=', PLATFORM_PROJECT_REF)
+      .executeTakeFirst()
+
+    let platformProjectId = platformProject?.id
+
+    if (!platformProject) {
+      const insertedPlatformProject = await trx
+        .insertInto('projects')
+        .values({
+          organization_id: DEFAULT_ORG_ID,
+          ref: PLATFORM_PROJECT_REF,
+          name: PLATFORM_PROJECT_NAME,
+          region: DEFAULT_REGION,
+          cloud_provider: DEFAULT_CLOUD_PROVIDER,
+          status: 'ACTIVE_HEALTHY',
+          infra_compute_size: DEFAULT_INFRA_SIZE,
+          db_host: DEFAULT_DB_HOST,
+          db_version: DEFAULT_DB_VERSION,
+          connection_string: DEFAULT_CONNECTION_STRING,
+          rest_url: DEFAULT_REST_URL,
+          is_branch_enabled: false,
+          is_physical_backups_enabled: false,
+          subscription_id: PLATFORM_PROJECT_SUBSCRIPTION_ID,
+          preview_branch_refs: [],
+          anon_key: PLATFORM_PROJECT_ANON_KEY,
+          service_key: PLATFORM_PROJECT_SERVICE_KEY,
+        })
+        .returning('id')
+        .executeTakeFirst()
+
+      platformProjectId = insertedPlatformProject?.id
+    } else if (
+      platformProject.anon_key !== PLATFORM_PROJECT_ANON_KEY ||
+      platformProject.service_key !== PLATFORM_PROJECT_SERVICE_KEY ||
+      platformProject.rest_url !== DEFAULT_REST_URL ||
+      platformProject.connection_string !== DEFAULT_CONNECTION_STRING
+    ) {
+      await trx
+        .updateTable('projects')
+        .set({
+          anon_key: PLATFORM_PROJECT_ANON_KEY,
+          service_key: PLATFORM_PROJECT_SERVICE_KEY,
+          rest_url: DEFAULT_REST_URL,
+          connection_string: DEFAULT_CONNECTION_STRING,
+        })
+        .where('id', '=', platformProject.id)
+        .execute()
+    }
+
+    if (platformProjectId) {
+      const runtimeRow = await trx
+        .selectFrom('project_runtimes')
+        .select(['project_id'])
+        .where('project_id', '=', platformProjectId)
+        .executeTakeFirst()
+
+      if (!runtimeRow) {
+        const platformRoot = resolve(PROJECTS_ROOT, PLATFORM_PROJECT_REF)
+        await trx
+          .insertInto('project_runtimes')
+          .values({
+            project_id: platformProjectId,
+            root_dir: platformRoot,
+          })
+          .execute()
+      }
     }
 
     if (process.env.PLATFORM_SKIP_SEQUENCE_RESET !== 'true') {

@@ -7,10 +7,12 @@ import {
   DEFAULT_ORG_REQUIRES_MFA,
   DEFAULT_STRIPE_CUSTOMER_ID,
   DEFAULT_USAGE_BILLING_ENABLED,
+  PLATFORM_DEBUG_ENABLED,
+  PLATFORM_PROJECT_REF,
   PLAN_LABELS,
 } from '../config/defaults.js'
 import { getPlatformDb } from '../db/client.js'
-import { toOrganization, toProjectDetail } from '../db/mappers.js'
+import { toOrganization } from '../db/mappers.js'
 import { getProfile } from './profile.js'
 import type {
   CreateOrganizationBody,
@@ -136,13 +138,17 @@ export const listOrganizationProjects = async (
     .orderBy('inserted_at', 'asc')
     .execute()
 
+  const visibleProjects = projects.filter(
+    (project) => PLATFORM_DEBUG_ENABLED || project.ref !== PLATFORM_PROJECT_REF
+  )
+
   return {
     pagination: {
-      count: projects.length,
-      limit: projects.length,
+      count: visibleProjects.length,
+      limit: visibleProjects.length,
       offset: 0,
     },
-    projects: projects.map((project) => ({
+    projects: visibleProjects.map((project) => ({
       cloud_provider: project.cloud_provider,
       databases: [
         {

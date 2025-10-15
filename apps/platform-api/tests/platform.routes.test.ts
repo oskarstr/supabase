@@ -1,11 +1,10 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataType, newDb } from 'pg-mem'
 import { randomUUID } from 'node:crypto'
-import { DEFAULT_ORG_SLUG } from '../src/config/defaults.js'
 
 async function buildApp() {
   const platformRoutes = (await import('../src/routes/platform.js')).default
@@ -21,11 +20,22 @@ describe('platform routes', () => {
   let app: FastifyInstance
   let defaultProjectRef = ''
   let defaultOrganizationSlug = ''
+  let platformProjectRef = ''
+  let platformProjectSchema = ''
 
   beforeAll(async () => {
+    vi.resetModules()
+    process.env.PLATFORM_DEBUG = 'true'
     process.env.PLATFORM_DB_URL = 'pg-mem'
+    process.env.SUPABASE_DB_URL = 'pg-mem'
     process.env.PLATFORM_API_REPO_ROOT = process.cwd()
     process.env.PLATFORM_APPLY_MIGRATIONS = 'false'
+
+    const defaults = await import('../src/config/defaults.js')
+    defaultOrganizationSlug = defaults.DEFAULT_ORG_SLUG
+    defaultProjectRef = defaults.DEFAULT_PROJECT_REF
+    platformProjectRef = defaults.PLATFORM_PROJECT_REF
+    platformProjectSchema = defaults.PLATFORM_PROJECT_SCHEMA
 
     const memDb = newDb()
     const migrationPath = resolve(process.cwd(), 'migrations/0001_initial.sql')
@@ -49,8 +59,13 @@ describe('platform routes', () => {
     await seedDefaults()
     const { listProjectDetails } = await import('../src/store/projects.js')
     const projects = await listProjectDetails()
-    defaultProjectRef = projects[0]?.ref ?? ''
-    defaultOrganizationSlug = DEFAULT_ORG_SLUG
+    if (!defaultProjectRef) {
+      defaultProjectRef = projects[0]?.ref ?? ''
+    }
+    if (!platformProjectRef) {
+      const fallbackPlatform = projects.find((project) => project.ref !== defaultProjectRef)
+      platformProjectRef = fallbackPlatform?.ref ?? platformProjectRef
+    }
   })
 
   afterAll(async () => {
@@ -113,7 +128,7 @@ describe('platform routes', () => {
       method: 'POST',
       url: `/api/platform/pg-meta/${projectRef}/query?key=schemas`,
       payload: {
-        query: 'select schema_name from information_schema.schemata;',
+        query: 'select nspname as schema from pg_catalog.pg_namespace limit 5;',
       },
     })
 
@@ -183,6 +198,31 @@ describe('platform routes', () => {
     expect(pools.length).toBeGreaterThan(0)
   })
 
+  it('includes the platform debug project with its schema', async () => {
+    expect(platformProjectRef).toBeTruthy()
+    expect(platformProjectSchema).toBeTruthy()
+
+    const listResponse = await app.inject({
+      method: 'GET',
+      url: '/api/platform/projects',
+    })
+    expect(listResponse.statusCode).toBe(200)
+    const listPayload = listResponse.json() as {
+      projects: Array<{ ref: string }>
+    }
+    const availableRefs = listPayload.projects.map((project) => project.ref)
+    expect(availableRefs).toContain(platformProjectRef)
+
+    const postgrest = await app.inject({
+      method: 'GET',
+      url: `/api/platform/projects/${platformProjectRef}/config/postgrest`,
+    })
+    expect(postgrest.statusCode).toBe(200)
+    expect(postgrest.json()).toMatchObject({
+      db_schema: platformProjectSchema,
+    })
+  })
+
   it('exposes storage buckets and credentials', async () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
@@ -226,6 +266,22 @@ describe('platform routes', () => {
     })
     expect(publicUrl.statusCode).toBe(200)
     expect(publicUrl.json()).toMatchObject({ publicUrl: expect.any(String) })
+  })
+
+  it('executes pg-meta queries against the project database', async () => {
+    const projectRef = defaultProjectRef
+    expect(projectRef).toBeTruthy()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/platform/pg-meta/${projectRef}/query`,
+      payload: {
+        query: 'select 1 as value',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json()).toEqual([{ value: 1 }])
   })
 
   it('returns project content data and counts', async () => {
@@ -562,6 +618,9 @@ describe('platform routes', () => {
     const schemas = await app.inject({
       method: 'POST',
       url: `/api/platform/pg-meta/${projectRef}/query?key=schemas`,
+      payload: {
+        query: "select 'platform'::text as schema, 'platform'::text as name",
+      },
     })
     expect(schemas.statusCode).toBe(201)
     const payload = schemas.json()

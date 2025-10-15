@@ -13,6 +13,8 @@ import {
   DEFAULT_PHYSICAL_BACKUPS,
   DEFAULT_REGION,
   DEFAULT_REST_URL,
+  PLATFORM_DEBUG_ENABLED,
+  PLATFORM_PROJECT_REF,
 } from '../config/defaults.js'
 import { getPlatformDb } from '../db/client.js'
 import { toOrganization, toProjectDetail } from '../db/mappers.js'
@@ -31,6 +33,7 @@ import type {
 const db = getPlatformDb()
 
 const sanitizeRef = (value: string) => value.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+const isPlatformProjectRef = (ref: string) => ref === PLATFORM_PROJECT_REF
 
 const generateUniqueRef = async (name: string) => {
   const base = sanitizeRef(name) || `proj-${randomUUID().slice(0, 8)}`
@@ -139,12 +142,18 @@ const scheduleRemoval = async (project: ProjectDetail, org: Organization, runtim
 
 export const listProjectDetails = async (): Promise<ProjectDetail[]> => {
   const rows = await db.selectFrom('projects').selectAll().orderBy('inserted_at', 'asc').execute()
-  return rows.map((row) => toProjectDetail(row))
+  return rows
+    .filter((row) => PLATFORM_DEBUG_ENABLED || !isPlatformProjectRef(row.ref))
+    .map((row) => toProjectDetail(row))
 }
 
 export const getProject = async (ref: string): Promise<ProjectDetail | undefined> => {
   const row = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
-  return row ? toProjectDetail(row) : undefined
+  if (!row) return undefined
+  if (!PLATFORM_DEBUG_ENABLED && isPlatformProjectRef(row.ref)) {
+    return undefined
+  }
+  return toProjectDetail(row)
 }
 
 export const createProject = async (body: CreateProjectBody): Promise<CreateProjectResponse> => {

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
+import { PLATFORM_PROJECT_REF, PLATFORM_PROJECT_SCHEMA } from '../config/defaults.js'
 import { envString } from './env.js'
 import { getProject } from './projects.js'
 import type {
@@ -25,10 +26,10 @@ const nowIso = () => new Date().toISOString()
 
 // TODO(platform-api): Replace these stubbed configuration responses once real provisioning data
 // is available from the Supabase CLI integration.
-export const getProjectPostgrestConfig = (_ref: string): PostgrestConfigResponse => ({
+export const getProjectPostgrestConfig = (ref: string): PostgrestConfigResponse => ({
   db_anon_role: 'anon',
   db_extra_search_path: 'public',
-  db_schema: 'public, storage',
+  db_schema: ref === PLATFORM_PROJECT_REF ? PLATFORM_PROJECT_SCHEMA : 'public, storage',
   jwt_secret: JWT_SECRET_FALLBACK,
   max_rows: 1000,
   role_claim_key: '.role',

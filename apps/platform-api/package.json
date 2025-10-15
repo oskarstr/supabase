@@ -13,10 +13,12 @@
     "@fastify/cors": "^11.1.0",
     "dotenv": "^16.4.5",
     "fastify": "^5.1.0",
+    "crypto-js": "^4.2.0",
     "kysely": "^0.27.3",
     "pg": "^8.13.1"
   },
   "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
     "@types/pg": "^8.10.2",
     "pg-mem": "^3.0.5",
     "@types/node": "^22.13.14",
