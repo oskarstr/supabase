@@ -34,7 +34,7 @@
 - Provisioner runs inside the container—ensure Docker socket and Supabase CLI paths are available when running locally. Use the new fail-toggles instead of ad-hoc env hacking for error scenarios.
 - Studio wizard toggles `LOCAL` via feature flag, but the long-term source of truth should be platform API custom content; don’t hardcode local-only logic in React components.
 - Custom content now surfaces the `local` deployment target and runtime toggles; `logflare`/`vector` default to off but can be re-enabled from the wizard.
-- Platform API shares the stack’s `SUPABASE_DB_URL`; the db container now wraps the Supabase image with a tiny password-sync entrypoint so restarting `db` re-applies the `.env` password.
+- **2025-10-15 · e0e0a036c4** Platform API still reads `SUPABASE_DB_URL`; the `db` service now wraps the Supabase image with a password-sync entrypoint so restarting `db` re-applies the `.env` password.
 - Kong patch auto-injects the anonymous consumer; avoid editing upstream Kong templates directly.
 - Studio container must talk to the host’s Kong via `host.docker.internal`; use that host in `NEXT_PUBLIC_*` URLs or Studio will try `127.0.0.1:8000` and fail the health check.
 - Docker’s port-forwarding occasionally wedges after compose changes; a `docker compose ... restart kong` restored `localhost:8000` when the host started getting `ERR_CONNECTION_RESET`.

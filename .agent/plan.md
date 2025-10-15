@@ -12,6 +12,7 @@
   - Inject provisioner/destroyer dependencies to enable mocked success/failure paths; expose a deterministic “fail next provision/destroy” toggle for testing.
   - Persist generated artefacts (anon/service keys, REST URL, connection string, port ranges, runtime root) back into Postgres.
   - Capture structured CLI output/error metadata for operators and tests.
+  - Investigate why freshly provisioned local projects tear down their containers during COMING_UP (see latest session); reproduce and capture logs from platform-api/runtime-agent.
 - Ensure deletions are idempotent and INIT_FAILED/RESTORE_FAILED states are observable with retry timestamps.
 - Align `.env`/compose defaults with platform mode and automate missing variable generation where possible.
 - Reset pg sequences between test runs and seed deterministic fixtures to keep pg-mem/Postgres behaviour synchronized.
@@ -69,7 +70,7 @@
 - **2025-10-15 21:05 UTC · codex** – Updated Studio/Kong host URLs to `host.docker.internal` so the Studio container hits the gateway instead of `127.0.0.1`; stack comes up with Studio healthy again.
 - **2025-10-15 22:02 UTC · codex** – Restarted `supabase-kong` to clear a stale Docker port-forward so `localhost:8000` stopped returning `ERR_CONNECTION_RESET`.
 - **2025-10-15 22:20 UTC · codex** – Surfaced the local deployment target + runtime toggles via custom content, aligned the wizard defaults with runtime exclusions, and fixed `normalizeExcludedServices` so opting back into Logflare/Vector works.
-- **2025-10-15 22:40 UTC · codex** – (reverted) Dedicated platform DB role experiment removed; the db service now wraps the Supabase image with a password-sync entrypoint so restarting it realigns credentials with `.env`.
+- **2025-10-15 22:40 UTC · e0e0a036c4** – Replaced the dedicated role experiments with a lightweight wrapper around the `db` service that syncs the `postgres` password from `.env` via `supabase_admin` on startup.
 - **2025-10-15 15:10 UTC · codex** – Runtime agent now invokes the Supabase CLI synchronously for provision/stop/destroy, platform API sends network metadata, docs note the CLI path env, and the CLI’s internal packages are mirrored under the agent for future in-process orchestration. Agent responses now surface stdout/stderr/duration metadata and the platform logs those results when debug logging is enabled.
 - **2025-10-15 15:55 UTC · codex** – Added runtime-agent service to platform compose overlays, introduced container build (`apps/runtime-agent/Dockerfile`), and wired default `PLATFORM_ORCHESTRATOR_URL` env so platform-api talks to the agent by default.
 - **2025-10-15 20:20 UTC · codex** – Platform API now logs orchestrator stdout/stderr/duration, local runtimes exclude analytics/vector by default, and runtime-agent hostname is driven by `RUNTIME_AGENT_SUPABASE_HOST`; note ongoing Postgres password drift when composing with the base stack.
