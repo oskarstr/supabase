@@ -16,15 +16,24 @@ export const ALL_RUNTIME_SERVICES = [
 
 export type RuntimeService = (typeof ALL_RUNTIME_SERVICES)[number]
 
+const DEFAULT_EXCLUDED_SERVICES: RuntimeService[] = ['logflare', 'vector']
+
 export const normalizeExcludedServices = (services: string[] | undefined): string[] => {
-  if (!services) return []
-  const allowed = new Set<string>(ALL_RUNTIME_SERVICES)
   const normalized: string[] = []
-  for (const service of services) {
-    const trimmed = service.trim().toLowerCase()
+  const allowed = new Set<string>(ALL_RUNTIME_SERVICES)
+  const addIfValid = (value: string) => {
+    const trimmed = value.trim().toLowerCase()
     if (allowed.has(trimmed) && !normalized.includes(trimmed)) {
       normalized.push(trimmed)
     }
+  }
+
+  DEFAULT_EXCLUDED_SERVICES.forEach((service) => addIfValid(service))
+
+  if (!services) return normalized
+
+  for (const service of services) {
+    addIfValid(service)
   }
   return normalized
 }

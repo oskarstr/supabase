@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 
+	"github.com/rs/zerolog/log"
 	"github.com/supabase/supabase/apps/runtime-agent/internal/start"
 	"github.com/supabase/supabase/apps/runtime-agent/internal/stop"
 	"github.com/supabase/supabase/apps/runtime-agent/internal/utils"
@@ -154,6 +155,7 @@ func resetSupabaseGlobals() {
 	if hostname == "" {
 		hostname = utils.GetHostname()
 	}
+	log.Info().Str("hostname", hostname).Msg("runtime-agent configuring supabase hostname")
 	utils.Config = config.NewConfig(config.WithHostname(hostname))
 	utils.OutputFormat.Value = utils.OutputPretty
 	flags.ProjectRef = ""

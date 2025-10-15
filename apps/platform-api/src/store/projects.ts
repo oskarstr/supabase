@@ -164,6 +164,19 @@ const scheduleProvisioning = async (
   } catch (error) {
     console.error('[platform-api] provisioning failed', project.ref, error)
     await updateProject(project.ref, { status: 'INIT_FAILED' })
+    try {
+      await destroyProjectStack({
+        ref: project.ref,
+        name: project.name,
+        organizationSlug: org.slug,
+        projectRoot: runtimeRoot,
+      })
+    } catch (cleanupError) {
+      console.warn('[platform-api] failed to cleanup after provisioning failure', {
+        ref: project.ref,
+        error: cleanupError,
+      })
+    }
   }
 }
 
