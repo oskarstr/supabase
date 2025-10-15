@@ -122,7 +122,9 @@ export async function provisionProjectStack(context: ProvisionContext) {
     }
 
     try {
-      await runSupabaseCli(['stop', '--yes'], { cwd: runtime.supabaseDir })
+      await runSupabaseCli(['stop', '--yes'], {
+        cwd: context.projectRoot,
+      })
     } catch (error) {
       if (logEnabled) {
         console.warn('[provisioning] initial stop failed (continuing)', {
@@ -132,8 +134,24 @@ export async function provisionProjectStack(context: ProvisionContext) {
       }
     }
 
-    await runSupabaseCli(['start', '--ignore-health-check', '--yes'], {
-      cwd: runtime.supabaseDir,
+    // NOTE: Until the platform owns provisioning end-to-end, we rely on the Supabase CLI to
+    // bootstrap the local stack. We bind it to the same docker network as our compose overlay so
+    // the control plane can talk to the runtime without host-only port shims. Once the dedicated
+    // orchestrator lands, this call becomes the integration point to swap the backend out.
+    const explicitNetwork = process.env.PLATFORM_DOCKER_NETWORK?.trim()
+    const composeProject = process.env.COMPOSE_PROJECT_NAME?.trim()
+    const networkId = explicitNetwork && explicitNetwork.length > 0
+      ? explicitNetwork
+      : composeProject && composeProject.length > 0
+        ? `${composeProject}_default`
+        : 'supabase_default'
+    // The CLI probes 127.0.0.1 from inside its process, which fails when it runs inside the
+    // platform-api container. We skip that built-in probe and run platform-managed health checks
+    // instead so the future orchestrator can plug into the same lifecycle.
+    const startArgs = ['start', '--ignore-health-check', '--yes', '--network-id', networkId]
+
+    await runSupabaseCli(startArgs, {
+      cwd: context.projectRoot,
     })
   }
 
@@ -164,7 +182,9 @@ export async function destroyProjectStack(context: DestroyContext) {
     const supabaseDir = resolve(context.projectRoot, 'supabase')
     if (existsSync(supabaseDir)) {
       try {
-        await runSupabaseCli(['stop', '--yes'], { cwd: supabaseDir })
+        await runSupabaseCli(['stop', '--yes'], {
+          cwd: context.projectRoot,
+        })
       } catch (error) {
         if (process.env.FAIL_DESTRUCTION === 'true') {
           throw error

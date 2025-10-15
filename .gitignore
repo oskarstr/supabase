@@ -148,3 +148,5 @@ gcloud.json
 **/.sentryclirc
 
 keys.json
+# Platform API generated project runtimes
+platform-projects/

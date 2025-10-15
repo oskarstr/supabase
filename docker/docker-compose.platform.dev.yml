@@ -5,6 +5,7 @@ services:
       SUPABASE_CLI_VERSION: "2.51.0"
       SUPABASE_TELEMETRY_DISABLED: "true"
       PLATFORM_API_REPO_ROOT: /workspace
+      PLATFORM_PROJECTS_ROOT: ${PWD}/platform-projects
       PORT: "4210"
       HOST: "0.0.0.0"
       CI: "true"
@@ -26,6 +27,7 @@ services:
       - ..:/workspace
       - platform-api-data:/workspace/apps/platform-api/data
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}/platform-projects:${PWD}/platform-projects
     ports:
       - "4210:4210"
     depends_on:

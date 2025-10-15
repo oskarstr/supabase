@@ -76,7 +76,11 @@ export interface State {
 
 export const DATA_DIR = resolve(platformSrcDir, '../data')
 export const STATE_FILE = resolve(DATA_DIR, 'state.json')
-export const PROJECTS_ROOT = resolve(DATA_DIR, 'projects')
+
+const projectsRootOverride = process.env.PLATFORM_PROJECTS_ROOT?.trim()
+export const PROJECTS_ROOT = projectsRootOverride
+  ? resolve(projectsRootOverride)
+  : resolve(DATA_DIR, 'projects')
 
 const ensureDir = (path: string) => {
   if (!existsSync(path)) {
