@@ -116,13 +116,13 @@ const FALLBACK_LOCAL_RUNTIME_SERVICES = [
     id: 'logflare',
     label: 'Logflare',
     description: 'Analytics UI used by Studio for log drains and log exploration.',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     id: 'vector',
     label: 'Vector',
     description: 'Log forwarder that ships logs into Logflare and other destinations.',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
 ]
 

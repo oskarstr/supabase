@@ -22,6 +22,8 @@
 - Prefer `rg` for repo searches; avoid custom scripts unless they provide clear wins.
 - Keep test data deterministic (seed helpers, sequence resets) so pg-mem and Postgres behave consistently.
 - Keep commit messages clear and descriptive—skip `(chore)/(feat)` prefixes unless explicitly requested.
+- Since this is built with docker, whenever you are working on task, rerun/rebuild/restart whatever is relevant to the change you make the containers and test your implementation.
+- do not commit before user has tested functionality or given feedback.
 - Minimize upstream Studio/infra edits: prefer data-driven overrides (custom content, env flags) and only touch upstream components when absolutely unavoidable—document any divergence.
 - Custom Studio UI tweaks should be driven by custom content keys (e.g. `project_creation:deployment_targets`, `project_creation:local_runtime_services`) plus platform guards (`NEXT_PUBLIC_IS_PLATFORM`). Keep JSX additions minimal and gated so upstream builds remain unchanged when the content keys are absent.
 - Provisioning still shells out to the Supabase CLI inside the platform container. Because the CLI’s health probes are hardcoded to `127.0.0.1`, we currently rely on a `socat` port forward hack. Long-term fix is to move provisioning into a host-side agent (or native orchestrator) that drives Docker directly; note this in Phase 4 roadmap.
@@ -31,7 +33,11 @@
 - Project creation requires `organization_slug` and assumes async provisioning; the API intentionally ignores raw `organization_id`. Tests must inject slugs or create orgs first.
 - Provisioner runs inside the container—ensure Docker socket and Supabase CLI paths are available when running locally. Use the new fail-toggles instead of ad-hoc env hacking for error scenarios.
 - Studio wizard toggles `LOCAL` via feature flag, but the long-term source of truth should be platform API custom content; don’t hardcode local-only logic in React components.
+- Custom content now surfaces the `local` deployment target and runtime toggles; `logflare`/`vector` default to off but can be re-enabled from the wizard.
+- Platform API shares the stack’s `SUPABASE_DB_URL`; the db container now wraps the Supabase image with a tiny password-sync entrypoint so restarting `db` re-applies the `.env` password.
 - Kong patch auto-injects the anonymous consumer; avoid editing upstream Kong templates directly.
+- Studio container must talk to the host’s Kong via `host.docker.internal`; use that host in `NEXT_PUBLIC_*` URLs or Studio will try `127.0.0.1:8000` and fail the health check.
+- Docker’s port-forwarding occasionally wedges after compose changes; a `docker compose ... restart kong` restored `localhost:8000` when the host started getting `ERR_CONNECTION_RESET`.
 
 ## Recent Milestones
 - **2025-10-15 06:55 UTC · 12c266ec81** – Provisioner shells out to `supabase start --network-id <compose>`, runtime dirs live under `platform-projects/`, and the `LOCAL` cloud provider enum was added.

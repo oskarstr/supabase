@@ -4,6 +4,7 @@
 .github
 about
 docker
+!docker/db/**
 examples
 i18n
 **/node_modules

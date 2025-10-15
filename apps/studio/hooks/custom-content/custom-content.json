@@ -56,8 +56,33 @@
   "infra:cloud_providers": ["AWS", "AWS_K8S", "FLY"],
   "infra:aws_nimbus_label": "AWS Nimbus",
 
-  "project_creation:deployment_targets": ["remote"],
-  "project_creation:local_runtime_services": null,
+  "project_creation:deployment_targets": ["remote", "local"],
+  "project_creation:local_runtime_services": [
+    {
+      "id": "studio",
+      "label": "Supabase Studio",
+      "description": "Local dashboard for managing your project (http://localhost:3000).",
+      "defaultEnabled": true
+    },
+    {
+      "id": "mailpit",
+      "label": "Mailpit",
+      "description": "SMTP capture inbox for testing email flows locally.",
+      "defaultEnabled": true
+    },
+    {
+      "id": "logflare",
+      "label": "Logflare",
+      "description": "Analytics UI used by Studio for log drains and log exploration.",
+      "defaultEnabled": false
+    },
+    {
+      "id": "vector",
+      "label": "Vector",
+      "description": "Log forwarder that ships logs into Logflare and other destinations.",
+      "defaultEnabled": false
+    }
+  ],
 
   "ssl:certificate_url": "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/${env}/ssl/${env}-ca-2021.crt"
 }

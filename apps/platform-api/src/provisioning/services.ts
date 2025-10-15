@@ -28,13 +28,19 @@ export const normalizeExcludedServices = (services: string[] | undefined): strin
     }
   }
 
-  DEFAULT_EXCLUDED_SERVICES.forEach((service) => addIfValid(service))
-
-  if (!services) return normalized
+  if (!services || services.length === 0) {
+    DEFAULT_EXCLUDED_SERVICES.forEach((service) => addIfValid(service))
+    return normalized
+  }
 
   for (const service of services) {
     addIfValid(service)
   }
+
+  if (normalized.length === 0) {
+    DEFAULT_EXCLUDED_SERVICES.forEach((service) => addIfValid(service))
+  }
+
   return normalized
 }
 

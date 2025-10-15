@@ -66,6 +66,10 @@
 - Integrate contract test harness under `apps/platform-api/tests/auto-generated`, ensuring behaviour matches Studio expectations once provisioning is stable.
 
 ## Change Log
+- **2025-10-15 21:05 UTC · codex** – Updated Studio/Kong host URLs to `host.docker.internal` so the Studio container hits the gateway instead of `127.0.0.1`; stack comes up with Studio healthy again.
+- **2025-10-15 22:02 UTC · codex** – Restarted `supabase-kong` to clear a stale Docker port-forward so `localhost:8000` stopped returning `ERR_CONNECTION_RESET`.
+- **2025-10-15 22:20 UTC · codex** – Surfaced the local deployment target + runtime toggles via custom content, aligned the wizard defaults with runtime exclusions, and fixed `normalizeExcludedServices` so opting back into Logflare/Vector works.
+- **2025-10-15 22:40 UTC · codex** – (reverted) Dedicated platform DB role experiment removed; the db service now wraps the Supabase image with a password-sync entrypoint so restarting it realigns credentials with `.env`.
 - **2025-10-15 15:10 UTC · codex** – Runtime agent now invokes the Supabase CLI synchronously for provision/stop/destroy, platform API sends network metadata, docs note the CLI path env, and the CLI’s internal packages are mirrored under the agent for future in-process orchestration. Agent responses now surface stdout/stderr/duration metadata and the platform logs those results when debug logging is enabled.
 - **2025-10-15 15:55 UTC · codex** – Added runtime-agent service to platform compose overlays, introduced container build (`apps/runtime-agent/Dockerfile`), and wired default `PLATFORM_ORCHESTRATOR_URL` env so platform-api talks to the agent by default.
 - **2025-10-15 20:20 UTC · codex** – Platform API now logs orchestrator stdout/stderr/duration, local runtimes exclude analytics/vector by default, and runtime-agent hostname is driven by `RUNTIME_AGENT_SUPABASE_HOST`; note ongoing Postgres password drift when composing with the base stack.
