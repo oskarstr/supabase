@@ -1,6 +1,6 @@
 # Platform API Plan
 
-# From now on add current date and time when you add items here. 
+# This file is meant to track progress across developers, although in past additions havent included commit id and timestamp,  whoever is updating this file should include commit id and current date and time for easier tracking. thank you.
 
 ## Phase 1: Scaffolding ✅ *completed*
 - Created `apps/platform-api` workspace with Fastify + TypeScript.

@@ -1,5 +1,8 @@
 # Project Context
 
+# This file is meant to track knowledge base and context of the project, you should refer to this if you run into issues and bring yourself up to speed and share items here that you think would be helpful that you have discovered that you wish you knew before starting to work on this. your entry should include timestamp when you added it and you can refer to commit id. 
+
+
 - Goal: restore multi-project management to the open-source distribution. Supabase’s hosted platform keeps `/platform` functionality behind their SaaS; we’re rebuilding an equivalent control plane so self-hosted users can create/manage multiple projects via Studio, while still preserving the classic `docker compose up` experience. Also important to note we are trying to preserve ideally all of the upstream code while recreating clone of their Saas service. The code should be clean, as little hacks as possible. We have made some changes from upstream by adding new files but the main "server" logic lives in apps/platform-api.
 - Approach to date:
 - Added a new Fastify-based service under `apps/platform-api` that implements the core `/platform/**` routes, persists state, and simulates provisioning.
@@ -58,3 +61,4 @@
   - when adding dummy data, or stuff that is dependant on future functionality, always comment what needs to be done for future agents to know and quickly find.
   - we dont want to reinvent the wheel, but create something that most likely is how they built their saas. 
   - due to the nature of this product it being databases and peoples important data relying on this keep strong thinking on your development efforts, even further in the dev process that it doesnt destroy or introduce bugs that would turn into disaster. 
+  - when you add new commits, dont use the formatting of (feat), (chore) etc. Keep informative but straight to the point commit messages, some of you are mixing the formatting and its pissing me off. 

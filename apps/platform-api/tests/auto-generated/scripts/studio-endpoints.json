@@ -1,0 +1,2129 @@
+{
+  "metadata": {
+    "totalEndpoints": 302,
+    "extractedAt": "2025-10-15T02:21:00.221Z",
+    "methodBreakdown": {
+      "GET": 134,
+      "PATCH": 28,
+      "POST": 98,
+      "DELETE": 29,
+      "PUT": 13
+    }
+  },
+  "endpoints": [
+    {
+      "path": "/platform/projects/{ref}/resources/{id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/__templates/resource-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/resources/{id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/__templates/resource-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/branches",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/__templates/resources-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile/access-tokens",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/access-tokens/access-tokens-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile/access-tokens/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/access-tokens/access-tokens-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile/access-tokens",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/access-tokens/access-tokens-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/actions/{run_id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/actions/action-detail-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/actions/{run_id}/logs",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/actions/action-logs-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/actions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/actions/action-runs-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/infra-monitoring",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/analytics/infra-monitoring-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/usage/daily",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/analytics/org-daily-stats-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/daily-stats",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/analytics/project-daily-stats-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/oauth/authorizations/{id}",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-authorization/api-authorization-approve-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/oauth/authorizations/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-authorization/api-authorization-decline-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/oauth/authorizations/{id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-authorization/api-authorization-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/api-keys/{id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-keys/[id]/api-key-id-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/api-keys/{id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-keys/[id]/api-key-id-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/api-keys",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-keys/api-key-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/api-keys/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-keys/api-key-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/api-keys",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-keys/api-keys-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/api-keys/legacy",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-keys/legacy-api-key-toggle-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/api-keys/legacy",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-keys/legacy-api-keys-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/api-keys/temporary",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-keys/temp-api-keys-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/postgrest",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/api-settings/create-and-expose-api-schema-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/config",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/auth-config-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/config",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/auth-config-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/config/hooks",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/auth-hooks-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/users",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/user-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/users/{id}/factors",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/user-delete-mfa-factors-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/users/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/user-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/invite",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/user-invite-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/recover",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/user-reset-password-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/magiclink",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/user-send-magic-link-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/otp",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/user-send-otp-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/users/{id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/user-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/auth/{ref}/validate/spam",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/auth/validate-spam-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/network-bans",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/banned-ips/banned-ips-delete-mutations.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/network-bans/retrieve",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/banned-ips/banned-ips-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/branches",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branch-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/branches/{branch_id_or_ref}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branch-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/branches/{branch_id_or_ref}/diff",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branch-diff-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/branches/{branch_id_or_ref}/merge",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branch-merge-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/branches/{branch_id_or_ref}/push",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branch-push-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/branches/{branch_id_or_ref}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branch-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/branches/{branch_id_or_ref}/reset",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branch-reset-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/branches/{branch_id_or_ref}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branch-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/branches",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/branches/branches-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/cli/login",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/cli/login.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/disk",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/disk-attributes-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/disk",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/disk-attributes-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/disk/custom-config",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/disk-autoscale-config-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/disk/custom-config",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/disk-autoscale-config-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/disk/util",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/disk-utilization-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/secrets",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/jwt-secret-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/secrets/update-status",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/jwt-secret-updating-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/settings/sensitivity",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-compliance-config-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/available-versions",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-creation-postgres-versions-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/resize",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-disk-resize-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/postgrest",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-postgrest-config-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/postgrest",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-postgrest-config-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/settings",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-settings-v2-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/storage",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-storage-config-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/storage",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-storage-config-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/readonly/temporary-disable",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-temp-disable-read-only-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/restore/versions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-unpause-postgres-versions-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/upgrade/eligibility",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-upgrade-eligibility-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/upgrade/status",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/config/project-upgrade-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content/count",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/content-count-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/content-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content/item/{id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/content-id-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/content-infinite-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/content-insert-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/content-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/content-upsert-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content/folders/{id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/sql-folder-contents-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content/folders",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/sql-folder-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content/folders/{id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/sql-folder-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content/folders",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/sql-folders-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content/folders",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/sql-folders-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/content",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/content/sql-snippets-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/custom-hostname/activate",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/custom-domains/custom-domains-activate-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/custom-hostname/initialize",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/custom-domains/custom-domains-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/custom-hostname",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/custom-domains/custom-domains-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/custom-hostname",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/custom-domains/custom-domains-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/custom-hostname/reverify",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/custom-domains/custom-domains-reverify-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/backups/download",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/backup-download-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/backups/downloadable-backups",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/backup-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/backups/restore-physical",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/backup-restore-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/backups/restore",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/backup-restore-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/backups",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/backups-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/db-password",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/database-password-reset-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/backups/enable-physical-backups",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/enable-physical-backups-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/hook-enable",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/hooks-enable-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/database/migrations",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/migration-upsert-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/pgbouncer",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/pgbouncer-config-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/pgbouncer",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/pgbouncer-config-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/pgbouncer/status",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/pgbouncer-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/backups/pitr",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/pitr-restore-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/supavisor",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/supavisor-configuration-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/supavisor",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database/supavisor-configuration-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/extensions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database-extensions/database-extensions-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/policies",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database-policies/database-policies-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/publications",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database-publications/database-publications-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/triggers",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/database-triggers/database-triggers-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/api/rest",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/docs/project-json-schema-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/${slug}/documents/dpa",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/documents/dpa-request-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/functions/{function_slug}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/edge-functions/edge-function-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/functions/{function_slug}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/edge-functions/edge-functions-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/functions/deploy",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/edge-functions/edge-functions-deploy-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/functions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/edge-functions/edge-functions-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/functions/{function_slug}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/edge-functions/edge-functions-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/types",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/enumerated-types/enumerated-types-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/feedback/downgrade",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/feedback/exit-survey-send.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/feedback/send",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/feedback/feedback-send.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/feedback/send",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/feedback/support-ticket-send.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/feedback/upgrade",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/feedback/upgrade-survey-send.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/foreign-tables",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/foreign-tables/foreign-tables-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/cloud-marketplace/redirect",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/aws-redirect-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/github/authorization",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/github-authorization-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/github/authorization",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/github-authorization-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/github/branches/{connectionId}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/github-branches-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/github/connections",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/github-connection-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/github/connections/{connection_id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/github-connection-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/github/connections/{connection_id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/github-connection-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/github/connections",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/github-connections-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/github/repositories",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/github-repositories-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/{slug}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/integrations-query-org-only.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/integrations-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/vercel/connections",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/integrations-vercel-connections-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/vercel/connections/{connection_id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/integrations-vercel-installed-connection-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/vercel/connections/{connection_id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/vercel-connection-update-mutate.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/integrations/vercel",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/vercel-integration-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/vercel/redirect/{installation_id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/integrations/vercel-redirect-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/billing/invoices/{invoiceId}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/invoices/invoice-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/stripe/invoices/overdue",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/invoices/invoices-overdue-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/billing/invoices",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/invoices/invoices-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/billing/invoices/upcoming",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/invoices/org-invoice-upcoming-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/signing-keys",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/jwt-signing-keys/jwt-signing-key-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/signing-keys/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/jwt-signing-keys/jwt-signing-key-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/signing-keys/{id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/jwt-signing-keys/jwt-signing-key-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/signing-keys",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/jwt-signing-keys/jwt-signing-keys-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/signing-keys/legacy",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/jwt-signing-keys/legacy-jwt-signing-key-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/signing-keys/legacy",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/jwt-signing-keys/legacy-jwt-signing-key-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/notifications/advisor/exceptions",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/lint/create-lint-rule-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/notifications/advisor/exceptions",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/lint/delete-lint-rule-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/run-lints",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/lint/lint-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/notifications/advisor/exceptions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/lint/lint-rules-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/log-drains",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/log-drains/create-log-drain-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/log-drains/{token}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/log-drains/delete-log-drain-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/log-drains",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/log-drains/log-drains-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/log-drains/{token}",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/log-drains/update-log-drain-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/endpoints/logs.all",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/logs/get-unified-logs.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/endpoints/logs.all",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/logs/unified-log-inspection-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/endpoints/logs.all",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/logs/unified-logs-chart-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/endpoints/logs.all",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/logs/unified-logs-count-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/endpoints/logs.all",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/logs/unified-logs-facet-count-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/endpoints/logs.all",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/logs/unified-logs-infinite-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/materialized-views",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/materialized-views/materialized-views-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile/audit-login",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/misc/audit-login-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/reset-password",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/misc/reset-password-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/signup",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/misc/signup-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/network-restrictions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/network-restrictions/network-restrictions-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/network-restrictions/apply",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/network-restrictions/network-retrictions-apply-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/notifications/archive-all",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/notifications/notifications-v2-archive-all-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/notifications",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/notifications/notifications-v2-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/notifications/summary",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/notifications/notifications-v2-summary-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/notifications",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/notifications/notifications-v2-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/oauth/apps/{id}/revoke",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/oauth/authorized-app-revoke-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/oauth/apps",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/oauth/authorized-apps-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/oauth/apps",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/oauth/oauth-app-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/oauth/apps/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/oauth/oauth-app-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/oauth/apps/{id}",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/oauth/oauth-app-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/oauth/apps",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/oauth/oauth-apps-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/api/rest",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/open-api/api-spec-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/invitations/{token}",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organization-members/organization-invitation-accept-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/invitations",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organization-members/organization-invitation-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/invitations/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organization-members/organization-invitation-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/invitations/{token}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organization-members/organization-invitation-token-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/{gotrue_id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organization-members/organization-member-role-assign-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/roles",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organization-members/organization-roles-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/audit",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-audit-logs-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/available-regions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-available-regions-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/fly/{fly_organization_id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-by-fly-organization-id-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/cloud-marketplace",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/billing/credits/top-up",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-credit-top-up-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/customer",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-customer-profile-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/customer",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-customer-profile-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/cloud-marketplace/link",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-link-aws-marketplace-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/{gotrue_id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-member-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-members-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/invitations",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-members-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/mfa/enforcement",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-mfa-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/members/mfa/enforcement",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-mfa-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/payments/default",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-payment-method-default-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/payments",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-payment-method-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/payments/setup-intent",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-payment-method-setup-intent-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/payments",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-payment-methods-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/organizations/{slug}/project-claim/{token}",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-project-claim-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/organizations/{slug}/project-claim/{token}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-project-claim-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/tax-ids",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-tax-id-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/tax-ids",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-tax-id-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/tax-ids",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-tax-id-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organization-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/organizations/organizations-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile/permissions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/permissions/permissions-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/status",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/platform/platform-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/column-privileges",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/privileges/column-privileges-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile/audit",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/profile/profile-audit-logs-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/profile/profile-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/profile/profile-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/update-email",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/profile/profile-update-email-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/profile",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/profile/profile-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/clone",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/clone-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/clone",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/clone-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/database/{ref}/clone/status",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/clone-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/projects",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/org-projects-infinite-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/fly/{fly_extension_id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-by-fly-extension-id-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-detail-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/pause",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-pause-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/pause/status",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-pause-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/restart",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-restart-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/restart-services",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-restart-services-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/restore",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-restore-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/service-versions",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-service-versions.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/status",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/transfer",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-transfer-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/transfer/preview",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-transfer-preview-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/types/typescript",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-type-generation-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/upgrade",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/project-upgrade-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/projects-infinite-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/projects/projects-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/load-balancers",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/read-replicas/load-balancers-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/read-replicas/remove",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/read-replicas/replica-remove-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/read-replicas/setup",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/read-replicas/replica-setup-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/databases",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/read-replicas/replicas-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/databases-statuses",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/read-replicas/replicas-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/realtime",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/realtime/realtime-config-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/config/realtime",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/realtime/realtime-config-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/destinations-pipelines",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/create-destination-pipeline-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/tenants-sources",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/create-tenant-source-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/destinations/{destination_id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/destination-by-id-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/destinations",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/destinations-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/pipelines/{pipeline_id}",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/pipeline-by-id-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/pipelines/{pipeline_id}/status",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/pipeline-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/pipelines/{pipeline_id}/version",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/pipeline-version-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/pipelines",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/pipelines-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/sources",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/sources-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/pipelines/{pipeline_id}/start",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/start-pipeline-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/pipelines/{pipeline_id}/stop",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/stop-pipeline-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/replication/{ref}/sources/{source_id}/tables",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/replication/tables-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/analytics/endpoints/logs.all",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/reports/report.utils.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/secrets",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/secrets/secrets-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/secrets",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/secrets/secrets-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/secrets",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/secrets/secrets-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/health",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/service-status/service-status-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/query",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/sql/execute-sql-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/ssl-enforcement",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/ssl-enforcement/ssl-enforcement-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/ssl-enforcement",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/ssl-enforcement/ssl-enforcement-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/sso",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/sso/sso-config-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/sso",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/sso/sso-config-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/sso",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/sso/sso-config-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}/empty",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}/empty",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-empty-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}/objects",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-object-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}/objects/public-url",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-object-get-public-url-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}/objects/sign",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-object-sign-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}/objects/list",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-objects-list-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}",
+      "method": "PATCH",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/bucket-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/buckets-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/buckets/{id}/objects/move",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/object-move-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/credentials",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/s3-access-key-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/credentials/{id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/s3-access-key-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/credentials",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/s3-access-key-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/archive",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/storage-archive-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/storage/{ref}/archive",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/storage/storage-archive-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/stripe/setup-intent",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/stripe/setup-intent-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/billing/plans",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/subscriptions/org-plans-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/confirm-subscription",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/subscriptions/org-subscription-confirm-pending-create.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/billing/subscription",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/subscriptions/org-subscription-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/billing/subscription",
+      "method": "PUT",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/subscriptions/org-subscription-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/billing/addons/{addon_variant}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/subscriptions/project-addon-remove-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/billing/addons",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/subscriptions/project-addon-update-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects/{ref}/billing/addons",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/subscriptions/project-addons-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/tables",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/tables/tables-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/telemetry/reset",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/telemetry/send-reset-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/third-party-auth",
+      "method": "POST",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/third-party-auth/integration-create-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/third-party-auth/{tpa_id}",
+      "method": "DELETE",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/third-party-auth/integration-delete-mutation.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/v1/projects/{ref}/config/auth/third-party-auth",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/third-party-auth/integrations-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/organizations/{slug}/usage",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/usage/org-usage-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/projects-resource-warnings",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/usage/resource-warnings-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/pg-meta/{ref}/views",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/views/views-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/workflow-runs/{workflow_run_id}/logs",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/workflow-runs/workflow-run-logs-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/workflow-runs/{workflow_run_id}/logs",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/workflow-runs/workflow-run-query.ts",
+      "responseType": null,
+      "requestBody": null
+    },
+    {
+      "path": "/platform/workflow-runs",
+      "method": "GET",
+      "sourceFile": "/Users/oskarstrinitis/Documents/Projects/supabase/apps/studio/data/workflow-runs/workflow-runs-query.ts",
+      "responseType": null,
+      "requestBody": null
+    }
+  ]
+}
