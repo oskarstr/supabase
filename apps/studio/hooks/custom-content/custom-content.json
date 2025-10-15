@@ -56,5 +56,7 @@
   "infra:cloud_providers": ["AWS", "AWS_K8S", "FLY"],
   "infra:aws_nimbus_label": "AWS Nimbus",
 
+  "project_creation:deployment_targets": ["remote"],
+
   "ssl:certificate_url": "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/${env}/ssl/${env}-ca-2021.crt"
 }

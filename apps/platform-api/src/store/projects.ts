@@ -63,9 +63,18 @@ const updateProject = async (ref: string, values: ProjectUpdate) => {
 }
 
 const readProvisionedEnv = (runtimeRoot: string) => {
-  const envPath = resolve(runtimeRoot, '.env')
-  if (!existsSync(envPath)) return null
-  return parseEnv(readFileSync(envPath, 'utf-8'))
+  const candidatePaths = [
+    resolve(runtimeRoot, '.env'),
+    resolve(runtimeRoot, 'supabase/.env'),
+  ]
+
+  for (const envPath of candidatePaths) {
+    if (existsSync(envPath)) {
+      return parseEnv(readFileSync(envPath, 'utf-8'))
+    }
+  }
+
+  return null
 }
 
 const scheduleProvisioning = async (
@@ -74,14 +83,16 @@ const scheduleProvisioning = async (
   dbPass: string,
   runtimeRoot: string
 ) => {
+  const databasePassword = dbPass && dbPass.length > 0 ? dbPass : randomUUID()
   try {
     await provisionProjectStack({
+      projectId: project.id,
       ref: project.ref,
       name: project.name,
       organizationSlug: org.slug,
       cloudProvider: project.cloud_provider,
       region: project.region,
-      databasePassword: dbPass,
+      databasePassword,
       projectRoot: runtimeRoot,
     })
 

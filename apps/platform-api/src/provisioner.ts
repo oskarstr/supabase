@@ -1,6 +1,11 @@
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
+import { prepareSupabaseRuntime } from './provisioning/runtime.js'
+
 export interface ProvisionContext {
+  projectId: number
   ref: string
   name: string
   organizationSlug: string
@@ -24,12 +29,16 @@ const parseDelay = (value: string | undefined, fallback: number) => {
 
 const PROVISION_DELAY_MS = parseDelay(process.env.PROVISIONING_DELAY_MS, 1_000)
 const DESTRUCTION_DELAY_MS = parseDelay(process.env.DESTRUCTION_DELAY_MS, 1_000)
+const SUPABASE_BIN = process.env.SUPABASE_CLI_PATH?.trim() || 'supabase'
 
-function renderTemplate(template: string, context: Record<string, string>) {
-  return template.replace(/\{(\w+)\}/g, (_match, key: string) => context[key] ?? '')
-}
+const renderTemplate = (template: string, context: Record<string, string>) =>
+  template.replace(/\{(\w+)\}/g, (_match, key: string) => context[key] ?? '')
 
-async function runCommand(commandTemplate: string, context: Record<string, string>) {
+const runCommand = async (
+  commandTemplate: string,
+  context: Record<string, string>,
+  options: { cwd?: string } = {}
+) => {
   const command = renderTemplate(commandTemplate, context)
   const { spawn } = await import('node:child_process')
 
@@ -37,6 +46,7 @@ async function runCommand(commandTemplate: string, context: Record<string, strin
     const child = spawn(command, {
       stdio: 'inherit',
       shell: true,
+      cwd: options.cwd,
       env: {
         ...process.env,
         ...context,
@@ -51,6 +61,31 @@ async function runCommand(commandTemplate: string, context: Record<string, strin
   })
 }
 
+const runSupabaseCli = async (
+  args: string[],
+  options: { cwd: string; env?: Record<string, string> }
+) => {
+  const { spawn } = await import('node:child_process')
+
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(SUPABASE_BIN, args, {
+      stdio: 'inherit',
+      cwd: options.cwd,
+      env: {
+        ...process.env,
+        SUPABASE_TELEMETRY_DISABLED: 'true',
+        ...options.env,
+      },
+    })
+
+    child.on('error', reject)
+    child.on('exit', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`supabase ${args.join(' ')} exited with code ${code}`))
+    })
+  })
+}
+
 export async function provisionProjectStack(context: ProvisionContext) {
   const logEnabled = process.env.PLATFORM_API_LOG_PROVISIONING === 'true'
   if (logEnabled) {
@@ -59,20 +94,47 @@ export async function provisionProjectStack(context: ProvisionContext) {
 
   const provisionCommand = process.env.PLATFORM_API_PROVISION_CMD
   if (provisionCommand) {
-    await runCommand(provisionCommand, {
-      PROJECT_REF: context.ref,
-      PROJECT_NAME: context.name,
-      PROJECT_ORG: context.organizationSlug,
-      PROJECT_CLOUD_PROVIDER: context.cloudProvider,
-      PROJECT_REGION: context.region,
-      PROJECT_DB_PASSWORD: context.databasePassword,
-      PROJECT_ROOT: context.projectRoot,
-    })
+    await runCommand(
+      provisionCommand,
+      {
+        PROJECT_REF: context.ref,
+        PROJECT_NAME: context.name,
+        PROJECT_ORG: context.organizationSlug,
+        PROJECT_CLOUD_PROVIDER: context.cloudProvider,
+        PROJECT_REGION: context.region,
+        PROJECT_DB_PASSWORD: context.databasePassword,
+        PROJECT_ROOT: context.projectRoot,
+      },
+      { cwd: context.projectRoot }
+    )
   } else {
-    await sleep(PROVISION_DELAY_MS)
+    const runtime = await prepareSupabaseRuntime({
+      projectId: context.projectId,
+      projectRef: context.ref,
+      projectName: context.name,
+      projectRoot: context.projectRoot,
+      databasePassword: context.databasePassword,
+    })
+
     if (process.env.FAIL_PROVISIONING === 'true') {
+      await sleep(PROVISION_DELAY_MS)
       throw new Error('Provisioning failed due to FAIL_PROVISIONING flag')
     }
+
+    try {
+      await runSupabaseCli(['stop', '--yes'], { cwd: runtime.supabaseDir })
+    } catch (error) {
+      if (logEnabled) {
+        console.warn('[provisioning] initial stop failed (continuing)', {
+          ref: context.ref,
+          error,
+        })
+      }
+    }
+
+    await runSupabaseCli(['start', '--ignore-health-check', '--yes'], {
+      cwd: runtime.supabaseDir,
+    })
   }
 
   if (logEnabled) {
@@ -88,15 +150,34 @@ export async function destroyProjectStack(context: DestroyContext) {
 
   const destroyCommand = process.env.PLATFORM_API_DESTROY_CMD
   if (destroyCommand) {
-    await runCommand(destroyCommand, {
-      PROJECT_REF: context.ref,
-      PROJECT_NAME: context.name,
-      PROJECT_ORG: context.organizationSlug,
-      PROJECT_ROOT: context.projectRoot,
-    })
+    await runCommand(
+      destroyCommand,
+      {
+        PROJECT_REF: context.ref,
+        PROJECT_NAME: context.name,
+        PROJECT_ORG: context.organizationSlug,
+        PROJECT_ROOT: context.projectRoot,
+      },
+      { cwd: context.projectRoot }
+    )
   } else {
-    await sleep(DESTRUCTION_DELAY_MS)
+    const supabaseDir = resolve(context.projectRoot, 'supabase')
+    if (existsSync(supabaseDir)) {
+      try {
+        await runSupabaseCli(['stop', '--yes'], { cwd: supabaseDir })
+      } catch (error) {
+        if (process.env.FAIL_DESTRUCTION === 'true') {
+          throw error
+        }
+        console.warn('[provisioning] supabase stop failed during destroy', {
+          ref: context.ref,
+          error,
+        })
+      }
+    }
+
     if (process.env.FAIL_DESTRUCTION === 'true') {
+      await sleep(DESTRUCTION_DELAY_MS)
       throw new Error('Destruction failed due to FAIL_DESTRUCTION flag')
     }
   }

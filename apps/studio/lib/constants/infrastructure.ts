@@ -1,5 +1,5 @@
 import type { CloudProvider } from 'shared-data'
-import { AWS_REGIONS, FLY_REGIONS } from 'shared-data'
+import { AWS_REGIONS, FLY_REGIONS, LOCAL_REGIONS } from 'shared-data'
 
 import type { components } from 'data/api'
 import { useCustomContent } from 'hooks/custom-content/useCustomContent'
@@ -43,11 +43,14 @@ export function useDefaultProvider() {
 
   const { infraCloudProviders: validCloudProviders } = useCustomContent(['infra:cloud_providers'])
 
-  if (validCloudProviders?.includes(defaultProvider)) {
+  const remoteProviders = (validCloudProviders ?? []).filter((provider): provider is CloudProvider => provider !== 'LOCAL')
+
+  if (remoteProviders.includes(defaultProvider)) {
     return defaultProvider
   }
 
-  return (validCloudProviders?.[0] ?? 'AWS') as CloudProvider
+  const fallback = remoteProviders[0] ?? validCloudProviders?.[0] ?? 'AWS'
+  return fallback as CloudProvider
 }
 
 export const PROVIDERS = {
@@ -76,6 +79,12 @@ export const PROVIDERS = {
     name: 'AWS (Nimbus)',
     default_region: AWS_REGIONS_DEFAULT,
     regions: { ...AWS_REGIONS },
+  },
+  LOCAL: {
+    id: 'LOCAL',
+    name: 'Local',
+    default_region: LOCAL_REGIONS.LOCAL_DEV,
+    regions: { ...LOCAL_REGIONS },
   },
 } as const
 

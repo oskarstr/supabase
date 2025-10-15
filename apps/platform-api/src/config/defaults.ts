@@ -155,6 +155,9 @@ export const REGION_SPECIFICS: Record<CloudProvider, RegionSpecific[]> = {
   AWS_NIMBUS: [
     { code: 'aws-nimbus-us-east-1', name: 'US East 1 (Nimbus)', provider: 'AWS_NIMBUS', type: 'specific' },
   ],
+  LOCAL: [
+    { code: 'local-dev', name: 'Local Development', provider: 'LOCAL', type: 'specific' },
+  ],
 }
 
 export const DEFAULT_AVAILABLE_VERSIONS: AvailableVersionsResponse['available_versions'] = [

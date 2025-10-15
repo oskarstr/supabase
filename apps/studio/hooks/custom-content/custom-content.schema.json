@@ -89,6 +89,15 @@
       "description": "The label of the AWS Nimbus provider"
     },
 
+    "project_creation:deployment_targets": {
+      "type": ["array"],
+      "description": "Controls which deployment targets are available when creating a project",
+      "items": {
+        "type": "string",
+        "enum": ["local", "remote"]
+      }
+    },
+
     "ssl:certificate_url": {
       "type": "string",
       "description": "The URL of the SSL certificate"
@@ -103,6 +112,7 @@
     "logs:default_query",
     "infra:cloud_providers",
     "infra:aws_nimbus_label",
+    "project_creation:deployment_targets",
     "ssl:certificate_url"
   ],
   "additionalProperties": false

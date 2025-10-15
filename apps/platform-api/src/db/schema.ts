@@ -77,7 +77,7 @@ export interface ProjectsTable {
   ref: string
   name: string
   region: string
-  cloud_provider: 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS'
+  cloud_provider: 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS' | 'LOCAL'
   status:
     | 'INACTIVE'
     | 'ACTIVE_HEALTHY'

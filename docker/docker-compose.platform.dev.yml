@@ -1,18 +1,31 @@
 services:
   platform-api:
     image: node:22-alpine
-    command: sh -c "corepack enable pnpm && pnpm install --filter platform-api... && pnpm --filter platform-api... dev"
-    working_dir: /workspace
-    env_file:
-      - .env
     environment:
+      SUPABASE_CLI_VERSION: "2.51.0"
+      SUPABASE_TELEMETRY_DISABLED: "true"
       PLATFORM_API_REPO_ROOT: /workspace
       PORT: "4210"
       HOST: "0.0.0.0"
       CI: "true"
+    command: >
+      sh -c "apk add --no-cache bash curl docker-cli docker-cli-compose git jq openssl tar \
+        && ARCH=$$(uname -m) \
+        && case \$$ARCH in x86_64) BIN_ARCH=amd64 ;; aarch64) BIN_ARCH=arm64 ;; *) echo 'unsupported arch' \$$ARCH && exit 1 ;; esac \
+        && curl -fsSL https://github.com/supabase/cli/releases/download/v$${SUPABASE_CLI_VERSION}/supabase_linux_$${BIN_ARCH}.tar.gz -o /tmp/supabase.tgz \
+        && tar -xzf /tmp/supabase.tgz -C /usr/local/bin supabase \
+        && chmod +x /usr/local/bin/supabase \
+        && rm /tmp/supabase.tgz \
+        && corepack enable pnpm \
+        && pnpm install --filter platform-api... \
+        && pnpm --filter platform-api... dev"
+    working_dir: /workspace
+    env_file:
+      - .env
     volumes:
       - ..:/workspace
       - platform-api-data:/workspace/apps/platform-api/data
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "4210:4210"
     depends_on:

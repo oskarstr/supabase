@@ -34,5 +34,7 @@ export type CustomContentTypes = {
   infraCloudProviders: CloudProvider[]
   infraAwsNimbusLabel: string
 
+  projectCreationDeploymentTargets: ('local' | 'remote')[]
+
   sslCertificateUrl: string
 }

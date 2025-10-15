@@ -9,6 +9,34 @@ export const getAvailableRegions = (
   cloudProvider: CloudProvider,
   _organizationSlug: string
 ): RegionsInfo => {
+  if (cloudProvider === 'LOCAL') {
+    const defaultSmartGroup = REGION_SMART_GROUPS[0]
+    return {
+      all: {
+        smartGroup: [],
+        specific: [
+          {
+            code: 'local-dev',
+            name: 'Local Development',
+            provider: 'LOCAL',
+            type: 'specific',
+          },
+        ],
+      },
+      recommendations: {
+        smartGroup: { ...defaultSmartGroup },
+        specific: [
+          {
+            code: 'local-dev',
+            name: 'Local Development',
+            provider: 'LOCAL',
+            type: 'specific',
+          },
+        ],
+      },
+    }
+  }
+
   const specificRegions = REGION_SPECIFICS[cloudProvider] ?? []
   const recommendedSpecific = specificRegions.length > 0 ? [specificRegions[0]] : []
   const recommendedSmartGroup =

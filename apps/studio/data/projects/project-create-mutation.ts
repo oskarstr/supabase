@@ -57,7 +57,6 @@ export async function createProject({
   releaseChannel,
 }: ProjectCreateVariables) {
   const body: CreateProjectBody = {
-    cloud_provider: cloudProvider as CloudProvider,
     organization_slug: organizationSlug,
     name,
     db_pass: dbPass,
@@ -73,6 +72,14 @@ export async function createProject({
     data_api_use_api_schema: dataApiUseApiSchema,
     postgres_engine: postgresEngine,
     release_channel: releaseChannel,
+  }
+
+  if (cloudProvider) {
+    if (cloudProvider === 'LOCAL') {
+      ;(body as Record<string, any>).cloud_provider = 'LOCAL'
+    } else {
+      body.cloud_provider = cloudProvider as CreateProjectBody['cloud_provider']
+    }
   }
 
   const { data, error } = await post(`/platform/projects`, {

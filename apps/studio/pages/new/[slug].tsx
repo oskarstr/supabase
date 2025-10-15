@@ -102,6 +102,7 @@ const FormSchema = z.object({
   organization: z.string({
     required_error: 'Please select an organization',
   }),
+  deploymentTarget: z.enum(['local', 'remote']),
   projectName: z
     .string()
     .trim()
@@ -140,9 +141,28 @@ const Wizard: NextPageWithLayout = () => {
     ''
   )
 
-  const showAdvancedConfig = useIsFeatureEnabled('project_creation:show_advanced_config')
+  const {
+    infraCloudProviders: validCloudProviders,
+    projectCreationDeploymentTargets,
+  } = useCustomContent(['infra:cloud_providers', 'project_creation:deployment_targets'])
 
-  const { infraCloudProviders: validCloudProviders } = useCustomContent(['infra:cloud_providers'])
+  const deploymentTargets = (projectCreationDeploymentTargets ?? ['remote']).filter(
+    (target, index, array) => array.indexOf(target) === index
+  )
+
+  const deploymentTargetsWithOverrides = (() => {
+    const shouldEnableLocal = process.env.NEXT_PUBLIC_PLATFORM_ENABLE_LOCAL_TARGET === 'true'
+    if (shouldEnableLocal && !deploymentTargets.includes('local')) {
+      return [...deploymentTargets, 'local']
+    }
+    return deploymentTargets
+  })()
+
+  const defaultDeploymentTarget = deploymentTargetsWithOverrides.includes('remote')
+    ? 'remote'
+    : deploymentTargetsWithOverrides[0] ?? 'remote'
+
+  const showAdvancedConfig = useIsFeatureEnabled('project_creation:show_advanced_config')
 
   // This is to make the database.new redirect work correctly. The database.new redirect should be set to supabase.com/dashboard/new/last-visited-org
   if (slug === 'last-visited-org') {
@@ -314,6 +334,7 @@ const Wizard: NextPageWithLayout = () => {
     mode: 'onChange',
     defaultValues: {
       organization: slug,
+      deploymentTarget: defaultDeploymentTarget,
       projectName: projectName || '',
       postgresVersion: '',
       cloudProvider: PROVIDERS[defaultProvider].id,
@@ -328,7 +349,8 @@ const Wizard: NextPageWithLayout = () => {
     },
   })
 
-  const { instanceSize, cloudProvider, dbRegion, organization } = form.watch()
+  const { instanceSize, cloudProvider, dbRegion, organization, deploymentTarget } = form.watch()
+  const isLocalDeployment = deploymentTarget === 'local'
   const dbRegionExact = smartRegionToExactRegion(dbRegion)
 
   const availableOrioleVersion = useAvailableOrioleImageVersion(
@@ -337,27 +359,27 @@ const Wizard: NextPageWithLayout = () => {
       dbRegion: smartRegionEnabled ? dbRegionExact : dbRegion,
       organizationSlug: organization,
     },
-    { enabled: currentOrg !== null && !isManagedByVercel }
+    { enabled: !isLocalDeployment && currentOrg !== null && !isManagedByVercel }
   )
 
   // [kevin] This will eventually all be provided by a new API endpoint to preview and validate project creation, this is just for kaizen now
-  const monthlyComputeCosts =
-    // current project costs
-    organizationProjects.reduce((prev, acc) => {
-      const primaryDatabase = acc.databases.find((db) => db.identifier === acc.ref)
-      const cost = !!primaryDatabase ? monthlyInstancePrice(primaryDatabase.infra_compute_size) : 0
-      return prev + cost
-    }, 0) +
-    // selected compute size
-    monthlyInstancePrice(instanceSize) -
-    // compute credits
-    10
-
-  const availableComputeCredits = organizationProjects.length === 0 ? 10 : 0
-
-  const additionalMonthlySpend = isFreePlan
+  const monthlyComputeCosts = isLocalDeployment
     ? 0
-    : instanceSizeSpecs[instanceSize as DesiredInstanceSize]!.priceMonthly - availableComputeCredits
+    : organizationProjects.reduce((prev, acc) => {
+        const primaryDatabase = acc.databases.find((db) => db.identifier === acc.ref)
+        const cost = !!primaryDatabase ? monthlyInstancePrice(primaryDatabase.infra_compute_size) : 0
+        return prev + cost
+      }, 0) +
+      monthlyInstancePrice(instanceSize) -
+      10
+
+  const availableComputeCredits = isLocalDeployment ? 0 : organizationProjects.length === 0 ? 10 : 0
+
+  const additionalMonthlySpend = isLocalDeployment
+    ? 0
+    : isFreePlan
+        ? 0
+        : instanceSizeSpecs[instanceSize as DesiredInstanceSize]!.priceMonthly - availableComputeCredits
 
   // [Refactor] DB Password could be a common component used in multiple pages with repeated logic
   function generatePassword() {
@@ -367,11 +389,16 @@ const Wizard: NextPageWithLayout = () => {
   }
 
   const onSubmitWithComputeCostsConfirmation = async (values: z.infer<typeof FormSchema>) => {
+    const isLocal = values.deploymentTarget === 'local'
     const launchingLargerInstance =
       values.instanceSize &&
       !sizesWithNoCostConfirmationRequired.includes(values.instanceSize as DesiredInstanceSize)
 
-    if (additionalMonthlySpend > 0 && (hasOAuthApps || launchingLargerInstance)) {
+    if (
+      !isLocal &&
+      additionalMonthlySpend > 0 &&
+      (hasOAuthApps || launchingLargerInstance)
+    ) {
       sendEvent({
         action: 'project_creation_simple_version_confirm_modal_opened',
         properties: {
@@ -401,45 +428,52 @@ const Wizard: NextPageWithLayout = () => {
       useApiSchema,
       postgresVersionSelection,
       useOrioleDb,
+      deploymentTarget,
     } = values
 
-    if (useOrioleDb && !availableOrioleVersion) {
+    const isLocal = deploymentTarget === 'local'
+
+    if (!isLocal && useOrioleDb && !availableOrioleVersion) {
       return toast.error('No available OrioleDB image found, only Postgres is available')
     }
 
-    const { postgresEngine, releaseChannel } =
-      extractPostgresVersionDetails(postgresVersionSelection)
-
-    const { smartGroup = [], specific = [] } = availableRegionsData?.all ?? {}
-    const selectedRegion = smartRegionEnabled
-      ? smartGroup.find((x) => x.name === dbRegion) ?? specific.find((x) => x.name === dbRegion)
-      : undefined
-
     const data: ProjectCreateVariables = {
       dbPass,
-      cloudProvider,
       organizationSlug: currentOrg.slug,
       name: projectName,
-      // gets ignored due to org billing subscription anyway
-      dbPricingTierId: 'tier_free',
-      // only set the compute size on pro+ plans. Free plans always use micro (nano in the future) size.
-      dbInstanceSize: isFreePlan ? undefined : (instanceSize as DesiredInstanceSize),
-      dataApiExposedSchemas: !dataApi ? [] : undefined,
-      dataApiUseApiSchema: !dataApi ? false : useApiSchema,
-      postgresEngine: useOrioleDb ? availableOrioleVersion?.postgres_engine : postgresEngine,
-      releaseChannel: useOrioleDb ? availableOrioleVersion?.release_channel : releaseChannel,
-      ...(smartRegionEnabled ? { regionSelection: selectedRegion } : { dbRegion }),
     }
 
-    if (postgresVersion) {
-      if (!postgresVersion.match(/1[2-9]\..*/)) {
-        toast.error(
-          `Invalid Postgres version, should start with a number between 12-19, a dot and additional characters, i.e. 15.2 or 15.2.0-3`
-        )
-      }
+    if (isLocal) {
+      data.cloudProvider = 'LOCAL'
+    } else {
+      const { postgresEngine, releaseChannel } =
+        extractPostgresVersionDetails(postgresVersionSelection)
 
-      data['customSupabaseRequest'] = {
-        ami: { search_tags: { 'tag:postgresVersion': postgresVersion } },
+      const { smartGroup = [], specific = [] } = availableRegionsData?.all ?? {}
+      const selectedRegion = smartRegionEnabled
+        ? smartGroup.find((x) => x.name === dbRegion) ?? specific.find((x) => x.name === dbRegion)
+        : undefined
+
+      data.cloudProvider = cloudProvider
+      data.dbPricingTierId = 'tier_free'
+      data.dbInstanceSize = isFreePlan ? undefined : (instanceSize as DesiredInstanceSize)
+      data.dataApiExposedSchemas = !dataApi ? [] : undefined
+      data.dataApiUseApiSchema = !dataApi ? false : useApiSchema
+      data.postgresEngine = useOrioleDb ? availableOrioleVersion?.postgres_engine : postgresEngine
+      data.releaseChannel = useOrioleDb ? availableOrioleVersion?.release_channel : releaseChannel
+      if (smartRegionEnabled) data.regionSelection = selectedRegion
+      else data.dbRegion = dbRegion
+
+      if (postgresVersion) {
+        if (!postgresVersion.match(/1[2-9]\..*/)) {
+          toast.error(
+            `Invalid Postgres version, should start with a number between 12-19, a dot and additional characters, i.e. 15.2 or 15.2.0-3`
+          )
+        }
+
+        data['customSupabaseRequest'] = {
+          ami: { search_tags: { 'tag:postgresVersion': postgresVersion } },
+        }
       }
     }
 
@@ -468,16 +502,33 @@ const Wizard: NextPageWithLayout = () => {
   }, [slug])
 
   useEffect(() => {
+    if (isLocalDeployment) {
+      form.setValue('cloudProvider', 'LOCAL')
+      form.setValue('dbRegion', 'local-dev')
+    } else {
+      if (form.getValues('cloudProvider') === 'LOCAL') {
+        form.setValue('cloudProvider', PROVIDERS[defaultProvider].id)
+      }
+      if (form.getValues('dbRegion') === 'local-dev') {
+        if (defaultRegion) form.setValue('dbRegion', defaultRegion)
+        else form.setValue('dbRegion', PROVIDERS[defaultProvider].default_region.displayName)
+      }
+    }
+  }, [isLocalDeployment, defaultProvider, defaultRegion])
+
+  useEffect(() => {
+    if (isLocalDeployment) return
     if (form.getValues('dbRegion') === undefined && defaultRegion) {
       form.setValue('dbRegion', defaultRegion)
     }
-  }, [defaultRegion])
+  }, [defaultRegion, form, isLocalDeployment])
 
   useEffect(() => {
+    if (isLocalDeployment) return
     if (regionError) {
       form.setValue('dbRegion', PROVIDERS[defaultProvider].default_region.displayName)
     }
-  }, [regionError])
+  }, [defaultProvider, form, isLocalDeployment, regionError])
 
   return (
     <Form_Shadcn_ {...form}>
@@ -496,7 +547,8 @@ const Wizard: NextPageWithLayout = () => {
           footer={
             <div key="panel-footer" className="grid grid-cols-12 w-full gap-4 items-center">
               <div className="col-span-4">
-                {!isFreePlan &&
+                {!isLocalDeployment &&
+                  !isFreePlan &&
                   !projectCreationDisabled &&
                   canCreateProject &&
                   additionalMonthlySpend > 0 && (
@@ -684,6 +736,63 @@ const Wizard: NextPageWithLayout = () => {
 
                 {canCreateProject && (
                   <>
+                    {deploymentTargetsWithOverrides.length > 1 && (
+                      <Panel.Content>
+                        <FormField_Shadcn_
+                          control={form.control}
+                          name="deploymentTarget"
+                          render={({ field }) => (
+                            <FormItemLayout
+                              label="Deployment target"
+                              layout="horizontal"
+                              description="Choose where new services should run."
+                            >
+                              <Select_Shadcn_
+                                onValueChange={(value) => {
+                                  field.onChange(value)
+
+                                  if (value === 'local') {
+                                    form.setValue('cloudProvider', 'LOCAL', {
+                                      shouldValidate: true,
+                                    })
+                                    form.setValue('dbRegion', 'local-dev', {
+                                      shouldValidate: true,
+                                    })
+                                  } else {
+                                    const remoteProvider = PROVIDERS[defaultProvider].id
+                                    const fallbackRegion =
+                                      defaultRegion ??
+                                      PROVIDERS[defaultProvider].default_region.displayName
+
+                                    form.setValue('cloudProvider', remoteProvider, {
+                                      shouldValidate: true,
+                                    })
+                                    form.setValue('dbRegion', fallbackRegion, {
+                                      shouldValidate: true,
+                                    })
+                                  }
+                                }}
+                                value={field.value}
+                              >
+                                <FormControl_Shadcn_>
+                                  <SelectTrigger_Shadcn_>
+                                    <SelectValue_Shadcn_ placeholder="Select deployment target" />
+                                  </SelectTrigger_Shadcn_>
+                                </FormControl_Shadcn_>
+                                <SelectContent_Shadcn_>
+                                  {deploymentTargetsWithOverrides.map((target) => (
+                                    <SelectItem_Shadcn_ key={target} value={target}>
+                                      {target === 'local' ? 'Local (this machine)' : 'Remote (Supabase Cloud)'}
+                                    </SelectItem_Shadcn_>
+                                  ))}
+                                </SelectContent_Shadcn_>
+                              </Select_Shadcn_>
+                            </FormItemLayout>
+                          )}
+                        />
+                      </Panel.Content>
+                    )}
+
                     <Panel.Content>
                       <FormField_Shadcn_
                         control={form.control}
@@ -698,7 +807,7 @@ const Wizard: NextPageWithLayout = () => {
                       />
                     </Panel.Content>
 
-                    {cloudProviderEnabled && showNonProdFields && (
+                    {!isLocalDeployment && cloudProviderEnabled && showNonProdFields && (
                       <Panel.Content>
                         <FormField_Shadcn_
                           control={form.control}
@@ -747,7 +856,7 @@ const Wizard: NextPageWithLayout = () => {
                       </Panel.Content>
                     )}
 
-                    {currentOrg?.plan && currentOrg?.plan.id !== 'free' && (
+                    {!isLocalDeployment && currentOrg?.plan && currentOrg?.plan.id !== 'free' && (
                       <Panel.Content>
                         <FormField_Shadcn_
                           control={form.control}
@@ -899,21 +1008,23 @@ const Wizard: NextPageWithLayout = () => {
                       />
                     </Panel.Content>
 
-                    <Panel.Content>
-                      <FormField_Shadcn_
-                        control={form.control}
-                        name="dbRegion"
-                        render={({ field }) => (
-                          <RegionSelector
-                            field={field}
-                            form={form}
-                            cloudProvider={form.getValues('cloudProvider') as CloudProvider}
-                          />
-                        )}
-                      />
-                    </Panel.Content>
+                    {!isLocalDeployment && (
+                      <Panel.Content>
+                        <FormField_Shadcn_
+                          control={form.control}
+                          name="dbRegion"
+                          render={({ field }) => (
+                            <RegionSelector
+                              field={field}
+                              form={form}
+                              cloudProvider={form.getValues('cloudProvider') as CloudProvider}
+                            />
+                          )}
+                        />
+                      </Panel.Content>
+                    )}
 
-                    {showPostgresVersionSelector && (
+                    {!isLocalDeployment && showPostgresVersionSelector && (
                       <Panel.Content>
                         <FormField_Shadcn_
                           control={form.control}
@@ -972,7 +1083,7 @@ const Wizard: NextPageWithLayout = () => {
                       />
                     </Panel.Content>
                   )
-                ) : isManagedByVercel ? (
+                ) : !isLocalDeployment && isManagedByVercel ? (
                   <Panel.Content>
                     <PartnerManagedResource
                       managedBy={MANAGED_BY.VERCEL_MARKETPLACE}

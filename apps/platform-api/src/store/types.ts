@@ -1,8 +1,8 @@
 import type { components } from 'api-types'
 
-export type CloudProvider = 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS'
+export type CloudProvider = 'AWS' | 'FLY' | 'AWS_K8S' | 'AWS_NIMBUS' | 'LOCAL'
 
-export const CLOUD_PROVIDERS: CloudProvider[] = ['AWS', 'FLY', 'AWS_K8S', 'AWS_NIMBUS']
+export const CLOUD_PROVIDERS: CloudProvider[] = ['AWS', 'FLY', 'AWS_K8S', 'AWS_NIMBUS', 'LOCAL']
 
 export type ComputeSize =
   | 'pico'
