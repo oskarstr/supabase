@@ -372,7 +372,7 @@ export const pauseProject = async (ref: string): Promise<ProjectDetail | undefin
 
   if (runtime) {
     try {
-      await stopProjectStack({ projectRoot: runtime.root_dir })
+      await stopProjectStack({ projectRoot: runtime.root_dir, projectRef: projectRow.ref })
       await updateProject(ref, { status: 'INACTIVE' })
     } catch (error) {
       await updateProject(ref, { status: 'PAUSE_FAILED' })

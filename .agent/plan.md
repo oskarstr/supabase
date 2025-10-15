@@ -16,6 +16,7 @@
 - Align `.env`/compose defaults with platform mode and automate missing variable generation where possible.
 - Reset pg sequences between test runs and seed deterministic fixtures to keep pg-mem/Postgres behaviour synchronized.
 - Replace the temporary Supabase CLI shell-out with a host-native agent so runtime provisioning does not rely on localhost port forwarding hacks inside the platform container. New agent must support start/stop/status APIs and converge on CLI parity before we swap it in.
+  - Runtime agent (`apps/runtime-agent`) now shells out to the Supabase CLI for provision/stop/destroy. Supabase CLI internal packages are mirrored under the agent’s `internal/` tree so we can migrate to in-process orchestration; next step is to mount it in compose with docker socket + host network and start streaming status/metadata back.
 
 ### Phase 6 – Feature Coverage & Hardening *(in progress alongside Phase 4)*
 - Continue filling in Studio-dependent endpoints (storage, logs, auth config, analytics) and replace temporary stubs with real integrations.
@@ -65,6 +66,7 @@
 - Integrate contract test harness under `apps/platform-api/tests/auto-generated`, ensuring behaviour matches Studio expectations once provisioning is stable.
 
 ## Change Log
+- **2025-10-15 15:10 UTC · codex** – Runtime agent now invokes the Supabase CLI synchronously for provision/stop/destroy, platform API sends network metadata, docs note the CLI path env, and the CLI’s internal packages are mirrored under the agent for future in-process orchestration.
 - **2025-10-15 12:45 UTC** – Added provisioning/test readiness checklist and Studio local/remote alignment guidance (Codex).
 - **2025-10-15 06:55 UTC · 12c266ec81** – Provisioner now uses Supabase CLI on shared compose network; runtime dirs moved under `platform-projects/`; added `LOCAL` provider enum.
 - **2025-10-15 07:28 UTC · d4e4dcfc16** – Added local runtime health polling, pause/resume endpoints, and persisted service exclusions for CLI-based project stacks.

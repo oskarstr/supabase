@@ -1,0 +1,54 @@
+// Source: github.com/supabase/cli (commit 8b64f154fa7130f68f9194859b4459d4c0608b2b)
+
+package list
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/go-errors/errors"
+	"github.com/spf13/afero"
+	"github.com/supabase/supabase/apps/runtime-agent/internal/utils"
+	"github.com/supabase/supabase/apps/runtime-agent/pkg/api"
+)
+
+func Run(ctx context.Context, projectRef string, fsys afero.Fs) error {
+	resp, err := utils.GetSupabase().V1ListAllFunctionsWithResponse(ctx, projectRef)
+	if err != nil {
+		return errors.Errorf("failed to list functions: %w", err)
+	} else if resp.JSON200 == nil {
+		return errors.Errorf("unexpected list functions status %d: %s", resp.StatusCode(), string(resp.Body))
+	}
+
+	switch utils.OutputFormat.Value {
+	case utils.OutputPretty:
+		table := `|ID|NAME|SLUG|STATUS|VERSION|UPDATED_AT (UTC)|
+|-|-|-|-|-|-|
+`
+		for _, function := range *resp.JSON200 {
+			t := time.UnixMilli(function.UpdatedAt)
+			table += fmt.Sprintf(
+				"|`%s`|`%s`|`%s`|`%s`|`%d`|`%s`|\n",
+				function.Id,
+				function.Name,
+				function.Slug,
+				function.Status,
+				function.Version,
+				t.UTC().Format("2006-01-02 15:04:05"),
+			)
+		}
+		return utils.RenderTable(table)
+	case utils.OutputToml:
+		return utils.EncodeOutput(utils.OutputFormat.Value, os.Stdout, struct {
+			Functions []api.FunctionResponse `toml:"functions"`
+		}{
+			Functions: *resp.JSON200,
+		})
+	case utils.OutputEnv:
+		return errors.Errorf("--output env flag is not supported")
+	}
+
+	return utils.EncodeOutput(utils.OutputFormat.Value, os.Stdout, *resp.JSON200)
+}

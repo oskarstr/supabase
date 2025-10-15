@@ -11,6 +11,7 @@
 - **Goal**: restore multi-project management to the open-source distribution without forking upstream Studio; the control plane lives in `apps/platform-api`.
 - **Architecture**: Fastify + TypeScript service backed by Postgres (Kysely). Boot runs migrations (`apps/platform-api/migrations`) and seeds core data (`db/seed.ts`).
 - **Provisioning**: Supabase CLI is bundled in the platform-api image (`b5ca522836`) and runs against a host-visible `platform-projects/` directory with shared Docker networking (`12c266ec81`).
+- **Runtime agent**: A standalone Go HTTP service (`apps/runtime-agent`) now accepts provision/stop/destroy requests so the control plane can talk to a host-visible orchestrator over HTTP instead of shelling out directly. Supabase CLI internal packages are mirrored under `apps/runtime-agent/internal/...` for future in-process orchestration.
 - **Studio integration**: Docker compose overlays route `/api/platform/**` via Kong. The project wizard can expose local/remote deployment targets, currently gated by `NEXT_PUBLIC_PLATFORM_ENABLE_LOCAL_TARGET`.
 - **Auth/Kong**: Kong entrypoint injects the anonymous consumer, preserving Studio’s stock AuthClient flow (`/auth/v1/**` mirrors Supabase Cloud).
 
@@ -22,6 +23,7 @@
 - Minimize upstream Studio/infra edits: prefer data-driven overrides (custom content, env flags) and only touch upstream components when absolutely unavoidable—document any divergence.
 - Custom Studio UI tweaks should be driven by custom content keys (e.g. `project_creation:deployment_targets`, `project_creation:local_runtime_services`) plus platform guards (`NEXT_PUBLIC_IS_PLATFORM`). Keep JSX additions minimal and gated so upstream builds remain unchanged when the content keys are absent.
 - Provisioning still shells out to the Supabase CLI inside the platform container. Because the CLI’s health probes are hardcoded to `127.0.0.1`, we currently rely on a `socat` port forward hack. Long-term fix is to move provisioning into a host-side agent (or native orchestrator) that drives Docker directly; note this in Phase 4 roadmap.
+- Set `PLATFORM_ORCHESTRATOR_URL` (and optional `PLATFORM_ORCHESTRATOR_TOKEN`) to route provisioning calls through the runtime agent; the platform falls back to CLI shell-outs when the agent is unavailable. The agent shells out to the Supabase CLI binary (configure via `RUNTIME_AGENT_SUPABASE_CLI_PATH`) so it should run in a container with `/var/run/docker.sock` mounted and host networking enabled.
 
 ## Gotchas & Quick Tips
 - Project creation requires `organization_slug` and assumes async provisioning; the API intentionally ignores raw `organization_id`. Tests must inject slugs or create orgs first.
