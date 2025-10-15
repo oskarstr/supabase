@@ -117,12 +117,9 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
     Params: { ref: string }
     Querystring: { visibility?: string; favorite?: string; type?: string }
     Reply: ProjectContentListResponse
-  }>(
-    '/:ref/content',
-    async (request, reply) => {
-      return reply.send(listProjectContent(request.query.visibility, request.query.favorite))
-    }
-  )
+  }>('/:ref/content', async (request, reply) => {
+    return reply.send(listProjectContent(request.query.visibility, request.query.favorite))
+  })
 
   app.get<{ Params: { ref: string }; Reply: ProjectContentCountSummary }>(
     '/:ref/content/count',
@@ -149,16 +146,13 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
     }
   )
 
-  app.post<{ Params: { ref: string }; Body: unknown }>(
-    '/:ref/disk',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      return reply.code(201).send(getProjectDiskAttributes(project.ref))
+  app.post<{ Params: { ref: string }; Body: unknown }>('/:ref/disk', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    return reply.code(201).send(getProjectDiskAttributes(project.ref))
+  })
 
   app.get<{ Params: { ref: string }; Reply: DiskAutoscaleConfig | { message: string } }>(
     '/:ref/disk/custom-config',
@@ -233,86 +227,68 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{
     Params: { ref: string }
     Reply: PostgrestConfigResponse | { message: string }
-  }>(
-    '/:ref/config/postgrest',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      return reply.send(getProjectPostgrestConfig(project.ref))
+  }>('/:ref/config/postgrest', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    return reply.send(getProjectPostgrestConfig(project.ref))
+  })
 
   app.get<{
     Params: { ref: string }
     Reply: RealtimeConfigResponse | { message: string }
-  }>(
-    '/:ref/config/realtime',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      return reply.send(getProjectRealtimeConfig(project.ref))
+  }>('/:ref/config/realtime', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    return reply.send(getProjectRealtimeConfig(project.ref))
+  })
 
   app.get<{
     Params: { ref: string }
     Reply: PgbouncerConfigResponse | { message: string }
-  }>(
-    '/:ref/config/pgbouncer',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      return reply.send(getProjectPgbouncerConfig(project.ref))
+  }>('/:ref/config/pgbouncer', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    return reply.send(getProjectPgbouncerConfig(project.ref))
+  })
 
   app.get<{
     Params: { ref: string }
     Reply: PgbouncerStatusResponse | { message: string }
-  }>(
-    '/:ref/config/pgbouncer/status',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      return reply.send(getProjectPgbouncerStatus(project.ref))
+  }>('/:ref/config/pgbouncer/status', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    return reply.send(getProjectPgbouncerStatus(project.ref))
+  })
 
   app.get<{
     Params: { ref: string }
     Reply: StorageConfigResponse | { message: string }
-  }>(
-    '/:ref/config/storage',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      return reply.send(getProjectStorageConfig(project.ref))
+  }>('/:ref/config/storage', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    return reply.send(getProjectStorageConfig(project.ref))
+  })
 
   app.get<{
     Params: { ref: string }
     Reply: SupavisorConfigResponse[] | { message: string }
-  }>(
-    '/:ref/config/supavisor',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      return reply.send(listProjectSupavisorPools(project.ref))
+  }>('/:ref/config/supavisor', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    return reply.send(listProjectSupavisorPools(project.ref))
+  })
 
   app.get<{ Params: { ref: string }; Reply: LoadBalancerSummary[] | { message: string } }>(
     '/:ref/load-balancers',
@@ -361,16 +337,13 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{
     Params: { ref: string }
     Querystring: { interval?: string }
-  }>(
-    '/:ref/analytics/endpoints/usage.api-counts',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      return reply.send(listUsageApiCounts(project.ref))
+  }>('/:ref/analytics/endpoints/usage.api-counts', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    return reply.send(listUsageApiCounts(project.ref))
+  })
 
   app.get<{ Params: { ref: string } }>(
     '/:ref/analytics/endpoints/usage.api-requests-count',
@@ -386,69 +359,51 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{
     Params: { ref: string }
     Querystring: { function_id?: string; interval?: string }
-  }>(
-    '/:ref/analytics/endpoints/functions.combined-stats',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      const { function_id, interval } = request.query
-      if (!function_id || !interval) {
-        return reply
-          .code(400)
-          .send({ message: 'function_id and interval are required parameters' })
-      }
-      return reply.send(listFunctionCombinedStats(project.ref, function_id, interval))
+  }>('/:ref/analytics/endpoints/functions.combined-stats', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    const { function_id, interval } = request.query
+    if (!function_id || !interval) {
+      return reply.code(400).send({ message: 'function_id and interval are required parameters' })
+    }
+    return reply.send(listFunctionCombinedStats(project.ref, function_id, interval))
+  })
 
   app.get<{
     Params: { ref: string }
     Querystring: { function_id?: string; interval?: string }
-  }>(
-    '/:ref/analytics/endpoints/functions.req-stats',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      const { function_id, interval } = request.query
-      if (!function_id || !interval) {
-        return reply
-          .code(400)
-          .send({ message: 'function_id and interval are required parameters' })
-      }
-      return reply.send(listFunctionRequestStats(project.ref, function_id, interval))
+  }>('/:ref/analytics/endpoints/functions.req-stats', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    const { function_id, interval } = request.query
+    if (!function_id || !interval) {
+      return reply.code(400).send({ message: 'function_id and interval are required parameters' })
+    }
+    return reply.send(listFunctionRequestStats(project.ref, function_id, interval))
+  })
 
   app.get<{
     Params: { ref: string }
     Querystring: { function_id?: string; interval?: string }
-  }>(
-    '/:ref/analytics/endpoints/functions.resource-usage',
-    async (request, reply) => {
-      const project = await getProject(request.params.ref)
-      if (!project) {
-        return reply.code(404).send({ message: 'Project not found' })
-      }
-      const { function_id, interval } = request.query
-      if (!function_id || !interval) {
-        return reply
-          .code(400)
-          .send({ message: 'function_id and interval are required parameters' })
-      }
-      return reply.send(listFunctionResourceUsage(project.ref, function_id, interval))
+  }>('/:ref/analytics/endpoints/functions.resource-usage', async (request, reply) => {
+    const project = await getProject(request.params.ref)
+    if (!project) {
+      return reply.code(404).send({ message: 'Project not found' })
     }
-  )
+    const { function_id, interval } = request.query
+    if (!function_id || !interval) {
+      return reply.code(400).send({ message: 'function_id and interval are required parameters' })
+    }
+    return reply.send(listFunctionResourceUsage(project.ref, function_id, interval))
+  })
 
-  app.get<{ Params: { ref: string } }>(
-    '/:ref/api/rest',
-    async (request, reply) => {
-      return reply.send(getProjectRestDefinition(request.params.ref))
-    }
-  )
+  app.get<{ Params: { ref: string } }>('/:ref/api/rest', async (request, reply) => {
+    return reply.send(getProjectRestDefinition(request.params.ref))
+  })
 
   app.post<{ Params: { ref: string }; Reply: { api_key: string } }>(
     '/:ref/api-keys/temporary',

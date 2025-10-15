@@ -16,14 +16,14 @@ describe('telemetry endpoints (auto-generated)', () => {
 
   it('creates reset', async () => {
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/telemetry/reset`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/telemetry/reset`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)

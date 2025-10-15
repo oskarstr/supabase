@@ -12,143 +12,165 @@
 ## Coverage by Category
 
 ### projects (6.8% implemented)
+
 - Total: 132
 - Implemented: 9
 - Stubbed: 0
 - Missing: 123
 
 ### profile (44.4% implemented)
+
 - Total: 9
 - Implemented: 4
 - Stubbed: 0
 - Missing: 5
 
 ### organizations (10.7% implemented)
+
 - Total: 56
 - Implemented: 6
 - Stubbed: 0
 - Missing: 50
 
 ### oauth (0.0% implemented)
+
 - Total: 1
 - Implemented: 0
 - Stubbed: 0
 - Missing: 1
 
 ### auth (0.0% implemented)
+
 - Total: 12
 - Implemented: 0
 - Stubbed: 0
 - Missing: 12
 
 ### branches (0.0% implemented)
+
 - Total: 7
 - Implemented: 0
 - Stubbed: 0
 - Missing: 7
 
 ### cli (0.0% implemented)
+
 - Total: 1
 - Implemented: 0
 - Stubbed: 0
 - Missing: 1
 
 ### database (0.0% implemented)
+
 - Total: 11
 - Implemented: 0
 - Stubbed: 0
 - Missing: 11
 
 ### pg-meta (100.0% implemented)
+
 - Total: 11
 - Implemented: 11
 - Stubbed: 0
 - Missing: 0
 
 ### feedback (0.0% implemented)
+
 - Total: 4
 - Implemented: 0
 - Stubbed: 0
 - Missing: 4
 
 ### integrations (35.7% implemented)
+
 - Total: 14
 - Implemented: 5
 - Stubbed: 0
 - Missing: 9
 
 ### vercel (0.0% implemented)
+
 - Total: 1
 - Implemented: 0
 - Stubbed: 0
 - Missing: 1
 
 ### stripe (50.0% implemented)
+
 - Total: 2
 - Implemented: 1
 - Stubbed: 0
 - Missing: 1
 
 ### reset-password (0.0% implemented)
+
 - Total: 1
 - Implemented: 0
 - Stubbed: 0
 - Missing: 1
 
 ### signup (0.0% implemented)
+
 - Total: 1
 - Implemented: 0
 - Stubbed: 0
 - Missing: 1
 
 ### notifications (50.0% implemented)
+
 - Total: 4
 - Implemented: 2
 - Stubbed: 0
 - Missing: 2
 
 ### status (100.0% implemented)
+
 - Total: 1
 - Implemented: 1
 - Stubbed: 0
 - Missing: 0
 
 ### update-email (0.0% implemented)
+
 - Total: 1
 - Implemented: 0
 - Stubbed: 0
 - Missing: 1
 
 ### replication (0.0% implemented)
+
 - Total: 12
 - Implemented: 0
 - Stubbed: 0
 - Missing: 12
 
 ### storage (0.0% implemented)
+
 - Total: 16
 - Implemented: 0
 - Stubbed: 0
 - Missing: 16
 
 ### telemetry (100.0% implemented)
+
 - Total: 1
 - Implemented: 1
 - Stubbed: 0
 - Missing: 0
 
 ### projects-resource-warnings (0.0% implemented)
+
 - Total: 1
 - Implemented: 0
 - Stubbed: 0
 - Missing: 1
 
 ### workflow-runs (0.0% implemented)
+
 - Total: 3
 - Implemented: 0
 - Stubbed: 0
 - Missing: 3
-
 
 ## Next Steps
 

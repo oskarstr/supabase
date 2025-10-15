@@ -67,32 +67,26 @@ const profileRoutes: FastifyPluginAsync = async (app) => {
     }
   )
 
-  app.delete<{ Params: { id: string } }>(
-    '/access-tokens/:id',
-    async (request, reply) => {
-      const id = Number.parseInt(request.params.id, 10)
-      if (!Number.isFinite(id)) {
-        return reply.code(400).send({ message: 'Invalid access token id' })
-      }
-      const removed = await deleteAccessToken(id)
-      if (!removed) {
-        return reply.code(404).send({ message: 'Access token not found' })
-      }
-      return reply.send()
+  app.delete<{ Params: { id: string } }>('/access-tokens/:id', async (request, reply) => {
+    const id = Number.parseInt(request.params.id, 10)
+    if (!Number.isFinite(id)) {
+      return reply.code(400).send({ message: 'Invalid access token id' })
     }
-  )
+    const removed = await deleteAccessToken(id)
+    if (!removed) {
+      return reply.code(404).send({ message: 'Access token not found' })
+    }
+    return reply.send()
+  })
 
   app.post('/password-check', async (_request, reply) => {
     return reply.code(201).send(checkPasswordStrength())
   })
 
-  app.get<{ Reply: AccessControlPermission[] }>(
-    '/permissions',
-    async (_request, reply) => {
-      const permissions = await listPermissions()
-      return reply.send(permissions)
-    }
-  )
+  app.get<{ Reply: AccessControlPermission[] }>('/permissions', async (_request, reply) => {
+    const permissions = await listPermissions()
+    return reply.send(permissions)
+  })
 }
 
 export default profileRoutes

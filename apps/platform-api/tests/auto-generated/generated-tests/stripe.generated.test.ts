@@ -16,11 +16,11 @@ describe('stripe endpoints (auto-generated)', () => {
 
   it('lists overdue', async () => {
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/stripe/invoices/overdue`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/stripe/invoices/overdue`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -31,14 +31,14 @@ describe('stripe endpoints (auto-generated)', () => {
   it.skip('creates setup-intent', async () => {
     // TODO: Implement POST /platform/stripe/setup-intent
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/stripe/setup-intent`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/stripe/setup-intent`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)

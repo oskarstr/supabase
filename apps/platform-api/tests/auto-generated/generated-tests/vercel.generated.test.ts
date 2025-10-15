@@ -17,17 +17,17 @@ describe('vercel endpoints (auto-generated)', () => {
   it.skip('retrieves redirect by ID', async () => {
     // TODO: Implement GET /platform/vercel/redirect/{installation_id}
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/vercel/redirect/{installation_id}`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/vercel/redirect/{installation_id}`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
     const payload = response.json()
     expect(payload).toMatchObject({
-      id: expect.any(Number)
+      id: expect.any(Number),
     })
   })
 })

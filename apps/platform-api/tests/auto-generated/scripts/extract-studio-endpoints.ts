@@ -72,10 +72,13 @@ const output = {
   metadata: {
     totalEndpoints: endpoints.length,
     extractedAt: new Date().toISOString(),
-    methodBreakdown: endpoints.reduce((acc, e) => {
-      acc[e.method] = (acc[e.method] || 0) + 1
-      return acc
-    }, {} as Record<string, number>),
+    methodBreakdown: endpoints.reduce(
+      (acc, e) => {
+        acc[e.method] = (acc[e.method] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    ),
   },
   endpoints,
 }

@@ -1,9 +1,5 @@
 import { getPlatformDb } from '../db/client.js'
-import {
-  baseProfile,
-  DEFAULT_PRIMARY_EMAIL,
-  DEFAULT_USERNAME,
-} from '../config/defaults.js'
+import { baseProfile, DEFAULT_PRIMARY_EMAIL, DEFAULT_USERNAME } from '../config/defaults.js'
 import type {
   OrganizationInvitationsResponse,
   OrganizationMember,
@@ -63,9 +59,7 @@ export const listOrganizationMembers = async (slug: string): Promise<Organizatio
   }))
 }
 
-export const listOrganizationRoles = async (
-  slug: string
-): Promise<OrganizationRolesResponse> => {
+export const listOrganizationRoles = async (slug: string): Promise<OrganizationRolesResponse> => {
   const organization = await db
     .selectFrom('organizations')
     .select(['id'])

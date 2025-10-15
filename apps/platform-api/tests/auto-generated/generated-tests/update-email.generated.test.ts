@@ -17,14 +17,14 @@ describe('update-email endpoints (auto-generated)', () => {
   it.skip('handles update-email', async () => {
     // TODO: Implement PUT /platform/update-email
     const response = await app.inject({
-    method: 'PUT',
-    url: `/api/platform/update-email`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'PUT',
+      url: `/api/platform/update-email`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)

@@ -43,7 +43,9 @@ export function useDefaultProvider() {
 
   const { infraCloudProviders: validCloudProviders } = useCustomContent(['infra:cloud_providers'])
 
-  const remoteProviders = (validCloudProviders ?? []).filter((provider): provider is CloudProvider => provider !== 'LOCAL')
+  const remoteProviders = (validCloudProviders ?? []).filter(
+    (provider): provider is CloudProvider => provider !== 'LOCAL'
+  )
 
   if (remoteProviders.includes(defaultProvider)) {
     return defaultProvider

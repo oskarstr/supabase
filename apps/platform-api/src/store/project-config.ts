@@ -16,7 +16,10 @@ const DEFAULT_DB_USER = envString('SUPABASE_DB_USER', 'postgres') ?? 'postgres'
 const DEFAULT_DB_NAME = envString('SUPABASE_DB_NAME', 'postgres') ?? 'postgres'
 const DEFAULT_DB_PORT = Number.parseInt(envString('SUPABASE_DB_PORT', '5432') ?? '5432', 10)
 const DEFAULT_DB_HOST = envString('SUPABASE_DB_HOST', 'localhost') ?? 'localhost'
-const DEFAULT_PGBOUNCER_PORT = Number.parseInt(envString('SUPABASE_POOLER_PORT', '6543') ?? '6543', 10)
+const DEFAULT_PGBOUNCER_PORT = Number.parseInt(
+  envString('SUPABASE_POOLER_PORT', '6543') ?? '6543',
+  10
+)
 const JWT_SECRET_FALLBACK =
   envString('JWT_SECRET') ??
   envString('SERVICE_KEY') ??

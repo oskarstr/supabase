@@ -17,14 +17,14 @@ describe('feedback endpoints (auto-generated)', () => {
   it.skip('creates downgrade', async () => {
     // TODO: Implement POST /platform/feedback/downgrade
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/feedback/downgrade`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/feedback/downgrade`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -35,14 +35,14 @@ describe('feedback endpoints (auto-generated)', () => {
   it.skip('creates send', async () => {
     // TODO: Implement POST /platform/feedback/send
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/feedback/send`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/feedback/send`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -53,14 +53,14 @@ describe('feedback endpoints (auto-generated)', () => {
   it.skip('creates send', async () => {
     // TODO: Implement POST /platform/feedback/send
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/feedback/send`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/feedback/send`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -71,14 +71,14 @@ describe('feedback endpoints (auto-generated)', () => {
   it.skip('creates upgrade', async () => {
     // TODO: Implement POST /platform/feedback/upgrade
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/feedback/upgrade`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/feedback/upgrade`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)

@@ -70,7 +70,10 @@ function getRoutePrefixes(): RouteConfig[] {
   const routesWithoutPrefix = ['replication', 'database', 'projectResourceWarnings', 'pgMeta']
   for (const route of routesWithoutPrefix) {
     configs.push({
-      file: `${route.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')}.ts`,
+      file: `${route
+        .replace(/([A-Z])/g, '-$1')
+        .toLowerCase()
+        .replace(/^-/, '')}.ts`,
       prefix: '',
       apiPrefix: '/api/platform',
     })
@@ -106,7 +109,7 @@ function extractRoutes(): Route[] {
     }
 
     // Find the config for this file
-    const config = configs.find(c => c.file === fileName)
+    const config = configs.find((c) => c.file === fileName)
     if (!config) {
       console.warn(`⚠️  No config found for ${fileName}, skipping...`)
       return
@@ -125,7 +128,7 @@ function extractRoutes(): Route[] {
 
     while ((match = simpleRouteRegex.exec(content)) !== null) {
       const methodPath = { method: match[1], path: match[2] }
-      if (!allMatches.some(m => m.method === methodPath.method && m.path === methodPath.path)) {
+      if (!allMatches.some((m) => m.method === methodPath.method && m.path === methodPath.path)) {
         allMatches.push(methodPath)
       }
     }
@@ -167,7 +170,7 @@ const routes = extractRoutes()
 
 // Group by prefix for better readability
 const byPrefix: Record<string, Route[]> = {}
-routes.forEach(route => {
+routes.forEach((route) => {
   const prefix = route.path.split('/').slice(0, 3).join('/') // e.g., /api/platform
   if (!byPrefix[prefix]) byPrefix[prefix] = []
   byPrefix[prefix].push(route)
@@ -183,8 +186,8 @@ const output = {
     totalRoutes: routes.length,
     extractedAt: new Date().toISOString(),
     statusBreakdown: {
-      implemented: routes.filter(r => r.status === 'implemented').length,
-      stubbed: routes.filter(r => r.status === 'stubbed').length,
+      implemented: routes.filter((r) => r.status === 'implemented').length,
+      stubbed: routes.filter((r) => r.status === 'stubbed').length,
     },
   },
   routes,

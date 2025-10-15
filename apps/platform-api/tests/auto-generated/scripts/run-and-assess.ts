@@ -103,7 +103,6 @@ try {
   } else if (stats.passed > 0) {
     console.log('\n🎉 All tests passed!')
   }
-
 } catch (error: any) {
   console.log('\n' + '='.repeat(60))
   console.log('📊 TEST ASSESSMENT REPORT')

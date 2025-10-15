@@ -30,26 +30,20 @@ const storageRoutes: FastifyPluginAsync = async (app) => {
   app.post<{
     Params: { ref: string; id: string }
     Body: { path?: string; options?: Record<string, unknown> }
-  }>(
-    '/:ref/buckets/:id/objects/list',
-    async (request, reply) => {
-      const objects = listStorageObjects(request.params.ref, request.params.id, request.body?.path)
-      return reply.send(objects)
-    }
-  )
+  }>('/:ref/buckets/:id/objects/list', async (request, reply) => {
+    const objects = listStorageObjects(request.params.ref, request.params.id, request.body?.path)
+    return reply.send(objects)
+  })
 
   app.post<{
     Params: { ref: string; id: string }
     Body: { path: string }
     Reply: StoragePublicUrlResponse
-  }>(
-    '/:ref/buckets/:id/objects/public-url',
-    async (request, reply) => {
-      return reply.send(
-        createStoragePublicUrl(request.params.ref, request.params.id, request.body?.path ?? '')
-      )
-    }
-  )
+  }>('/:ref/buckets/:id/objects/public-url', async (request, reply) => {
+    return reply.send(
+      createStoragePublicUrl(request.params.ref, request.params.id, request.body?.path ?? '')
+    )
+  })
 }
 
 export default storageRoutes

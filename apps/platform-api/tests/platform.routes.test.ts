@@ -448,7 +448,11 @@ describe('platform routes', () => {
     const logsPost = await app.inject({
       method: 'POST',
       url: `/api/platform/projects/${projectRef}/analytics/endpoints/logs.all`,
-      payload: { sql: 'select 1', iso_timestamp_start: new Date().toISOString(), iso_timestamp_end: new Date().toISOString() },
+      payload: {
+        sql: 'select 1',
+        iso_timestamp_start: new Date().toISOString(),
+        iso_timestamp_end: new Date().toISOString(),
+      },
     })
     expect(logsPost.statusCode).toBe(200)
 

@@ -55,7 +55,10 @@ const COUNT_RESPONSE: ProjectContentCountSummary = {
 }
 
 // TODO(platform-api): Replace stubbed content responses once file-backed storage is implemented.
-export const listProjectContent = (visibility?: string, favorite?: string): ProjectContentListResponse => {
+export const listProjectContent = (
+  visibility?: string,
+  favorite?: string
+): ProjectContentListResponse => {
   if (favorite === 'true' || visibility === 'project') {
     return { data: [] }
   }

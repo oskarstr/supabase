@@ -11,9 +11,7 @@ export const listOrganizationIntegrations = (
   _slug: string
 ): GetOrganizationIntegrationResponse[] => []
 
-export const listGitHubConnections = (
-  _organizationId: number
-): ListGitHubConnectionsResponse => ({
+export const listGitHubConnections = (_organizationId: number): ListGitHubConnectionsResponse => ({
   connections: [],
 })
 

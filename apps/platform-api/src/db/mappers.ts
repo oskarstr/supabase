@@ -49,7 +49,10 @@ export interface OrganizationWithMembership {
   membership?: Selectable<OrganizationMembersTable>
 }
 
-export const toOrganization = ({ organization, membership }: OrganizationWithMembership): Organization => ({
+export const toOrganization = ({
+  organization,
+  membership,
+}: OrganizationWithMembership): Organization => ({
   billing_email: organization.billing_email,
   billing_partner: organization.billing_partner,
   id: organization.id,

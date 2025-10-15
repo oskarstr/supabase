@@ -14,11 +14,9 @@ const rawPgMetaBaseUrl =
 const PG_META_BASE_URL = rawPgMetaBaseUrl.replace(/\/+$/, '')
 const PG_META_CRYPTO_KEY = process.env.PG_META_CRYPTO_KEY?.trim() || 'SAMPLE_KEY'
 
-const buildPgMetaUrl = (path: string) =>
-  `${PG_META_BASE_URL}/${path.replace(/^\//, '')}`
+const buildPgMetaUrl = (path: string) => `${PG_META_BASE_URL}/${path.replace(/^\//, '')}`
 
-const parseBooleanParam = (value?: string) =>
-  value === undefined ? undefined : value === 'true'
+const parseBooleanParam = (value?: string) => (value === undefined ? undefined : value === 'true')
 
 const parseNumberParam = (value?: string) => {
   if (value === undefined) return undefined
@@ -126,7 +124,8 @@ const pgMetaRoutes: FastifyPluginAsync = async (app) => {
           connectionString,
           applicationName: options.applicationName,
           disableStatementTimeout:
-            (options.body as { disable_statement_timeout?: boolean }).disable_statement_timeout === true,
+            (options.body as { disable_statement_timeout?: boolean }).disable_statement_timeout ===
+            true,
         })
 
         return { status: 201, payload: rows }
@@ -225,48 +224,46 @@ const pgMetaRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(status).send(payload ?? [])
   })
 
-  const simpleProxy =
-    (path: string) =>
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const connectionHeader = request.headers['x-connection-encrypted']
-      const applicationNameHeader = request.headers['x-pg-application-name']
-      const params = request.params as { ref: string }
-      const query = request.query as Record<string, string | undefined>
+  const simpleProxy = (path: string) => async (request: FastifyRequest, reply: FastifyReply) => {
+    const connectionHeader = request.headers['x-connection-encrypted']
+    const applicationNameHeader = request.headers['x-pg-application-name']
+    const params = request.params as { ref: string }
+    const query = request.query as Record<string, string | undefined>
 
-      const { status, payload } = await forwardPgMeta(params.ref, path, {
-        connectionString:
-          typeof connectionHeader === 'string' && connectionHeader.trim().length > 0
-            ? connectionHeader.trim()
+    const { status, payload } = await forwardPgMeta(params.ref, path, {
+      connectionString:
+        typeof connectionHeader === 'string' && connectionHeader.trim().length > 0
+          ? connectionHeader.trim()
+          : undefined,
+      applicationName:
+        typeof applicationNameHeader === 'string' && applicationNameHeader.trim().length > 0
+          ? applicationNameHeader.trim()
+          : undefined,
+      query: {
+        include_columns:
+          parseBooleanParam(query.include_columns) !== undefined
+            ? String(parseBooleanParam(query.include_columns))
             : undefined,
-        applicationName:
-          typeof applicationNameHeader === 'string' && applicationNameHeader.trim().length > 0
-            ? applicationNameHeader.trim()
+        include_system_schemas:
+          parseBooleanParam(query.include_system_schemas) !== undefined
+            ? String(parseBooleanParam(query.include_system_schemas))
             : undefined,
-        query: {
-          include_columns:
-            parseBooleanParam(query.include_columns) !== undefined
-              ? String(parseBooleanParam(query.include_columns))
-              : undefined,
-          include_system_schemas:
-            parseBooleanParam(query.include_system_schemas) !== undefined
-              ? String(parseBooleanParam(query.include_system_schemas))
-              : undefined,
-          included_schemas: parseCsvParam(query.included_schemas),
-          excluded_schemas: parseCsvParam(query.excluded_schemas),
-          column_ids: parseCsvParam(query.column_ids),
-          limit:
-            parseNumberParam(query.limit) !== undefined
-              ? String(parseNumberParam(query.limit))
-              : undefined,
-          offset:
-            parseNumberParam(query.offset) !== undefined
-              ? String(parseNumberParam(query.offset))
-              : undefined,
-        },
-      })
+        included_schemas: parseCsvParam(query.included_schemas),
+        excluded_schemas: parseCsvParam(query.excluded_schemas),
+        column_ids: parseCsvParam(query.column_ids),
+        limit:
+          parseNumberParam(query.limit) !== undefined
+            ? String(parseNumberParam(query.limit))
+            : undefined,
+        offset:
+          parseNumberParam(query.offset) !== undefined
+            ? String(parseNumberParam(query.offset))
+            : undefined,
+      },
+    })
 
-      return reply.code(status).send(payload ?? [])
-    }
+    return reply.code(status).send(payload ?? [])
+  }
 
   app.get('/pg-meta/:ref/views', simpleProxy('views'))
   app.get('/pg-meta/:ref/policies', simpleProxy('policies'))

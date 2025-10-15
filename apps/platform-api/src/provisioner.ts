@@ -141,11 +141,12 @@ export async function provisionProjectStack(context: ProvisionContext) {
     // orchestrator lands, this call becomes the integration point to swap the backend out.
     const explicitNetwork = process.env.PLATFORM_DOCKER_NETWORK?.trim()
     const composeProject = process.env.COMPOSE_PROJECT_NAME?.trim()
-    const networkId = explicitNetwork && explicitNetwork.length > 0
-      ? explicitNetwork
-      : composeProject && composeProject.length > 0
-        ? `${composeProject}_default`
-        : 'supabase_default'
+    const networkId =
+      explicitNetwork && explicitNetwork.length > 0
+        ? explicitNetwork
+        : composeProject && composeProject.length > 0
+          ? `${composeProject}_default`
+          : 'supabase_default'
     // The CLI probes 127.0.0.1 from inside its process, which fails when it runs inside the
     // platform-api container. We skip that built-in probe and run platform-managed health checks
     // instead so the future orchestrator can plug into the same lifecycle.

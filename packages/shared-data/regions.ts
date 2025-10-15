@@ -1,5 +1,8 @@
 export type CloudProvider = 'FLY' | 'AWS' | 'AWS_K8S' | 'AWS_NIMBUS' | 'LOCAL'
-export type Region = Partial<typeof AWS_REGIONS> | Partial<typeof FLY_REGIONS> | Partial<typeof LOCAL_REGIONS>
+export type Region =
+  | Partial<typeof AWS_REGIONS>
+  | Partial<typeof FLY_REGIONS>
+  | Partial<typeof LOCAL_REGIONS>
 
 export const AWS_REGIONS = {
   WEST_US: {

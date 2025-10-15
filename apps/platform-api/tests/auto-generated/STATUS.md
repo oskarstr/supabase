@@ -99,18 +99,18 @@ See [COVERAGE_REPORT.md](./COVERAGE_REPORT.md) for the full breakdown.
 
 **Current Coverage by Major Categories:**
 
-| Category | Endpoints | Status |
-|----------|-----------|--------|
-| Projects | 132 | Tests generated, mostly unimplemented |
-| Organizations | 56 | Tests generated, mostly unimplemented |
-| Database | 11 | Tests generated |
-| Auth | 12 | Tests generated |
-| Storage | 16 | Tests generated |
-| Integrations | 14 | Tests generated |
-| Replication | 12 | Tests generated |
-| Profile | 9 | Tests generated |
-| Branches | 7 | Tests generated |
-| Others | 33 | Tests generated |
+| Category      | Endpoints | Status                                |
+| ------------- | --------- | ------------------------------------- |
+| Projects      | 132       | Tests generated, mostly unimplemented |
+| Organizations | 56        | Tests generated, mostly unimplemented |
+| Database      | 11        | Tests generated                       |
+| Auth          | 12        | Tests generated                       |
+| Storage       | 16        | Tests generated                       |
+| Integrations  | 14        | Tests generated                       |
+| Replication   | 12        | Tests generated                       |
+| Profile       | 9         | Tests generated                       |
+| Branches      | 7         | Tests generated                       |
+| Others        | 33        | Tests generated                       |
 
 **Note:** The coverage report shows 0% implemented because the path matching algorithm needs improvement. The 27 routes you have are likely not being matched correctly due to path format differences (e.g., `/api/platform/` prefix, `:id` vs `{id}` params).
 
@@ -121,6 +121,7 @@ See [COVERAGE_REPORT.md](./COVERAGE_REPORT.md) for the full breakdown.
 **Issue:** The route matcher isn't detecting your 27 implemented routes.
 
 **Likely causes:**
+
 - Path prefix differences (`/api/platform/foo` vs `/platform/foo`)
 - Parameter format (`{id}` vs `:id`)
 - Route registration patterns not recognized
@@ -161,13 +162,14 @@ it.skip('lists organizations', async () => {
     expect(payload[0]).toMatchObject({
       id: expect.any(Number),
       name: expect.any(String),
-      slug: expect.any(String)
+      slug: expect.any(String),
     })
   }
 })
 ```
 
 **Smart features:**
+
 - ✅ Knows GET returns 200, POST returns 201, DELETE returns 204
 - ✅ Knows organization lists should be arrays
 - ✅ Knows organizations need id, name, slug fields

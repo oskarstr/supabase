@@ -15,7 +15,11 @@ const withPrefix = (alias: string) => `${ACCESS_TOKEN_PREFIX}_${alias}`
 const db = getPlatformDb()
 
 export const listAccessTokens = async (): Promise<AccessToken[]> => {
-  const rows = await db.selectFrom('access_tokens').selectAll().orderBy('created_at', 'desc').execute()
+  const rows = await db
+    .selectFrom('access_tokens')
+    .selectAll()
+    .orderBy('created_at', 'desc')
+    .execute()
   return rows.map((row) => toAccessToken(row) as AccessToken)
 }
 
@@ -54,11 +58,19 @@ export const createAccessToken = async (name: string): Promise<AccessTokenWithSe
 }
 
 export const getAccessToken = async (id: number): Promise<AccessToken | undefined> => {
-  const row = await db.selectFrom('access_tokens').selectAll().where('id', '=', id).executeTakeFirst()
+  const row = await db
+    .selectFrom('access_tokens')
+    .selectAll()
+    .where('id', '=', id)
+    .executeTakeFirst()
   return row ? (toAccessToken(row) as AccessToken) : undefined
 }
 
 export const deleteAccessToken = async (id: number) => {
-  const result = await db.deleteFrom('access_tokens').where('id', '=', id).returning('id').executeTakeFirst()
+  const result = await db
+    .deleteFrom('access_tokens')
+    .where('id', '=', id)
+    .returning('id')
+    .executeTakeFirst()
   return Boolean(result?.id)
 }

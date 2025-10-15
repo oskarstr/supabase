@@ -17,14 +17,14 @@ describe('notifications endpoints (auto-generated)', () => {
   it.skip('handles archive-all', async () => {
     // TODO: Implement PATCH /platform/notifications/archive-all
     const response = await app.inject({
-    method: 'PATCH',
-    url: `/api/platform/notifications/archive-all`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'PATCH',
+      url: `/api/platform/notifications/archive-all`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -34,11 +34,11 @@ describe('notifications endpoints (auto-generated)', () => {
 
   it('lists notifications', async () => {
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/notifications`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/notifications`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -48,11 +48,11 @@ describe('notifications endpoints (auto-generated)', () => {
 
   it('lists summary', async () => {
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/notifications/summary`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/notifications/summary`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -63,14 +63,14 @@ describe('notifications endpoints (auto-generated)', () => {
   it.skip('handles notifications', async () => {
     // TODO: Implement PATCH /platform/notifications
     const response = await app.inject({
-    method: 'PATCH',
-    url: `/api/platform/notifications`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'PATCH',
+      url: `/api/platform/notifications`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)

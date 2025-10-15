@@ -16,11 +16,11 @@ describe('status endpoints (auto-generated)', () => {
 
   it('lists status', async () => {
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/status`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/status`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)

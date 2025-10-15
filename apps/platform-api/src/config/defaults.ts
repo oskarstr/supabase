@@ -24,7 +24,9 @@ export const DEFAULT_BILLING_EMAIL = envString('STUDIO_DEFAULT_BILLING_EMAIL') ?
 
 const rawBillingPartner = envString('STUDIO_DEFAULT_BILLING_PARTNER')
 export const DEFAULT_BILLING_PARTNER =
-  rawBillingPartner === 'fly' || rawBillingPartner === 'aws_marketplace' || rawBillingPartner === 'vercel_marketplace'
+  rawBillingPartner === 'fly' ||
+  rawBillingPartner === 'aws_marketplace' ||
+  rawBillingPartner === 'vercel_marketplace'
     ? rawBillingPartner
     : null
 
@@ -35,8 +37,8 @@ export const PLAN_LABELS: Record<Organization['plan']['id'], string> = {
   enterprise: 'Enterprise',
 }
 
-export const DEFAULT_PLAN_ID =
-  (envString('STUDIO_DEFAULT_PLAN', 'enterprise') ?? 'enterprise') as Organization['plan']['id']
+export const DEFAULT_PLAN_ID = (envString('STUDIO_DEFAULT_PLAN', 'enterprise') ??
+  'enterprise') as Organization['plan']['id']
 export const DEFAULT_PLAN_NAME = PLAN_LABELS[DEFAULT_PLAN_ID]
 
 export const DEFAULT_USAGE_BILLING_ENABLED =
@@ -67,8 +69,7 @@ export const DEFAULT_IS_SSO_USER = envString('STUDIO_DEFAULT_SSO_USER', 'false')
 
 export const DEFAULT_ADMIN_EMAIL =
   envString('PLATFORM_ADMIN_EMAIL', DEFAULT_PRIMARY_EMAIL) ?? DEFAULT_PRIMARY_EMAIL
-export const DEFAULT_ADMIN_PASSWORD =
-  envString('PLATFORM_ADMIN_PASSWORD', 'supabase') ?? 'supabase'
+export const DEFAULT_ADMIN_PASSWORD = envString('PLATFORM_ADMIN_PASSWORD', 'supabase') ?? 'supabase'
 
 export const DEFAULT_PROJECT_NAME =
   envString('STUDIO_DEFAULT_PROJECT', 'Local Project') ?? 'Local Project'
@@ -78,11 +79,11 @@ export const DEFAULT_PROJECT_REF =
     ? rawProjectRef.trim()
     : slugify(DEFAULT_PROJECT_NAME) || 'default'
 export const DEFAULT_REGION = envString('STUDIO_DEFAULT_REGION', 'local') ?? 'local'
-export const DEFAULT_CLOUD_PROVIDER =
-  (envString('STUDIO_DEFAULT_CLOUD_PROVIDER', 'AWS') ?? 'AWS') as CloudProvider
+export const DEFAULT_CLOUD_PROVIDER = (envString('STUDIO_DEFAULT_CLOUD_PROVIDER', 'AWS') ??
+  'AWS') as CloudProvider
 export const DEFAULT_DB_VERSION = envString('STUDIO_DEFAULT_DB_VERSION', '15') ?? '15'
-export const DEFAULT_INFRA_SIZE =
-  (envString('STUDIO_DEFAULT_COMPUTE_SIZE', 'micro') ?? 'micro') as ComputeSize
+export const DEFAULT_INFRA_SIZE = (envString('STUDIO_DEFAULT_COMPUTE_SIZE', 'micro') ??
+  'micro') as ComputeSize
 
 const defaultDbUrl = envString('SUPABASE_DB_URL', envString('DATABASE_URL')) ?? ''
 export const DEFAULT_CONNECTION_STRING = defaultDbUrl.length > 0 ? defaultDbUrl : null
@@ -101,12 +102,10 @@ const defaultRestBase =
   envString('SUPABASE_PUBLIC_URL', 'http://localhost:54321') ?? 'http://localhost:54321'
 export const DEFAULT_REST_URL = buildRestUrl(defaultRestBase)
 export const DEFAULT_ANON_KEY = envString('ANON_KEY', randomUUID()) ?? randomUUID()
-export const DEFAULT_SERVICE_KEY =
-  envString('SERVICE_ROLE_KEY', randomUUID()) ?? randomUUID()
+export const DEFAULT_SERVICE_KEY = envString('SERVICE_ROLE_KEY', randomUUID()) ?? randomUUID()
 export const DEFAULT_PROJECT_SUBSCRIPTION_ID =
   envString('STUDIO_DEFAULT_PROJECT_SUBSCRIPTION_ID') ?? randomUUID()
-export const DEFAULT_BRANCH_ENABLED =
-  envString('STUDIO_DEFAULT_BRANCH_ENABLED', 'false') === 'true'
+export const DEFAULT_BRANCH_ENABLED = envString('STUDIO_DEFAULT_BRANCH_ENABLED', 'false') === 'true'
 export const DEFAULT_PHYSICAL_BACKUPS =
   envString('STUDIO_DEFAULT_PHYSICAL_BACKUPS', 'false') === 'true'
 
@@ -124,12 +123,10 @@ export const PLATFORM_PROJECT_SCHEMA =
 export const PLATFORM_PROJECT_REF =
   envString('PLATFORM_PROJECT_REF', 'platform')?.trim() || 'platform'
 export const PLATFORM_PROJECT_NAME =
-  envString('PLATFORM_PROJECT_NAME', 'Platform Control Plane')?.trim() ||
-  'Platform Control Plane'
+  envString('PLATFORM_PROJECT_NAME', 'Platform Control Plane')?.trim() || 'Platform Control Plane'
 export const PLATFORM_PROJECT_SUBSCRIPTION_ID =
   envString('PLATFORM_PROJECT_SUBSCRIPTION_ID') ?? randomUUID()
-export const PLATFORM_PROJECT_ANON_KEY =
-  envString('PLATFORM_PROJECT_ANON_KEY') ?? DEFAULT_ANON_KEY
+export const PLATFORM_PROJECT_ANON_KEY = envString('PLATFORM_PROJECT_ANON_KEY') ?? DEFAULT_ANON_KEY
 export const PLATFORM_PROJECT_SERVICE_KEY =
   envString('PLATFORM_PROJECT_SERVICE_KEY') ?? DEFAULT_SERVICE_KEY
 export const PLATFORM_DEBUG_ENABLED = envBoolean('PLATFORM_DEBUG', false)
@@ -153,11 +150,14 @@ export const REGION_SPECIFICS: Record<CloudProvider, RegionSpecific[]> = {
     { code: 'aws-k8s-us-east-1', name: 'US East 1 (K8S)', provider: 'AWS_K8S', type: 'specific' },
   ],
   AWS_NIMBUS: [
-    { code: 'aws-nimbus-us-east-1', name: 'US East 1 (Nimbus)', provider: 'AWS_NIMBUS', type: 'specific' },
+    {
+      code: 'aws-nimbus-us-east-1',
+      name: 'US East 1 (Nimbus)',
+      provider: 'AWS_NIMBUS',
+      type: 'specific',
+    },
   ],
-  LOCAL: [
-    { code: 'local-dev', name: 'Local Development', provider: 'LOCAL', type: 'specific' },
-  ],
+  LOCAL: [{ code: 'local-dev', name: 'Local Development', provider: 'LOCAL', type: 'specific' }],
 }
 
 export const DEFAULT_AVAILABLE_VERSIONS: AvailableVersionsResponse['available_versions'] = [

@@ -59,7 +59,10 @@ export const executeProjectSql = async (
 
   try {
     if (options.applicationName) {
-      await client.query('select set_config($1, $2, false)', ['application_name', options.applicationName])
+      await client.query('select set_config($1, $2, false)', [
+        'application_name',
+        options.applicationName,
+      ])
     }
 
     if (options.disableStatementTimeout) {

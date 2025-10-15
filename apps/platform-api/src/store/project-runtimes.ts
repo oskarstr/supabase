@@ -24,7 +24,10 @@ export const ensureProjectRuntime = async (
   const db = getPlatformDb()
   const rootDir = resolve(PROJECTS_ROOT, projectRef)
   ensureDir(rootDir)
-  const normalizedExcluded = options.excludedServices?.map((service) => service.trim()).filter((service) => service.length > 0) ?? []
+  const normalizedExcluded =
+    options.excludedServices
+      ?.map((service) => service.trim())
+      .filter((service) => service.length > 0) ?? []
 
   const existing = await db
     .selectFrom('project_runtimes')
@@ -38,7 +41,8 @@ export const ensureProjectRuntime = async (
       updates.root_dir = rootDir
     }
     const existingExcluded = existing.excluded_services ?? []
-    const hasExcludedUpdate = options.excludedServices !== undefined &&
+    const hasExcludedUpdate =
+      options.excludedServices !== undefined &&
       normalizedExcluded.join(',') !== existingExcluded.join(',')
 
     if (hasExcludedUpdate) {
@@ -50,7 +54,9 @@ export const ensureProjectRuntime = async (
         .updateTable('project_runtimes')
         .set({
           ...('root_dir' in updates ? { root_dir: updates.root_dir } : {}),
-          ...('excluded_services' in updates ? { excluded_services: updates.excluded_services } : {}),
+          ...('excluded_services' in updates
+            ? { excluded_services: updates.excluded_services }
+            : {}),
           updated_at: new Date(),
         })
         .where('project_id', '=', projectId)
@@ -76,7 +82,9 @@ export const ensureProjectRuntime = async (
   return { project_id: projectId, root_dir: rootDir, excluded_services: normalizedExcluded }
 }
 
-export const getProjectRuntime = async (projectId: number): Promise<ProjectRuntimeRecord | undefined> => {
+export const getProjectRuntime = async (
+  projectId: number
+): Promise<ProjectRuntimeRecord | undefined> => {
   const db = getPlatformDb()
   const row = await db
     .selectFrom('project_runtimes')

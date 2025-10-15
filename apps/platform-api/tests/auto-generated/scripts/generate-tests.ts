@@ -67,13 +67,12 @@ function normalizePath(path: string): string {
 function findMatchingRoute(endpoint: Endpoint, routes: Route[]): Route | null {
   const normalizedEndpointPath = normalizePath(endpoint.path)
 
-  return routes.find(route => {
-    const normalizedRoutePath = normalizePath(route.path)
-    return (
-      route.method === endpoint.method &&
-      normalizedRoutePath === normalizedEndpointPath
-    )
-  }) || null
+  return (
+    routes.find((route) => {
+      const normalizedRoutePath = normalizePath(route.path)
+      return route.method === endpoint.method && normalizedRoutePath === normalizedEndpointPath
+    }) || null
+  )
 }
 
 // Helper: Extract category from endpoint path
@@ -90,18 +89,29 @@ function generateTestName(endpoint: Endpoint): string {
 
   // Handle parameterized paths
   if (resource.includes('{') || resource.includes(':')) {
-    const action = endpoint.method === 'GET' ? 'retrieves' :
-                   endpoint.method === 'POST' ? 'creates' :
-                   endpoint.method === 'PATCH' || endpoint.method === 'PUT' ? 'updates' :
-                   endpoint.method === 'DELETE' ? 'deletes' : 'handles'
+    const action =
+      endpoint.method === 'GET'
+        ? 'retrieves'
+        : endpoint.method === 'POST'
+          ? 'creates'
+          : endpoint.method === 'PATCH' || endpoint.method === 'PUT'
+            ? 'updates'
+            : endpoint.method === 'DELETE'
+              ? 'deletes'
+              : 'handles'
     const parentResource = pathParts[pathParts.length - 2]
     return `${action} ${parentResource} by ID`
   }
 
   // Handle collection endpoints
-  const action = endpoint.method === 'GET' ? 'lists' :
-                 endpoint.method === 'POST' ? 'creates' :
-                 endpoint.method === 'DELETE' ? 'deletes' : 'handles'
+  const action =
+    endpoint.method === 'GET'
+      ? 'lists'
+      : endpoint.method === 'POST'
+        ? 'creates'
+        : endpoint.method === 'DELETE'
+          ? 'deletes'
+          : 'handles'
   return `${action} ${resource}`
 }
 
@@ -155,7 +165,7 @@ function generateAssertions(endpoint: Endpoint, route: Route | null): string {
     }
   }
 
-  return assertions.map(a => `    ${a}`).join('\n')
+  return assertions.map((a) => `    ${a}`).join('\n')
 }
 
 // Helper: Generate test code for an endpoint
@@ -163,7 +173,9 @@ function generateTestCode(endpoint: Endpoint, route: Route | null): string {
   const testName = generateTestName(endpoint)
   const isImplemented = route && route.status === 'implemented'
   const itMethod = isImplemented ? 'it' : 'it.skip'
-  const todoComment = !isImplemented ? `\n    // TODO: Implement ${endpoint.method} ${endpoint.path}` : ''
+  const todoComment = !isImplemented
+    ? `\n    // TODO: Implement ${endpoint.method} ${endpoint.path}`
+    : ''
 
   // Convert path params from {id} to actual values for test
   const testPath = endpoint.path
@@ -198,12 +210,15 @@ ${assertions}
 }
 
 // Group endpoints by category
-const endpointsByCategory = studioData.endpoints.reduce((acc, endpoint) => {
-  const category = getCategory(endpoint.path)
-  if (!acc[category]) acc[category] = []
-  acc[category].push(endpoint)
-  return acc
-}, {} as Record<string, Endpoint[]>)
+const endpointsByCategory = studioData.endpoints.reduce(
+  (acc, endpoint) => {
+    const category = getCategory(endpoint.path)
+    if (!acc[category]) acc[category] = []
+    acc[category].push(endpoint)
+    return acc
+  },
+  {} as Record<string, Endpoint[]>
+)
 
 console.log(`📁 Organized into ${Object.keys(endpointsByCategory).length} categories`)
 
@@ -241,19 +256,21 @@ describe('${category} endpoints (auto-generated)', () => {
 
 `
 
-  const tests = endpoints.map(endpoint => {
-    const route = findMatchingRoute(endpoint, implementedData.routes)
+  const tests = endpoints
+    .map((endpoint) => {
+      const route = findMatchingRoute(endpoint, implementedData.routes)
 
-    // Update stats
-    if (route) {
-      if (route.status === 'implemented') stats.implemented++
-      else if (route.status === 'stubbed') stats.stubbed++
-    } else {
-      stats.missing++
-    }
+      // Update stats
+      if (route) {
+        if (route.status === 'implemented') stats.implemented++
+        else if (route.status === 'stubbed') stats.stubbed++
+      } else {
+        stats.missing++
+      }
 
-    return generateTestCode(endpoint, route)
-  }).join('\n')
+      return generateTestCode(endpoint, route)
+    })
+    .join('\n')
 
   const content = imports + tests + '})\n'
 
@@ -285,11 +302,11 @@ const coverageReport = `# Platform API Test Coverage Report
 
 ${Object.entries(endpointsByCategory)
   .map(([category, endpoints]) => {
-    const categoryImplemented = endpoints.filter(e => {
+    const categoryImplemented = endpoints.filter((e) => {
       const route = findMatchingRoute(e, implementedData.routes)
       return route && route.status === 'implemented'
     }).length
-    const categoryStubbed = endpoints.filter(e => {
+    const categoryStubbed = endpoints.filter((e) => {
       const route = findMatchingRoute(e, implementedData.routes)
       return route && route.status === 'stubbed'
     }).length
@@ -314,7 +331,9 @@ ${Object.entries(endpointsByCategory)
 
 ## Test Files Generated
 
-${Object.keys(endpointsByCategory).map(cat => `- \`${cat}.generated.test.ts\``).join('\n')}
+${Object.keys(endpointsByCategory)
+  .map((cat) => `- \`${cat}.generated.test.ts\``)
+  .join('\n')}
 `
 
 writeFileSync(coverageReportPath, coverageReport)
@@ -322,4 +341,6 @@ writeFileSync(coverageReportPath, coverageReport)
 console.log('\n📊 Test Generation Complete!')
 console.log(`✅ Generated ${totalGenerated} test files`)
 console.log(`✅ Created coverage report: ${coverageReportPath}`)
-console.log(`\n📈 Coverage: ${implementedPercent}% implemented, ${stubbedPercent}% stubbed, ${missingPercent}% missing`)
+console.log(
+  `\n📈 Coverage: ${implementedPercent}% implemented, ${stubbedPercent}% stubbed, ${missingPercent}% missing`
+)

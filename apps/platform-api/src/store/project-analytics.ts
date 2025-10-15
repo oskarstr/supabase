@@ -1,7 +1,4 @@
-import type {
-  ProjectLogDrainSummary,
-  UsageApiCountSummary,
-} from './types.js'
+import type { ProjectLogDrainSummary, UsageApiCountSummary } from './types.js'
 
 const nowIso = () => new Date().toISOString()
 
@@ -78,11 +75,7 @@ export const listFunctionCombinedStats = (
   result: [buildCombinedStatsPoint()],
 })
 
-export const listFunctionRequestStats = (
-  _ref: string,
-  _functionId: string,
-  _interval: string
-) => ({
+export const listFunctionRequestStats = (_ref: string, _functionId: string, _interval: string) => ({
   result: [
     {
       timestamp: nowIso(),

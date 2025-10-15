@@ -3,7 +3,11 @@ import { ColumnType, Generated } from 'kysely'
 type Timestamp = ColumnType<Date, Date | string | undefined, Date | string | undefined>
 type StringArray = ColumnType<string[], string[] | undefined, string[] | undefined>
 type IntegerArray = ColumnType<number[], number[] | undefined, number[] | undefined>
-type Json = ColumnType<Record<string, unknown> | null, Record<string, unknown> | null | undefined, Record<string, unknown> | null | undefined>
+type Json = ColumnType<
+  Record<string, unknown> | null,
+  Record<string, unknown> | null | undefined,
+  Record<string, unknown> | null | undefined
+>
 
 export interface ProfilesTable {
   id: Generated<number>

@@ -49,7 +49,11 @@ const generateUniqueRef = async (name: string) => {
   let attempt = 1
 
   while (attempt < 100) {
-    const existing = await db.selectFrom('projects').select('id').where('ref', '=', candidate).executeTakeFirst()
+    const existing = await db
+      .selectFrom('projects')
+      .select('id')
+      .where('ref', '=', candidate)
+      .executeTakeFirst()
     if (!existing) return candidate
     attempt += 1
     candidate = `${base}-${attempt}`
@@ -57,7 +61,18 @@ const generateUniqueRef = async (name: string) => {
   throw new Error('Failed to generate unique project ref')
 }
 
-type ProjectUpdate = Partial<Pick<ProjectsTable, 'status' | 'rest_url' | 'connection_string' | 'db_host' | 'db_version' | 'anon_key' | 'service_key'>>
+type ProjectUpdate = Partial<
+  Pick<
+    ProjectsTable,
+    | 'status'
+    | 'rest_url'
+    | 'connection_string'
+    | 'db_host'
+    | 'db_version'
+    | 'anon_key'
+    | 'service_key'
+  >
+>
 
 const updateProject = async (ref: string, values: ProjectUpdate) => {
   await db
@@ -71,10 +86,7 @@ const updateProject = async (ref: string, values: ProjectUpdate) => {
 }
 
 const readProvisionedEnv = (runtimeRoot: string) => {
-  const candidatePaths = [
-    resolve(runtimeRoot, '.env'),
-    resolve(runtimeRoot, 'supabase/.env'),
-  ]
+  const candidatePaths = [resolve(runtimeRoot, '.env'), resolve(runtimeRoot, 'supabase/.env')]
 
   for (const envPath of candidatePaths) {
     if (existsSync(envPath)) {
@@ -96,9 +108,10 @@ const scheduleProvisioning = async (
   const runtimeRoot = options.runtime.root_dir
   const excludedServices = options.runtime.excluded_services ?? []
   const existingEnv = readProvisionedEnv(runtimeRoot)
-  const databasePassword = options.dbPassword && options.dbPassword.length > 0
-    ? options.dbPassword
-    : existingEnv?.SUPABASE_DB_PASSWORD ?? existingEnv?.POSTGRES_PASSWORD ?? randomUUID()
+  const databasePassword =
+    options.dbPassword && options.dbPassword.length > 0
+      ? options.dbPassword
+      : existingEnv?.SUPABASE_DB_PASSWORD ?? existingEnv?.POSTGRES_PASSWORD ?? randomUUID()
   try {
     await provisionProjectStack({
       projectId: project.id,
@@ -131,7 +144,7 @@ const scheduleProvisioning = async (
     if (dbUrl) {
       updates.connection_string = dbUrl
       try {
-          updates.db_host = new URL(dbUrl).hostname
+        updates.db_host = new URL(dbUrl).hostname
       } catch {
         /* noop */
       }
@@ -296,7 +309,11 @@ export const createProject = async (body: CreateProjectBody): Promise<CreateProj
 }
 
 export const deleteProject = async (ref: string): Promise<RemoveProjectResponse | undefined> => {
-  const projectRow = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
+  const projectRow = await db
+    .selectFrom('projects')
+    .selectAll()
+    .where('ref', '=', ref)
+    .executeTakeFirst()
   if (!projectRow) return undefined
 
   const organization = await db
@@ -339,7 +356,11 @@ export const deleteProject = async (ref: string): Promise<RemoveProjectResponse 
 }
 
 export const pauseProject = async (ref: string): Promise<ProjectDetail | undefined> => {
-  const projectRow = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
+  const projectRow = await db
+    .selectFrom('projects')
+    .selectAll()
+    .where('ref', '=', ref)
+    .executeTakeFirst()
   if (!projectRow) return undefined
   if (!PLATFORM_DEBUG_ENABLED && isPlatformProjectRef(projectRow.ref)) {
     return undefined
@@ -365,7 +386,11 @@ export const pauseProject = async (ref: string): Promise<ProjectDetail | undefin
 }
 
 export const resumeProject = async (ref: string): Promise<ProjectDetail | undefined> => {
-  const projectRow = await db.selectFrom('projects').selectAll().where('ref', '=', ref).executeTakeFirst()
+  const projectRow = await db
+    .selectFrom('projects')
+    .selectAll()
+    .where('ref', '=', ref)
+    .executeTakeFirst()
   if (!projectRow) return undefined
   if (!PLATFORM_DEBUG_ENABLED && isPlatformProjectRef(projectRow.ref)) {
     return undefined

@@ -17,14 +17,14 @@ describe('reset-password endpoints (auto-generated)', () => {
   it.skip('creates reset-password', async () => {
     // TODO: Implement POST /platform/reset-password
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/reset-password`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/reset-password`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)

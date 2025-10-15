@@ -1,8 +1,4 @@
-import type {
-  DiskAutoscaleConfig,
-  DiskAttributes,
-  DiskUtilizationResponse,
-} from './types.js'
+import type { DiskAutoscaleConfig, DiskAttributes, DiskUtilizationResponse } from './types.js'
 
 const nowIso = () => new Date().toISOString()
 

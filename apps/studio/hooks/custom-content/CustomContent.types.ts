@@ -35,12 +35,14 @@ export type CustomContentTypes = {
   infraAwsNimbusLabel: string
 
   projectCreationDeploymentTargets: ('local' | 'remote')[]
-  projectCreationLocalRuntimeServices: {
-    id: string
-    label: string
-    description?: string
-    defaultEnabled?: boolean
-  }[] | null
+  projectCreationLocalRuntimeServices:
+    | {
+        id: string
+        label: string
+        description?: string
+        defaultEnabled?: boolean
+      }[]
+    | null
 
   sslCertificateUrl: string
 }

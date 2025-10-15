@@ -17,14 +17,14 @@ describe('profile endpoints (auto-generated)', () => {
   it.skip('creates access-tokens', async () => {
     // TODO: Implement POST /platform/profile/access-tokens
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/profile/access-tokens`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/profile/access-tokens`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -35,11 +35,11 @@ describe('profile endpoints (auto-generated)', () => {
   it.skip('deletes access-tokens by ID', async () => {
     // TODO: Implement DELETE /platform/profile/access-tokens/{id}
     const response = await app.inject({
-    method: 'DELETE',
-    url: `/api/platform/profile/access-tokens/1`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'DELETE',
+      url: `/api/platform/profile/access-tokens/1`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(204)
@@ -47,11 +47,11 @@ describe('profile endpoints (auto-generated)', () => {
 
   it('lists access-tokens', async () => {
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/profile/access-tokens`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/profile/access-tokens`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -61,14 +61,14 @@ describe('profile endpoints (auto-generated)', () => {
 
   it('creates audit-login', async () => {
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/profile/audit-login`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/profile/audit-login`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -79,11 +79,11 @@ describe('profile endpoints (auto-generated)', () => {
   it.skip('lists permissions', async () => {
     // TODO: Implement GET /platform/profile/permissions
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/profile/permissions`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/profile/permissions`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -93,11 +93,11 @@ describe('profile endpoints (auto-generated)', () => {
 
   it('lists audit', async () => {
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/profile/audit`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/profile/audit`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -108,14 +108,14 @@ describe('profile endpoints (auto-generated)', () => {
   it.skip('creates profile', async () => {
     // TODO: Implement POST /platform/profile
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/profile`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/profile`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -125,11 +125,11 @@ describe('profile endpoints (auto-generated)', () => {
 
   it('lists profile', async () => {
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/profile`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/profile`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -140,14 +140,14 @@ describe('profile endpoints (auto-generated)', () => {
   it.skip('handles profile', async () => {
     // TODO: Implement PATCH /platform/profile
     const response = await app.inject({
-    method: 'PATCH',
-    url: `/api/platform/profile`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'PATCH',
+      url: `/api/platform/profile`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)

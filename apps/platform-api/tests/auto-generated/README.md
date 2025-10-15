@@ -94,7 +94,7 @@ it('lists organizations', async () => {
     expect(payload[0]).toMatchObject({
       id: expect.any(Number),
       name: expect.any(String),
-      slug: expect.any(String)
+      slug: expect.any(String),
     })
   }
 })
@@ -117,7 +117,7 @@ it('creates projects', async () => {
   expect(payload).toMatchObject({
     id: expect.any(Number),
     ref: expect.any(String),
-    name: expect.any(String)
+    name: expect.any(String),
   })
 })
 ```
@@ -132,11 +132,13 @@ it('creates projects', async () => {
 ### 1. Studio Endpoint Extraction
 
 Scans `apps/studio/data/` for all query and mutation files, extracting:
+
 - API path (e.g., `/platform/organizations`)
 - HTTP method (GET, POST, PATCH, DELETE, PUT)
 - Source file location
 
 **Pattern matching:**
+
 ```typescript
 // Finds patterns like:
 get('/platform/organizations')
@@ -147,10 +149,12 @@ del('/platform/projects/{ref}')
 ### 2. Implementation Analysis
 
 Scans `apps/platform-api/src/routes/` for all route definitions:
+
 - Matches routes to Studio endpoints
 - Detects implementation status (implemented/stubbed/missing)
 
 **Status detection:**
+
 - `implemented` - Route exists, no TODO comments, no obvious stubs
 - `stubbed` - Route exists but contains TODO or returns mock data
 - `missing` - No matching route found
@@ -158,6 +162,7 @@ Scans `apps/platform-api/src/routes/` for all route definitions:
 ### 3. Test Generation
 
 For each Studio endpoint:
+
 1. Look for matching platform-api route
 2. Generate test with appropriate assertions
 3. Use `it.skip` if not implemented, `it` if implemented
@@ -166,6 +171,7 @@ For each Studio endpoint:
 ### 4. Coverage Tracking
 
 Generates `COVERAGE_REPORT.md` showing:
+
 - Overall coverage percentage
 - Breakdown by category
 - List of missing endpoints
@@ -195,8 +201,8 @@ The `generateTestCode()` function controls test structure. Modify to match your 
 In `generate-tests.ts`, filter endpoints before processing:
 
 ```typescript
-const filteredEndpoints = studioData.endpoints.filter(e =>
-  e.path.startsWith('/platform/') // Only generate tests for platform API
+const filteredEndpoints = studioData.endpoints.filter(
+  (e) => e.path.startsWith('/platform/') // Only generate tests for platform API
 )
 ```
 
@@ -224,12 +230,14 @@ New endpoints will appear as `it.skip` tests with TODO comments.
 ## 📈 Benefits
 
 ### Without This System
+
 - ❌ Manual test writing for 302 endpoints = weeks of work
 - ❌ Hard to know what's missing or broken
 - ❌ No way to track upstream Studio changes
 - ❌ Tests drift from actual Studio usage
 
 ### With This System
+
 - ✅ Auto-generate comprehensive tests in minutes
 - ✅ Clear coverage report shows exactly what's missing
 - ✅ Regenerate anytime Studio changes
@@ -240,6 +248,7 @@ New endpoints will appear as `it.skip` tests with TODO comments.
 ### Tests show 0% coverage but I have routes implemented
 
 The path matching algorithm might need tuning. Check:
+
 1. Path parameter formats (`:id` vs `{id}`)
 2. API prefix differences (`/api/platform/` vs `/platform/`)
 3. Edit `normalizePath()` in `generate-tests.ts` to improve matching
@@ -247,6 +256,7 @@ The path matching algorithm might need tuning. Check:
 ### Extraction scripts fail
 
 Ensure you're running from `apps/platform-api`:
+
 ```bash
 cd apps/platform-api
 npx tsx tests/auto-generated/scripts/extract-studio-endpoints.ts
@@ -255,6 +265,7 @@ npx tsx tests/auto-generated/scripts/extract-studio-endpoints.ts
 ### Generated tests don't match your style
 
 Edit `generate-tests.ts` functions:
+
 - `generateTestCode()` - Overall test structure
 - `generateAssertions()` - Assertion logic
 - `generateTestName()` - Test naming
@@ -273,6 +284,7 @@ Potential enhancements:
 ## 🤝 Contributing
 
 This system was designed to be maintained and improved. Feel free to:
+
 - Improve the path matching algorithm
 - Add smarter assertions
 - Enhance endpoint categorization

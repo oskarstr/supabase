@@ -17,11 +17,11 @@ describe('projects-resource-warnings endpoints (auto-generated)', () => {
   it.skip('lists projects-resource-warnings', async () => {
     // TODO: Implement GET /platform/projects-resource-warnings
     const response = await app.inject({
-    method: 'GET',
-    url: `/api/platform/projects-resource-warnings`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
+      method: 'GET',
+      url: `/api/platform/projects-resource-warnings`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
     })
 
     expect(response.statusCode).toBe(200)
@@ -31,7 +31,7 @@ describe('projects-resource-warnings endpoints (auto-generated)', () => {
       expect(payload[0]).toMatchObject({
         id: expect.any(Number),
         ref: expect.any(String),
-        name: expect.any(String)
+        name: expect.any(String),
       })
     }
   })

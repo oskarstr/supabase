@@ -63,7 +63,21 @@ export const getUpcomingInvoice = (_slug: string): UpcomingInvoiceSummary => ({
 
 export const listAvailablePlans = (_slug: string) => ({
   plans: [
-    { id: 'free', name: 'Free', price: 0, change_type: 'none', effective_at: 'none', is_current: true },
-    { id: 'pro', name: 'Pro', price: 2500, change_type: 'upgrade', effective_at: 'now', is_current: false },
+    {
+      id: 'free',
+      name: 'Free',
+      price: 0,
+      change_type: 'none',
+      effective_at: 'none',
+      is_current: true,
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: 2500,
+      change_type: 'upgrade',
+      effective_at: 'now',
+      is_current: false,
+    },
   ],
 })

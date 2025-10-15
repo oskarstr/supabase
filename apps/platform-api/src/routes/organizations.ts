@@ -98,17 +98,14 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
   app.get<{
     Params: { slug: string }
     Reply: OrganizationInvitationsResponse | { message: string }
-  }>(
-    '/:slug/members/invitations',
-    async (request, reply) => {
-      const org = await getOrganizationDetail(request.params.slug)
-      if (!org) {
-        return reply.code(404).send({ message: 'Organization not found' })
-      }
-      const invitations = await listOrganizationInvitations(request.params.slug)
-      return reply.send(invitations)
+  }>('/:slug/members/invitations', async (request, reply) => {
+    const org = await getOrganizationDetail(request.params.slug)
+    if (!org) {
+      return reply.code(404).send({ message: 'Organization not found' })
     }
-  )
+    const invitations = await listOrganizationInvitations(request.params.slug)
+    return reply.send(invitations)
+  })
 
   app.get<{
     Params: { slug: string }
@@ -163,34 +160,28 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
     Params: { slug: string }
     Querystring: { start?: string; end?: string }
     Reply: OrgDailyUsageResponse | { message: string }
-  }>(
-    '/:slug/usage/daily',
-    async (request, reply) => {
-      const usage = await listOrganizationDailyUsage(
-        request.params.slug,
-        request.query.start,
-        request.query.end
-      )
-      if (!usage) {
-        return reply.code(404).send({ message: 'Organization not found' })
-      }
-      return reply.send(usage)
+  }>('/:slug/usage/daily', async (request, reply) => {
+    const usage = await listOrganizationDailyUsage(
+      request.params.slug,
+      request.query.start,
+      request.query.end
+    )
+    if (!usage) {
+      return reply.code(404).send({ message: 'Organization not found' })
     }
-  )
+    return reply.send(usage)
+  })
 
   app.get<{
     Params: { slug: string }
     Reply: MemberWithFreeProjectLimit[] | { message: string }
-  }>(
-    '/:slug/members/reached-free-project-limit',
-    async (request, reply) => {
-      const members = await listMembersReachedFreeProjectLimit(request.params.slug)
-      if (!members) {
-        return reply.code(404).send({ message: 'Organization not found' })
-      }
-      return reply.send(members)
+  }>('/:slug/members/reached-free-project-limit', async (request, reply) => {
+    const members = await listMembersReachedFreeProjectLimit(request.params.slug)
+    if (!members) {
+      return reply.code(404).send({ message: 'Organization not found' })
     }
-  )
+    return reply.send(members)
+  })
 
   app.get<{ Params: { slug: string }; Reply: CustomerProfileSummary | { message: string } }>(
     '/:slug/customer',
@@ -229,28 +220,20 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
     Params: { slug: string }
     Querystring: { limit?: number; offset?: number }
     Reply: InvoiceSummary[] | { message: string }
-  }>(
-    '/:slug/billing/invoices',
-    async (request, reply) => {
-      const org = await getOrganizationDetail(request.params.slug)
-      if (!org) {
-        return reply.code(404).send({ message: 'Organization not found' })
-      }
-      const invoices = listOrganizationInvoices(request.params.slug)
-      const limitValue = request.query.limit
-      const offsetValue = request.query.offset
-      const limit =
-        typeof limitValue === 'number' && Number.isFinite(limitValue)
-          ? limitValue
-          : invoices.length
-      const offset =
-        typeof offsetValue === 'number' && Number.isFinite(offsetValue)
-          ? offsetValue
-          : 0
-      reply.header('X-Total-Count', invoices.length)
-      return reply.send(invoices.slice(offset, offset + limit))
+  }>('/:slug/billing/invoices', async (request, reply) => {
+    const org = await getOrganizationDetail(request.params.slug)
+    if (!org) {
+      return reply.code(404).send({ message: 'Organization not found' })
     }
-  )
+    const invoices = listOrganizationInvoices(request.params.slug)
+    const limitValue = request.query.limit
+    const offsetValue = request.query.offset
+    const limit =
+      typeof limitValue === 'number' && Number.isFinite(limitValue) ? limitValue : invoices.length
+    const offset = typeof offsetValue === 'number' && Number.isFinite(offsetValue) ? offsetValue : 0
+    reply.header('X-Total-Count', invoices.length)
+    return reply.send(invoices.slice(offset, offset + limit))
+  })
 
   app.get<{ Params: { slug: string }; Reply: UpcomingInvoiceSummary | { message: string } }>(
     '/:slug/billing/invoices/upcoming',
@@ -263,29 +246,26 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
     }
   )
 
-  app.get<{ Params: { slug: string }; Reply: ReturnType<typeof listAvailablePlans> | { message: string } }>(
-    '/:slug/billing/plans',
-    async (request, reply) => {
-      const org = await getOrganizationDetail(request.params.slug)
-      if (!org) {
-        return reply.code(404).send({ message: 'Organization not found' })
-      }
-      return reply.send(listAvailablePlans(request.params.slug))
+  app.get<{
+    Params: { slug: string }
+    Reply: ReturnType<typeof listAvailablePlans> | { message: string }
+  }>('/:slug/billing/plans', async (request, reply) => {
+    const org = await getOrganizationDetail(request.params.slug)
+    if (!org) {
+      return reply.code(404).send({ message: 'Organization not found' })
     }
-  )
+    return reply.send(listAvailablePlans(request.params.slug))
+  })
 
-  app.get<{ Params: { slug: string } }>(
-    '/:slug/billing/subscription',
-    async (request, reply) => {
-      const org = (await listOrganizations()).find(
-        (organization: Organization) => organization.slug === request.params.slug
-      )
-      if (!org) {
-        return reply.code(404).send({ message: 'Organization not found' })
-      }
-      return reply.send(getSubscriptionForOrg(org))
+  app.get<{ Params: { slug: string } }>('/:slug/billing/subscription', async (request, reply) => {
+    const org = (await listOrganizations()).find(
+      (organization: Organization) => organization.slug === request.params.slug
+    )
+    if (!org) {
+      return reply.code(404).send({ message: 'Organization not found' })
     }
-  )
+    return reply.send(getSubscriptionForOrg(org))
+  })
 }
 
 export default organizationsRoutes

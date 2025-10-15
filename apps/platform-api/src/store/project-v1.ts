@@ -13,11 +13,7 @@ const buildTimestamp = () => Math.floor(Date.now() / 1000)
 export const listProjectApiKeys = (ref: string, reveal: boolean): ApiKeyResponse[] => {
   const baseInserted = nowIso()
 
-  const makeKey = (
-    name: string,
-    type: ApiKeyResponse['type'],
-    apiKey: string
-  ): ApiKeyResponse => ({
+  const makeKey = (name: string, type: ApiKeyResponse['type'], apiKey: string): ApiKeyResponse => ({
     id: `${ref}-${name}`,
     name,
     type,

@@ -17,14 +17,14 @@ describe('cli endpoints (auto-generated)', () => {
   it.skip('creates login', async () => {
     // TODO: Implement POST /platform/cli/login
     const response = await app.inject({
-    method: 'POST',
-    url: `/api/platform/cli/login`,
-    headers: {
-      Authorization: 'Bearer test-token',
-    },
-    payload: {
-      // TODO: Add appropriate request body
-    },
+      method: 'POST',
+      url: `/api/platform/cli/login`,
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+      payload: {
+        // TODO: Add appropriate request body
+      },
     })
 
     expect(response.statusCode).toBe(200)

@@ -372,9 +372,7 @@ export const seedDefaults = async () => {
           }
         } else {
           await sql
-            .raw(
-              `SELECT setval(pg_get_serial_sequence('${table}', 'id'), ${maxId})`
-            )
+            .raw(`SELECT setval(pg_get_serial_sequence('${table}', 'id'), ${maxId})`)
             .execute(trx)
         }
       }
@@ -390,8 +388,7 @@ const ensureAdminAuthUser = async (email: string, password: string) => {
   const gotrueUrl = process.env.SUPABASE_GOTRUE_URL?.trim() || process.env.GOTRUE_URL?.trim()
   const serviceKey =
     process.env.SUPABASE_SERVICE_KEY?.trim() || process.env.SERVICE_ROLE_KEY?.trim()
-  const apiKey =
-    process.env.SUPABASE_ANON_KEY?.trim() || process.env.ANON_KEY?.trim() || serviceKey
+  const apiKey = process.env.SUPABASE_ANON_KEY?.trim() || process.env.ANON_KEY?.trim() || serviceKey
 
   if (!gotrueUrl || !serviceKey || !email || !password) {
     return

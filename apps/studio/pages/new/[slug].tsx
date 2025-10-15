@@ -181,9 +181,9 @@ const Wizard: NextPageWithLayout = () => {
   ])
   const isPlatform = process.env.NEXT_PUBLIC_IS_PLATFORM === 'true'
   const localRuntimeServiceOptions = isPlatform
-    ? (projectCreationLocalRuntimeServices && projectCreationLocalRuntimeServices.length > 0
-        ? projectCreationLocalRuntimeServices
-        : FALLBACK_LOCAL_RUNTIME_SERVICES)
+    ? projectCreationLocalRuntimeServices && projectCreationLocalRuntimeServices.length > 0
+      ? projectCreationLocalRuntimeServices
+      : FALLBACK_LOCAL_RUNTIME_SERVICES
     : []
   const localRuntimeServiceIds = localRuntimeServiceOptions.map((service) => service.id)
   const defaultLocalServiceSelection = localRuntimeServiceOptions
@@ -412,7 +412,9 @@ const Wizard: NextPageWithLayout = () => {
     ? 0
     : organizationProjects.reduce((prev, acc) => {
         const primaryDatabase = acc.databases.find((db) => db.identifier === acc.ref)
-        const cost = !!primaryDatabase ? monthlyInstancePrice(primaryDatabase.infra_compute_size) : 0
+        const cost = !!primaryDatabase
+          ? monthlyInstancePrice(primaryDatabase.infra_compute_size)
+          : 0
         return prev + cost
       }, 0) +
       monthlyInstancePrice(instanceSize) -
@@ -423,8 +425,9 @@ const Wizard: NextPageWithLayout = () => {
   const additionalMonthlySpend = isLocalDeployment
     ? 0
     : isFreePlan
-        ? 0
-        : instanceSizeSpecs[instanceSize as DesiredInstanceSize]!.priceMonthly - availableComputeCredits
+      ? 0
+      : instanceSizeSpecs[instanceSize as DesiredInstanceSize]!.priceMonthly -
+        availableComputeCredits
 
   // [Refactor] DB Password could be a common component used in multiple pages with repeated logic
   function generatePassword() {
@@ -439,11 +442,7 @@ const Wizard: NextPageWithLayout = () => {
       values.instanceSize &&
       !sizesWithNoCostConfirmationRequired.includes(values.instanceSize as DesiredInstanceSize)
 
-    if (
-      !isLocal &&
-      additionalMonthlySpend > 0 &&
-      (hasOAuthApps || launchingLargerInstance)
-    ) {
+    if (!isLocal && additionalMonthlySpend > 0 && (hasOAuthApps || launchingLargerInstance)) {
       sendEvent({
         action: 'project_creation_simple_version_confirm_modal_opened',
         properties: {
@@ -492,7 +491,9 @@ const Wizard: NextPageWithLayout = () => {
     if (isLocal) {
       data.cloudProvider = 'LOCAL'
       const selectedServices = localServices?.length ? localServices : defaultLocalServiceSelection
-      const excludedServices = localRuntimeServiceIds.filter((serviceId) => !selectedServices.includes(serviceId))
+      const excludedServices = localRuntimeServiceIds.filter(
+        (serviceId) => !selectedServices.includes(serviceId)
+      )
       if (excludedServices.length > 0) {
         data.localRuntimeExclude = excludedServices
       }
@@ -833,7 +834,9 @@ const Wizard: NextPageWithLayout = () => {
                                 <SelectContent_Shadcn_>
                                   {deploymentTargetsWithOverrides.map((target) => (
                                     <SelectItem_Shadcn_ key={target} value={target}>
-                                      {target === 'local' ? 'Local (this machine)' : 'Remote (Supabase Cloud)'}
+                                      {target === 'local'
+                                        ? 'Local (this machine)'
+                                        : 'Remote (Supabase Cloud)'}
                                     </SelectItem_Shadcn_>
                                   ))}
                                 </SelectContent_Shadcn_>
@@ -871,13 +874,17 @@ const Wizard: NextPageWithLayout = () => {
                             >
                               <div className="space-y-3">
                                 {localRuntimeServiceOptions.map((service) => {
-                                  const checked = (field.value ?? defaultLocalServiceSelection).includes(service.id)
+                                  const checked = (
+                                    field.value ?? defaultLocalServiceSelection
+                                  ).includes(service.id)
                                   return (
                                     <label key={service.id} className="flex items-start gap-3">
                                       <Checkbox_Shadcn_
                                         checked={checked}
                                         onCheckedChange={(next) => {
-                                          const current = new Set(field.value ?? defaultLocalServiceSelection)
+                                          const current = new Set(
+                                            field.value ?? defaultLocalServiceSelection
+                                          )
                                           if (next) current.add(service.id)
                                           else current.delete(service.id)
                                           field.onChange(Array.from(current))

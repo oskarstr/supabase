@@ -26,7 +26,9 @@ const createPool = () => {
     process.env.PLATFORM_DB_URL?.trim() || process.env.SUPABASE_DB_URL?.trim()
 
   if (!connectionString) {
-    throw new Error('Platform database URL is not configured. Set PLATFORM_DB_URL or SUPABASE_DB_URL.')
+    throw new Error(
+      'Platform database URL is not configured. Set PLATFORM_DB_URL or SUPABASE_DB_URL.'
+    )
   }
 
   const pool = new Pool({
