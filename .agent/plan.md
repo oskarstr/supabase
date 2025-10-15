@@ -23,6 +23,7 @@
 - *Note from Codex (GPT-5, new agent):* Provisioner currently shells out via `PLATFORM_API_PROVISION_CMD`, but the platform-api container lacks the Supabase CLI and Docker socket. Recommend baking the CLI into the image (or mounting it) and wiring the socket so provisioning commands like `supabase init/start` can run in-container for both local and eventual cloud targets. This keeps the hook abstraction while avoiding brittle host-only scripts.
 - *Update (b5ca522836, 2025-10-15 05:33 UTC):* Platform API image now bundles the Supabase CLI + Docker client and mounts the host socket by default. Provision hooks generate per-project configs, allocate deterministic ports, and call `supabase start/stop`. Failures still leave project status as TODO (validate service health, capture outputs).
 - *Update (Codex):* Stubbed additional analytics, disk, storage, auth, and integration endpoints so Studio no longer 404s (e.g. `/analytics/log-drains`, `/disk/*`, `/auth/{ref}/config`). Replace these placeholders with real service integrations once available.
+- *Update (12c266ec81, 2025-10-15 06:55 UTC):* Local project provisioning now uses the Supabase CLI on the shared compose network (`PLATFORM_DOCKER_NETWORK` fallback) and stores project runtimes under a host-visible `platform-projects/` root. Added migration allowing the `LOCAL` cloud provider enum.
 
 ## Phase 5: Docker & Compose Integration ✅ *completed*
 - Production overlay: `docker-compose.platform.yml` adds the platform service (port 4210) and points Studio at it.
