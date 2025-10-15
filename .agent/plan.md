@@ -12,9 +12,10 @@
   - Inject provisioner/destroyer dependencies to enable mocked success/failure paths; expose a deterministic “fail next provision/destroy” toggle for testing.
   - Persist generated artefacts (anon/service keys, REST URL, connection string, port ranges, runtime root) back into Postgres.
   - Capture structured CLI output/error metadata for operators and tests.
-  - Ensure deletions are idempotent and INIT_FAILED/RESTORE_FAILED states are observable with retry timestamps.
-  - Align `.env`/compose defaults with platform mode and automate missing variable generation where possible.
-  - Reset pg sequences between test runs and seed deterministic fixtures to keep pg-mem/Postgres behaviour synchronized.
+- Ensure deletions are idempotent and INIT_FAILED/RESTORE_FAILED states are observable with retry timestamps.
+- Align `.env`/compose defaults with platform mode and automate missing variable generation where possible.
+- Reset pg sequences between test runs and seed deterministic fixtures to keep pg-mem/Postgres behaviour synchronized.
+- Replace the temporary Supabase CLI shell-out with a host-native agent so runtime provisioning does not rely on localhost port forwarding hacks inside the platform container. New agent must support start/stop/status APIs and converge on CLI parity before we swap it in.
 
 ### Phase 6 – Feature Coverage & Hardening *(in progress alongside Phase 4)*
 - Continue filling in Studio-dependent endpoints (storage, logs, auth config, analytics) and replace temporary stubs with real integrations.

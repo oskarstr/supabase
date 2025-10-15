@@ -21,6 +21,7 @@
 - Keep commit messages clear and descriptive—skip `(chore)/(feat)` prefixes unless explicitly requested.
 - Minimize upstream Studio/infra edits: prefer data-driven overrides (custom content, env flags) and only touch upstream components when absolutely unavoidable—document any divergence.
 - Custom Studio UI tweaks should be driven by custom content keys (e.g. `project_creation:deployment_targets`, `project_creation:local_runtime_services`) plus platform guards (`NEXT_PUBLIC_IS_PLATFORM`). Keep JSX additions minimal and gated so upstream builds remain unchanged when the content keys are absent.
+- Provisioning still shells out to the Supabase CLI inside the platform container. Because the CLI’s health probes are hardcoded to `127.0.0.1`, we currently rely on a `socat` port forward hack. Long-term fix is to move provisioning into a host-side agent (or native orchestrator) that drives Docker directly; note this in Phase 4 roadmap.
 
 ## Gotchas & Quick Tips
 - Project creation requires `organization_slug` and assumes async provisioning; the API intentionally ignores raw `organization_id`. Tests must inject slugs or create orgs first.
