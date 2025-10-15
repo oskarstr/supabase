@@ -80,7 +80,7 @@ export const toProjectDetail = (
   connectionString: row.connection_string,
   db_host: row.db_host,
   dbVersion: row.db_version ?? undefined,
-  id: row.id,
+  id: Number(row.id),
   infra_compute_size: row.infra_compute_size,
   inserted_at: toIso(row.inserted_at) ?? nowIsoString(),
   is_branch_enabled: row.is_branch_enabled,
@@ -91,7 +91,7 @@ export const toProjectDetail = (
       }
     : undefined,
   name: row.name,
-  organization_id: row.organization_id,
+  organization_id: Number(row.organization_id),
   ref: row.ref,
   region: row.region,
   restUrl: row.rest_url ?? '',

@@ -30,10 +30,12 @@ services:
     build:
       context: ..
       dockerfile: apps/runtime-agent/Dockerfile
+    container_name: runtime-agent
     environment:
       RUNTIME_AGENT_LISTEN_ADDR: ":8085"
       RUNTIME_AGENT_COMMAND_TIMEOUT: 15m
       RUNTIME_AGENT_SUPABASE_CLI_PATH: supabase
+      RUNTIME_AGENT_SUPABASE_HOST: host.docker.internal
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}/platform-projects:${PWD}/platform-projects

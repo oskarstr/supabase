@@ -150,7 +150,11 @@ func (e *localExecutor) withProjectEnvironment(
 
 func resetSupabaseGlobals() {
 	viper.Reset()
-	utils.Config = config.NewConfig(config.WithHostname(utils.GetHostname()))
+	hostname := os.Getenv("RUNTIME_AGENT_SUPABASE_HOST")
+	if hostname == "" {
+		hostname = utils.GetHostname()
+	}
+	utils.Config = config.NewConfig(config.WithHostname(hostname))
 	utils.OutputFormat.Value = utils.OutputPretty
 	flags.ProjectRef = ""
 }

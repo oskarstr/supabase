@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -85,7 +86,7 @@ type destroyRequest struct {
 
 func (s *Server) handleProvision(w http.ResponseWriter, r *http.Request) {
 	var req provisionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		httpError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
@@ -121,7 +122,7 @@ func (s *Server) handleProvision(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	var req stopRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		httpError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
@@ -159,7 +160,7 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
 	var req destroyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		httpError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
@@ -257,6 +258,19 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			Dur("duration", duration).
 			Msg("request")
 	})
+}
+
+func decodeJSON(r *http.Request, dst any) error {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to read request body")
+		return err
+	}
+	if err := json.Unmarshal(body, dst); err != nil {
+		log.Error().Err(err).Str("body", string(body)).Msg("invalid json payload")
+		return err
+	}
+	return nil
 }
 
 type responseWriter struct {
