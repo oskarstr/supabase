@@ -4,6 +4,18 @@ import { setTimeout as sleep } from 'node:timers/promises'
 
 import { prepareSupabaseRuntime } from './provisioning/runtime.js'
 
+interface OrchestratorExecutionResult {
+  stdout?: string
+  stderr?: string
+  duration_ms?: number
+}
+
+interface OrchestratorResponse {
+  status: string
+  result?: OrchestratorExecutionResult
+  error?: string
+}
+
 export interface ProvisionContext {
   projectId: number
   ref: string
@@ -167,7 +179,7 @@ export async function provisionProjectStack(context: ProvisionContext) {
 
   const orchestrator = useOrchestrator()
   if (orchestrator) {
-    await orchestrator.provision({
+    const response: OrchestratorResponse | null = await orchestrator.provision({
       project_id: context.projectId,
       project_ref: context.ref,
       project_name: context.name,
@@ -180,6 +192,13 @@ export async function provisionProjectStack(context: ProvisionContext) {
       network_id: networkId,
       ignore_health_check: true,
     })
+    if (logEnabled && response?.result) {
+      console.log('[provisioning] orchestrator result', {
+        ref: context.ref,
+        status: response.status,
+        duration_ms: response.result.duration_ms,
+      })
+    }
   } else if (process.env.PLATFORM_API_PROVISION_CMD) {
     const provisionCommand = process.env.PLATFORM_API_PROVISION_CMD
     await runCommand(
@@ -244,11 +263,18 @@ export async function destroyProjectStack(context: DestroyContext) {
 
   const orchestrator = useOrchestrator()
   if (orchestrator) {
-    await orchestrator.destroy({
+    const response: OrchestratorResponse | null = await orchestrator.destroy({
       project_ref: context.ref,
       project_root: context.projectRoot,
       organization_slug: context.organizationSlug,
     })
+    if (logEnabled && response?.result) {
+      console.log('[provisioning] orchestrator destroy result', {
+        ref: context.ref,
+        status: response.status,
+        duration_ms: response.result.duration_ms,
+      })
+    }
   } else if (process.env.PLATFORM_API_DESTROY_CMD) {
     const destroyCommand = process.env.PLATFORM_API_DESTROY_CMD
     await runCommand(
@@ -303,10 +329,17 @@ export async function stopProjectStack(context: StopContext) {
 
   const orchestrator = useOrchestrator()
   if (orchestrator) {
-    await orchestrator.stop({
+    const response: OrchestratorResponse | null = await orchestrator.stop({
       project_ref: context.projectRef,
       project_root: context.projectRoot,
     })
+    if (logEnabled && response?.result) {
+      console.log('[provisioning] orchestrator stop result', {
+        ref: context.projectRef,
+        status: response.status,
+        duration_ms: response.result.duration_ms,
+      })
+    }
   } else {
     await runSupabaseCli(['stop', '--yes'], {
       cwd: context.projectRoot,

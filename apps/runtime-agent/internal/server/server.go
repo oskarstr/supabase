@@ -18,6 +18,12 @@ type Server struct {
 	executor executor
 }
 
+type operationResult struct {
+	Stdout     string `json:"stdout,omitempty"`
+	Stderr     string `json:"stderr,omitempty"`
+	DurationMs int64  `json:"duration_ms"`
+}
+
 func New(cfg Config) *Server {
 	s := &Server{
 		cfg:      cfg,
@@ -92,18 +98,24 @@ func (s *Server) handleProvision(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := s.operationContext(r.Context())
 	defer cancel()
 
-	if err := s.executor.Provision(ctx, req); err != nil {
+	result, err := s.executor.Provision(ctx, req)
+	if err != nil {
 		log.Error().
 			Err(err).
 			Int("project_id", req.ProjectID).
 			Str("project_ref", req.ProjectRef).
 			Msg("provision failed")
-		httpError(w, http.StatusInternalServerError, err.Error())
+		respondJSON(w, http.StatusInternalServerError, map[string]any{
+			"status": "failed",
+			"error":  err.Error(),
+			"result": result,
+		})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	respondJSON(w, http.StatusOK, map[string]any{
 		"status": "completed",
+		"result": result,
 	})
 }
 
@@ -125,17 +137,23 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := s.operationContext(r.Context())
 	defer cancel()
 
-	if err := s.executor.Stop(ctx, req); err != nil {
+	result, err := s.executor.Stop(ctx, req)
+	if err != nil {
 		log.Error().
 			Err(err).
 			Str("project_ref", req.ProjectRef).
 			Msg("stop failed")
-		httpError(w, http.StatusInternalServerError, err.Error())
+		respondJSON(w, http.StatusInternalServerError, map[string]any{
+			"status": "failed",
+			"error":  err.Error(),
+			"result": result,
+		})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	respondJSON(w, http.StatusOK, map[string]any{
 		"status": "completed",
+		"result": result,
 	})
 }
 
@@ -157,17 +175,23 @@ func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := s.operationContext(r.Context())
 	defer cancel()
 
-	if err := s.executor.Destroy(ctx, req); err != nil {
+	result, err := s.executor.Destroy(ctx, req)
+	if err != nil {
 		log.Error().
 			Err(err).
 			Str("project_ref", req.ProjectRef).
 			Msg("destroy failed")
-		httpError(w, http.StatusInternalServerError, err.Error())
+		respondJSON(w, http.StatusInternalServerError, map[string]any{
+			"status": "failed",
+			"error":  err.Error(),
+			"result": result,
+		})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	respondJSON(w, http.StatusOK, map[string]any{
 		"status": "completed",
+		"result": result,
 	})
 }
 
@@ -246,7 +270,7 @@ func (w *responseWriter) WriteHeader(status int) {
 }
 
 type executor interface {
-	Provision(context.Context, provisionRequest) error
-	Stop(context.Context, stopRequest) error
-	Destroy(context.Context, destroyRequest) error
+	Provision(context.Context, provisionRequest) (operationResult, error)
+	Stop(context.Context, stopRequest) (operationResult, error)
+	Destroy(context.Context, destroyRequest) (operationResult, error)
 }

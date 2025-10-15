@@ -1,9 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
@@ -23,35 +26,90 @@ func newLocalExecutor() *localExecutor {
 	return &localExecutor{}
 }
 
-func (e *localExecutor) Provision(ctx context.Context, req provisionRequest) error {
+func (e *localExecutor) Provision(ctx context.Context, req provisionRequest) (operationResult, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, req.NetworkID, func(fsys afero.Fs) error {
-		excluded := append([]string(nil), req.ExcludedServices...)
-		return start.Run(ctx, fsys, excluded, req.IgnoreHealthCheck)
+	return e.runWithLogs(func() error {
+		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, req.NetworkID, func(fsys afero.Fs) error {
+			excluded := append([]string(nil), req.ExcludedServices...)
+			return start.Run(ctx, fsys, excluded, req.IgnoreHealthCheck)
+		})
 	})
 }
 
-func (e *localExecutor) Stop(ctx context.Context, req stopRequest) error {
+func (e *localExecutor) Stop(ctx context.Context, req stopRequest) (operationResult, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
-		// The CLI defaults to backing up data volumes; we skip that for now
-		const backupVolumes = false
-		return stop.Run(ctx, backupVolumes, req.ProjectRef, false, fsys)
+	return e.runWithLogs(func() error {
+		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
+			const backupVolumes = false
+			return stop.Run(ctx, backupVolumes, req.ProjectRef, false, fsys)
+		})
 	})
 }
 
-func (e *localExecutor) Destroy(ctx context.Context, req destroyRequest) error {
+func (e *localExecutor) Destroy(ctx context.Context, req destroyRequest) (operationResult, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
-		const backupVolumes = false
-		return stop.Run(ctx, backupVolumes, req.ProjectRef, false, fsys)
+	return e.runWithLogs(func() error {
+		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
+			const backupVolumes = false
+			return stop.Run(ctx, backupVolumes, req.ProjectRef, false, fsys)
+		})
 	})
+}
+
+func (e *localExecutor) runWithLogs(fn func() error) (operationResult, error) {
+	var result operationResult
+	startTime := time.Now()
+
+	originalStdout := os.Stdout
+	originalStderr := os.Stderr
+
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	if err != nil {
+		return result, err
+	}
+	stderrReader, stderrWriter, err := os.Pipe()
+	if err != nil {
+		stdoutReader.Close()
+		stdoutWriter.Close()
+		return result, err
+	}
+
+	os.Stdout = stdoutWriter
+	os.Stderr = stderrWriter
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(&stdoutBuf, stdoutReader)
+	}()
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(&stderrBuf, stderrReader)
+	}()
+
+	runErr := fn()
+
+	stdoutWriter.Close()
+	stderrWriter.Close()
+	wg.Wait()
+	stdoutReader.Close()
+	stderrReader.Close()
+
+	os.Stdout = originalStdout
+	os.Stderr = originalStderr
+
+	result.Stdout = stdoutBuf.String()
+	result.Stderr = stderrBuf.String()
+	result.DurationMs = time.Since(startTime).Milliseconds()
+	return result, runErr
 }
 
 func (e *localExecutor) withProjectEnvironment(
