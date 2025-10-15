@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import { parse as parseEnv } from 'dotenv'
@@ -164,6 +165,13 @@ const scheduleRemoval = async (project: ProjectDetail, org: Organization, runtim
 
     await db.deleteFrom('projects').where('ref', '=', project.ref).execute()
     await removeProjectRuntime(project.id)
+    await rm(runtimeRoot, { recursive: true, force: true }).catch((error) => {
+      console.warn('[platform-api] failed to delete project runtime directory', {
+        ref: project.ref,
+        runtimeRoot,
+        error,
+      })
+    })
   } catch (error) {
     console.error('[platform-api] destruction failed', project.ref, error)
     await updateProject(project.ref, { status: 'RESTORE_FAILED' })
@@ -315,9 +323,12 @@ export const deleteProject = async (ref: string): Promise<RemoveProjectResponse 
 
   await updateProject(ref, { status: 'GOING_DOWN' })
 
-  const runtime = await ensureProjectRuntime(projectRow.ref, projectRow.id)
+  const existingRuntime = await getProjectRuntime(projectRow.id)
+  const runtime = await ensureProjectRuntime(projectRow.ref, projectRow.id, {
+    excludedServices: existingRuntime?.excluded_services,
+  })
 
-  const detail = toProjectDetail(projectRow)
+  const detail = toProjectDetail(projectRow, runtime)
   void scheduleRemoval(detail, organizationSummary, runtime.root_dir)
 
   return {
@@ -360,7 +371,10 @@ export const resumeProject = async (ref: string): Promise<ProjectDetail | undefi
     return undefined
   }
 
-  const runtime = await ensureProjectRuntime(projectRow.ref, projectRow.id)
+  const existingRuntime = await getProjectRuntime(projectRow.id)
+  const runtime = await ensureProjectRuntime(projectRow.ref, projectRow.id, {
+    excludedServices: existingRuntime?.excluded_services,
+  })
 
   const organization = await db
     .selectFrom('organizations')

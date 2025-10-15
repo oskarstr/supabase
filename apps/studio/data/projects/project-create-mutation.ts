@@ -38,6 +38,7 @@ export type ProjectCreateVariables = {
   dataApiUseApiSchema?: boolean
   postgresEngine?: PostgresEngine
   releaseChannel?: ReleaseChannel
+  localRuntimeExclude?: string[]
 }
 
 export async function createProject({
@@ -55,6 +56,7 @@ export async function createProject({
   dataApiUseApiSchema,
   postgresEngine,
   releaseChannel,
+  localRuntimeExclude,
 }: ProjectCreateVariables) {
   const body: CreateProjectBody = {
     organization_slug: organizationSlug,
@@ -72,6 +74,12 @@ export async function createProject({
     data_api_use_api_schema: dataApiUseApiSchema,
     postgres_engine: postgresEngine,
     release_channel: releaseChannel,
+  }
+
+  if (localRuntimeExclude && localRuntimeExclude.length > 0) {
+    ;(body as Record<string, any>).local_runtime = {
+      exclude_services: localRuntimeExclude,
+    }
   }
 
   if (cloudProvider) {

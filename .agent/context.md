@@ -15,9 +15,10 @@
 - **Auth/Kong**: Kong entrypoint injects the anonymous consumer, preserving Studio’s stock AuthClient flow (`/auth/v1/**` mirrors Supabase Cloud).
 
 ## Working Conventions & Tooling
-- Always fetch upstream Supabase docs/CLI references via **Context7** before recreating functionality—several documented CLI helpers (e.g., provisioning commands) and other resources of general functionality exist and should be reused instead of rebuilt.
+- Always fetch upstream Supabase docs/CLI references via **Context7** before recreating functionality—several documented CLI helpers (e.g., provisioning commands) and other resources exist and should be reused instead of rebuilt.
 - Prefer `rg` for repo searches; avoid custom scripts unless they provide clear wins.
 - Keep test data deterministic (seed helpers, sequence resets) so pg-mem and Postgres behave consistently.
+- Keep commit messages clear and descriptive—skip `(chore)/(feat)` prefixes unless explicitly requested.
 
 ## Gotchas & Quick Tips
 - Project creation requires `organization_slug` and assumes async provisioning; the API intentionally ignores raw `organization_id`. Tests must inject slugs or create orgs first.

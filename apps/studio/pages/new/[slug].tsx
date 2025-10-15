@@ -75,6 +75,7 @@ import {
   FormControl_Shadcn_,
   FormField_Shadcn_,
   Input_Shadcn_,
+  Checkbox_Shadcn_,
   Select_Shadcn_,
   SelectContent_Shadcn_,
   SelectGroup_Shadcn_,
@@ -97,6 +98,31 @@ import { InfoTooltip } from 'ui-patterns/info-tooltip'
 const sizes: DesiredInstanceSize[] = ['micro', 'small', 'medium']
 
 const sizesWithNoCostConfirmationRequired: DesiredInstanceSize[] = ['micro', 'small']
+
+const LOCAL_RUNTIME_OPTIONAL_SERVICES = [
+  {
+    id: 'studio',
+    label: 'Supabase Studio',
+    description: 'Local dashboard for managing your project (http://localhost:3000).',
+  },
+  {
+    id: 'mailpit',
+    label: 'Mailpit',
+    description: 'SMTP capture inbox for testing email flows locally.',
+  },
+  {
+    id: 'logflare',
+    label: 'Logflare',
+    description: 'Analytics UI used by Studio for log drains and log exploration.',
+  },
+  {
+    id: 'vector',
+    label: 'Vector',
+    description: 'Log forwarder that ships logs into Logflare and other destinations.',
+  },
+] as const
+
+const DEFAULT_LOCAL_RUNTIME_SERVICES = LOCAL_RUNTIME_OPTIONAL_SERVICES.map((service) => service.id)
 
 const FormSchema = z.object({
   organization: z.string({
@@ -127,6 +153,7 @@ const FormSchema = z.object({
   useApiSchema: z.boolean(),
   postgresVersionSelection: z.string(),
   useOrioleDb: z.boolean(),
+  localServices: z.array(z.string()),
 })
 
 export type CreateProjectForm = z.infer<typeof FormSchema>
@@ -346,10 +373,12 @@ const Wizard: NextPageWithLayout = () => {
       useApiSchema: false,
       postgresVersionSelection: '',
       useOrioleDb: false,
+      localServices: DEFAULT_LOCAL_RUNTIME_SERVICES,
     },
   })
 
   const { instanceSize, cloudProvider, dbRegion, organization, deploymentTarget } = form.watch()
+  const localServicesSelection = form.watch('localServices')
   const isLocalDeployment = deploymentTarget === 'local'
   const dbRegionExact = smartRegionToExactRegion(dbRegion)
 
@@ -429,6 +458,7 @@ const Wizard: NextPageWithLayout = () => {
       postgresVersionSelection,
       useOrioleDb,
       deploymentTarget,
+      localServices,
     } = values
 
     const isLocal = deploymentTarget === 'local'
@@ -445,6 +475,17 @@ const Wizard: NextPageWithLayout = () => {
 
     if (isLocal) {
       data.cloudProvider = 'LOCAL'
+      data.dbRegion = 'local-dev'
+
+      const enabledServices = (localServices && localServices.length > 0)
+        ? Array.from(new Set(localServices))
+        : DEFAULT_LOCAL_RUNTIME_SERVICES
+      const excludedServices = LOCAL_RUNTIME_OPTIONAL_SERVICES.map((service) => service.id).filter(
+        (serviceId) => !enabledServices.includes(serviceId)
+      )
+      if (excludedServices.length > 0) {
+        data.localRuntimeExclude = excludedServices
+      }
     } else {
       const { postgresEngine, releaseChannel } =
         extractPostgresVersionDetails(postgresVersionSelection)
@@ -486,6 +527,12 @@ const Wizard: NextPageWithLayout = () => {
       setAllProjects(allOrgProjects)
     }
   }, [allOrgProjects, allProjects, setAllProjects])
+
+  useEffect(() => {
+    if (isLocalDeployment && (!localServicesSelection || localServicesSelection.length === 0)) {
+      form.setValue('localServices', DEFAULT_LOCAL_RUNTIME_SERVICES, { shouldValidate: true })
+    }
+  }, [form, isLocalDeployment, localServicesSelection])
 
   useEffect(() => {
     // Handle no org: redirect to new org route
@@ -806,6 +853,48 @@ const Wizard: NextPageWithLayout = () => {
                         )}
                       />
                     </Panel.Content>
+
+                    {isLocalDeployment && (
+                      <Panel.Content>
+                        <FormField_Shadcn_
+                          control={form.control}
+                          name="localServices"
+                          render={({ field }) => (
+                            <FormItemLayout
+                              label="Local runtime services"
+                              layout="vertical"
+                              description="Uncheck services you do not need when running this project locally."
+                            >
+                              <div className="space-y-3">
+                                {LOCAL_RUNTIME_OPTIONAL_SERVICES.map((service) => {
+                                  const checked = (field.value ?? DEFAULT_LOCAL_RUNTIME_SERVICES).includes(service.id)
+                                  return (
+                                    <label key={service.id} className="flex items-start gap-3">
+                                      <Checkbox_Shadcn_
+                                        checked={checked}
+                                        onCheckedChange={(next) => {
+                                          const current = new Set(field.value ?? DEFAULT_LOCAL_RUNTIME_SERVICES)
+                                          if (next) {
+                                            current.add(service.id)
+                                          } else {
+                                            current.delete(service.id)
+                                          }
+                                          field.onChange(Array.from(current))
+                                        }}
+                                      />
+                                      <span>
+                                        <p className="font-medium text-sm">{service.label}</p>
+                                        <p className="text-foreground-lighter text-sm leading-snug">{service.description}</p>
+                                      </span>
+                                    </label>
+                                  )
+                                })}
+                              </div>
+                            </FormItemLayout>
+                          )}
+                        />
+                      </Panel.Content>
+                    )}
 
                     {!isLocalDeployment && cloudProviderEnabled && showNonProdFields && (
                       <Panel.Content>

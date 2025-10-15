@@ -217,7 +217,7 @@ const projectsRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  app.post<{ Params: { ref: string } }>('/:ref/resume', async (request, reply) => {
+  app.post<{ Params: { ref: string } }>('/:ref/restore', async (request, reply) => {
     try {
       const project = await resumeProject(request.params.ref)
       if (!project) {
