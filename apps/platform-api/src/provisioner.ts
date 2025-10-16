@@ -42,6 +42,10 @@ const PROVISION_DELAY_MS = parseDelay(process.env.PROVISIONING_DELAY_MS, 1_000)
 const DESTRUCTION_DELAY_MS = parseDelay(process.env.DESTRUCTION_DELAY_MS, 1_000)
 const ORCHESTRATOR_URL = process.env.PLATFORM_ORCHESTRATOR_URL?.trim() || ''
 const ORCHESTRATOR_TOKEN = process.env.PLATFORM_ORCHESTRATOR_TOKEN?.trim()
+const ORCHESTRATOR_TIMEOUT_MS = parseDelay(
+  process.env.PLATFORM_ORCHESTRATOR_TIMEOUT_MS,
+  900_000
+)
 
 const renderTemplate = (template: string, context: Record<string, string>) =>
   template.replace(/\{(\w+)\}/g, (_match, key: string) => context[key] ?? '')
@@ -88,10 +92,31 @@ const useOrchestrator = () => {
       headers['authorization'] = `Bearer ${ORCHESTRATOR_TOKEN}`
     }
 
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers,
-    } as any)
+    const controller = new AbortController()
+    let timeout: NodeJS.Timeout | undefined
+    if (ORCHESTRATOR_TIMEOUT_MS > 0) {
+      timeout = setTimeout(() => controller.abort(), ORCHESTRATOR_TIMEOUT_MS)
+    }
+
+    let response: Response
+    try {
+      response = (await fetch(`${baseUrl}${path}`, {
+        ...init,
+        headers,
+        signal: controller.signal,
+      } as any)) as Response
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(
+          `orchestrator request timed out after ${ORCHESTRATOR_TIMEOUT_MS}ms`
+        )
+      }
+      throw error
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout)
+      }
+    }
 
     if (!response.ok) {
       const message = await response.text()

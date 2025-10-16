@@ -1,14 +1,16 @@
 package server
 
 import (
-        "context"
-        "crypto/subtle"
-        "encoding/json"
-        "errors"
-        "io"
-        "net/http"
-        "strings"
-        "time"
+	"context"
+	"crypto/subtle"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -18,6 +20,7 @@ type Server struct {
 	server   *http.Server
 	router   http.Handler
 	executor executor
+	rootDir  string
 }
 
 type operationResult struct {
@@ -30,6 +33,13 @@ func New(cfg Config) *Server {
 	s := &Server{
 		cfg:      cfg,
 		executor: newLocalExecutor(),
+	}
+	if cfg.ProjectsRoot != "" {
+		root := cfg.ProjectsRoot
+		if resolved, err := filepath.EvalSymlinks(root); err == nil {
+			root = resolved
+		}
+		s.rootDir = root
 	}
 	s.router = s.routes()
 	s.server = &http.Server{
@@ -52,12 +62,12 @@ func (s *Server) Stop(ctx context.Context) error {
 }
 
 func (s *Server) routes() http.Handler {
-        mux := http.NewServeMux()
-        mux.HandleFunc("POST /v1/projects/provision", s.requireAuth(s.handleProvision))
-        mux.HandleFunc("POST /v1/projects/stop", s.requireAuth(s.handleStop))
-        mux.HandleFunc("POST /v1/projects/destroy", s.requireAuth(s.handleDestroy))
-        mux.HandleFunc("GET /healthz", s.handleHealthz)
-        return loggingMiddleware(mux)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/projects/provision", s.requireAuth(s.handleProvision))
+	mux.HandleFunc("POST /v1/projects/stop", s.requireAuth(s.handleStop))
+	mux.HandleFunc("POST /v1/projects/destroy", s.requireAuth(s.handleDestroy))
+	mux.HandleFunc("GET /healthz", s.handleHealthz)
+	return loggingMiddleware(mux)
 }
 
 type provisionRequest struct {
@@ -97,19 +107,26 @@ func (s *Server) handleProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	normalizedRoot, err := s.normalizeProjectRoot(req.ProjectRoot)
+	if err != nil {
+		httpError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	req.ProjectRoot = normalizedRoot
+
 	ctx, cancel := s.operationContext(r.Context())
 	defer cancel()
 
-	result, err := s.executor.Provision(ctx, req)
-	if err != nil {
+	result, execErr := s.executor.Provision(ctx, req)
+	if execErr != nil {
 		log.Error().
-			Err(err).
+			Err(execErr).
 			Int("project_id", req.ProjectID).
 			Str("project_ref", req.ProjectRef).
 			Msg("provision failed")
 		respondJSON(w, http.StatusInternalServerError, map[string]any{
 			"status": "failed",
-			"error":  err.Error(),
+			"error":  execErr.Error(),
 			"result": result,
 		})
 		return
@@ -136,18 +153,25 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	normalizedRoot, err := s.normalizeProjectRoot(req.ProjectRoot)
+	if err != nil {
+		httpError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	req.ProjectRoot = normalizedRoot
+
 	ctx, cancel := s.operationContext(r.Context())
 	defer cancel()
 
-	result, err := s.executor.Stop(ctx, req)
-	if err != nil {
+	result, execErr := s.executor.Stop(ctx, req)
+	if execErr != nil {
 		log.Error().
-			Err(err).
+			Err(execErr).
 			Str("project_ref", req.ProjectRef).
 			Msg("stop failed")
 		respondJSON(w, http.StatusInternalServerError, map[string]any{
 			"status": "failed",
-			"error":  err.Error(),
+			"error":  execErr.Error(),
 			"result": result,
 		})
 		return
@@ -160,11 +184,11 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
-        var req destroyRequest
-        if err := decodeJSON(r, &req); err != nil {
-                httpError(w, http.StatusBadRequest, "invalid json payload")
-                return
-        }
+	var req destroyRequest
+	if err := decodeJSON(r, &req); err != nil {
+		httpError(w, http.StatusBadRequest, "invalid json payload")
+		return
+	}
 	if strings.TrimSpace(req.ProjectRef) == "" {
 		httpError(w, http.StatusBadRequest, "project_ref is required")
 		return
@@ -174,18 +198,25 @@ func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	normalizedRoot, err := s.normalizeProjectRoot(req.ProjectRoot)
+	if err != nil {
+		httpError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	req.ProjectRoot = normalizedRoot
+
 	ctx, cancel := s.operationContext(r.Context())
 	defer cancel()
 
-	result, err := s.executor.Destroy(ctx, req)
-	if err != nil {
+	result, execErr := s.executor.Destroy(ctx, req)
+	if execErr != nil {
 		log.Error().
-			Err(err).
+			Err(execErr).
 			Str("project_ref", req.ProjectRef).
 			Msg("destroy failed")
 		respondJSON(w, http.StatusInternalServerError, map[string]any{
 			"status": "failed",
-			"error":  err.Error(),
+			"error":  execErr.Error(),
 			"result": result,
 		})
 		return
@@ -198,40 +229,40 @@ func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
-        respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
-        if strings.TrimSpace(s.cfg.AuthToken) == "" {
-                return next
-        }
+	if strings.TrimSpace(s.cfg.AuthToken) == "" {
+		return next
+	}
 
-        expected := []byte(s.cfg.AuthToken)
+	expected := []byte(s.cfg.AuthToken)
 
-        return func(w http.ResponseWriter, r *http.Request) {
-                header := strings.TrimSpace(r.Header.Get("Authorization"))
-                if header == "" {
-                        log.Warn().Str("path", r.URL.Path).Msg("missing authorization header")
-                        httpError(w, http.StatusUnauthorized, "unauthorized")
-                        return
-                }
+	return func(w http.ResponseWriter, r *http.Request) {
+		header := strings.TrimSpace(r.Header.Get("Authorization"))
+		if header == "" {
+			log.Warn().Str("path", r.URL.Path).Msg("missing authorization header")
+			httpError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 
-                const prefix = "Bearer "
-                if len(header) <= len(prefix) || !strings.EqualFold(header[:len(prefix)], prefix) {
-                        log.Warn().Str("path", r.URL.Path).Msg("invalid authorization scheme")
-                        httpError(w, http.StatusUnauthorized, "unauthorized")
-                        return
-                }
+		const prefix = "Bearer "
+		if len(header) <= len(prefix) || !strings.EqualFold(header[:len(prefix)], prefix) {
+			log.Warn().Str("path", r.URL.Path).Msg("invalid authorization scheme")
+			httpError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 
-                token := strings.TrimSpace(header[len(prefix):])
-                if subtle.ConstantTimeCompare([]byte(token), expected) != 1 {
-                        log.Warn().Str("path", r.URL.Path).Msg("invalid authorization token")
-                        httpError(w, http.StatusUnauthorized, "unauthorized")
-                        return
-                }
+		token := strings.TrimSpace(header[len(prefix):])
+		if subtle.ConstantTimeCompare([]byte(token), expected) != 1 {
+			log.Warn().Str("path", r.URL.Path).Msg("invalid authorization token")
+			httpError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 
-                next(w, r)
-        }
+		next(w, r)
+	}
 }
 
 func validateProvisionRequest(req provisionRequest) error {
@@ -261,6 +292,38 @@ func (s *Server) operationContext(parent context.Context) (context.Context, cont
 		return context.WithCancel(parent)
 	}
 	return context.WithTimeout(parent, s.cfg.CommandTimeout)
+}
+
+func (s *Server) normalizeProjectRoot(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", errors.New("project_root is required")
+	}
+
+	absPath, err := filepath.Abs(trimmed)
+	if err != nil {
+		return "", errors.New("failed to resolve project_root")
+	}
+
+	normalized := absPath
+	if resolved, err := filepath.EvalSymlinks(absPath); err == nil {
+		normalized = resolved
+	}
+
+	if s.rootDir == "" {
+		return normalized, nil
+	}
+
+	if normalized == s.rootDir {
+		return normalized, nil
+	}
+
+	prefix := s.rootDir + string(os.PathSeparator)
+	if strings.HasPrefix(normalized, prefix) {
+		return normalized, nil
+	}
+
+	return "", errors.New("project_root must be within the configured projects directory")
 }
 
 func respondJSON(w http.ResponseWriter, status int, payload any) {

@@ -40,6 +40,7 @@ services:
       RUNTIME_AGENT_COMMAND_TIMEOUT: 15m
       RUNTIME_AGENT_SUPABASE_HOST: host.docker.internal
       RUNTIME_AGENT_AUTH_TOKEN: ${PLATFORM_ORCHESTRATOR_TOKEN:-supabase-runtime-agent}
+      RUNTIME_AGENT_PROJECTS_ROOT: ${PWD}/platform-projects
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}/platform-projects:${PWD}/platform-projects
