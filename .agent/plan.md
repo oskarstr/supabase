@@ -54,7 +54,7 @@
 
 ### Phase 5 – Docker & Compose Integration ✅
 - Production overlay (`docker-compose.platform.yml`) adds the platform service and routes traffic through Kong.
-- Dev overlay runs the API in watch mode; platform API Dockerfile builds with runtime-agent dependencies baked in.
+- Platform API now runs via the host dev server (`pnpm --filter platform-api dev`); the Docker dev overlay was removed to avoid node_modules/esbuild mismatch.
 - Added `docker/.env.platform.example` capturing required platform variables.
 
 ## Backlog & Future Phases
@@ -77,6 +77,7 @@
 - Integrate contract test harness under `apps/platform-api/tests/auto-generated`, ensuring behaviour matches Studio expectations once provisioning is stable.
 
 ## Change Log
+- **2025-10-16 07:05 UTC · codex** – Removed the platform dev Docker overlay; run platform-api locally via pnpm to avoid cross-arch esbuild/node_modules issues in containers.
 - **2025-10-16 06:50 UTC · codex** – Landed pg-mem-backed project lifecycle suite covering provision/pause/destroy happy paths and failure states; auth/storage routes now guard against pre-provision access and need follow-up fetch-based tests.
 - **2025-10-15 21:05 UTC · codex** – Updated Studio/Kong host URLs to `host.docker.internal` so the Studio container hits the gateway instead of `127.0.0.1`; stack comes up with Studio healthy again.
 - **2025-10-16 05:15 UTC · codex** – Removed the auto-generated route smoke suite; will reintroduce via a dedicated workflow once schema/migration replay is wired up for pg-mem.

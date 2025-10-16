@@ -5,6 +5,7 @@
 about
 docker
 !docker/db/**
+!docker/scripts/**
 examples
 i18n
 **/node_modules
