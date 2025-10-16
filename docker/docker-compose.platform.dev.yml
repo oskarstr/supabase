@@ -10,11 +10,14 @@ services:
       PORT: "4210"
       HOST: "0.0.0.0"
       CI: "true"
-    command: >
-      sh -c "apk add --no-cache bash curl git jq openssl tar \
-        && corepack enable pnpm \
-        && pnpm install --filter platform-api... \
-        && pnpm --filter platform-api... dev"
+    command:
+      - sh
+      - -lc
+      - |
+          apk add --no-cache bash curl git jq openssl tar \
+            && corepack enable pnpm \
+            && pnpm install --filter platform-api... \
+            && pnpm --filter platform-api... dev
     working_dir: /workspace
     env_file:
       - .env
