@@ -147,11 +147,13 @@ const DEFAULT_DEPLOYMENT_TARGET_OPTIONS: Record<string, DeploymentTargetOption> 
   },
 }
 
-const FormSchema = z.object({
+const BaseFormSchema = z.object({
   organization: z.string({
     required_error: 'Please select an organization',
   }),
-  deploymentTarget: z.enum(['local', 'remote']),
+  deploymentTarget: z.string({
+    required_error: 'Please select a deployment target.',
+  }),
   projectName: z
     .string()
     .trim()
@@ -179,7 +181,7 @@ const FormSchema = z.object({
   localServices: z.array(z.string()).default([]),
 })
 
-export type CreateProjectForm = z.infer<typeof FormSchema>
+export type CreateProjectForm = z.infer<typeof BaseFormSchema>
 
 const Wizard: NextPageWithLayout = () => {
   const router = useRouter()
@@ -242,17 +244,21 @@ const Wizard: NextPageWithLayout = () => {
     return options
   }, [projectCreationDeploymentTargetOptions])
 
-  const deploymentTargets = (projectCreationDeploymentTargets ?? ['remote']).filter(
-    (target, index, array) => array.indexOf(target) === index
+  const deploymentTargets = useMemo(
+    () =>
+      (projectCreationDeploymentTargets ?? ['remote']).filter(
+        (target, index, array) => array.indexOf(target) === index
+      ),
+    [projectCreationDeploymentTargets]
   )
 
-  const deploymentTargetsWithOverrides = (() => {
+  const deploymentTargetsWithOverrides = useMemo(() => {
     const shouldEnableLocal = process.env.NEXT_PUBLIC_PLATFORM_ENABLE_LOCAL_TARGET === 'true'
     if (shouldEnableLocal && !deploymentTargets.includes('local')) {
       return [...deploymentTargets, 'local']
     }
     return deploymentTargets
-  })()
+  }, [deploymentTargets])
 
   const defaultDeploymentTarget = deploymentTargetsWithOverrides.includes('remote')
     ? 'remote'
@@ -296,6 +302,27 @@ const Wizard: NextPageWithLayout = () => {
 
   const [isComputeCostsConfirmationModalVisible, setIsComputeCostsConfirmationModalVisible] =
     useState(false)
+
+  const allowedDeploymentTargetIds = useMemo(() => {
+    const uniqueTargets = Array.from(new Set(deploymentTargetsWithOverrides))
+    return uniqueTargets.length > 0 ? uniqueTargets : ['remote']
+  }, [deploymentTargetsWithOverrides])
+
+  const formSchema = useMemo(() => {
+    const schema = BaseFormSchema.extend({
+      deploymentTarget: z.enum(allowedDeploymentTargetIds as [string, ...string[]]),
+    })
+
+    return schema.superRefine(({ dbPassStrength }, refinementContext) => {
+      if (dbPassStrength < DEFAULT_MINIMUM_PASSWORD_STRENGTH) {
+        refinementContext.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['dbPass'],
+          message: passwordStrengthWarning || 'Password not secure enough',
+        })
+      }
+    })
+  }, [allowedDeploymentTargetIds, passwordStrengthWarning])
 
   const { data: organizations, isSuccess: isOrganizationsSuccess } = useOrganizationsQuery()
 
@@ -418,18 +445,8 @@ const Wizard: NextPageWithLayout = () => {
     setPasswordStrengthMessage(message)
   }
 
-  FormSchema.superRefine(({ dbPassStrength }, refinementContext) => {
-    if (dbPassStrength < DEFAULT_MINIMUM_PASSWORD_STRENGTH) {
-      refinementContext.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['dbPass'],
-        message: passwordStrengthWarning || 'Password not secure enough',
-      })
-    }
-  })
-
-  const form = useForm<z.infer<typeof FormSchema>>({
-    resolver: zodResolver(FormSchema),
+  const form = useForm<CreateProjectForm>({
+    resolver: zodResolver(formSchema),
     mode: 'onChange',
     defaultValues: {
       organization: slug,
@@ -545,7 +562,7 @@ const Wizard: NextPageWithLayout = () => {
     delayedCheckPasswordStrength(password)
   }
 
-  const onSubmitWithComputeCostsConfirmation = async (values: z.infer<typeof FormSchema>) => {
+  const onSubmitWithComputeCostsConfirmation = async (values: CreateProjectForm) => {
     const isLocal = values.deploymentTarget === 'local'
     const launchingLargerInstance =
       values.instanceSize &&
@@ -567,7 +584,7 @@ const Wizard: NextPageWithLayout = () => {
     }
   }
 
-  const onSubmit = async (values: z.infer<typeof FormSchema>) => {
+  const onSubmit = async (values: CreateProjectForm) => {
     if (!currentOrg) return console.error('Unable to retrieve current organization')
 
     const {
