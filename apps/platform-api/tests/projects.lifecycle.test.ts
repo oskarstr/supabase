@@ -8,6 +8,7 @@ import { DataType, newDb } from 'pg-mem'
 import { randomUUID } from 'node:crypto'
 import type { Kysely } from 'kysely'
 import type { PlatformDatabase } from '../src/db/schema.js'
+import { derivePortAllocation } from '../src/provisioning/ports.js'
 
 const mocks = vi.hoisted(() => ({
   provisionProjectStack: vi.fn(),
@@ -75,7 +76,7 @@ describe('project lifecycle integration', () => {
   const fetchRuntimeRow = async (db: PlatformDb, projectId: number) =>
     db
       .selectFrom('project_runtimes')
-      .select(['project_id', 'root_dir', 'excluded_services'])
+      .select(['project_id', 'root_dir', 'excluded_services', 'port_base'])
       .where('project_id', '=', projectId)
       .executeTakeFirst()
 
@@ -201,6 +202,8 @@ describe('project lifecycle integration', () => {
       root_dir: expectedRoot,
       excluded_services: ['logflare', 'vector'],
     })
+    expect(runtimeRow?.port_base).toBeTypeOf('number')
+    const expectedPorts = derivePortAllocation(runtimeRow!.port_base)
 
     const provisionPayload = mocks.provisionProjectStack.mock.calls[0]?.[0]
     expect(provisionPayload).toMatchObject({
@@ -212,12 +215,13 @@ describe('project lifecycle integration', () => {
       databasePassword: 'postgres',
       projectRoot: expectedRoot,
       excludedServices: ['logflare', 'vector'],
+      ports: expectedPorts,
     })
     expect(typeof provisionPayload.projectId).toBe('number')
 
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledTimes(1)
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: projectRow?.id,
+      ports: expectedPorts,
       excludedServices: ['logflare', 'vector'],
     })
     expect(mocks.destroyProjectStack).not.toHaveBeenCalled()
@@ -331,13 +335,17 @@ describe('project lifecycle integration', () => {
 
     const runtimeRow = projectRow && (await fetchRuntimeRow(db, projectRow.id))
     expect(runtimeRow?.excluded_services).toEqual(['realtime', 'vector', 'logflare'])
+    const runtimePorts = runtimeRow && derivePortAllocation(runtimeRow.port_base)
 
     expect(mocks.provisionProjectStack).toHaveBeenCalledTimes(1)
     const provisionPayload = mocks.provisionProjectStack.mock.calls[0]?.[0]
     expect(provisionPayload?.excludedServices).toEqual(['realtime', 'vector', 'logflare'])
+    if (runtimePorts) {
+      expect(provisionPayload?.ports).toEqual(runtimePorts)
+    }
 
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: projectRow?.id,
+      ports: runtimePorts ?? expect.anything(),
       excludedServices: ['realtime', 'vector', 'logflare'],
     })
   })
@@ -375,9 +383,11 @@ describe('project lifecycle integration', () => {
 
     await waitForProjectStatus(db, projectRef, 'ACTIVE_HEALTHY')
     const runtimeRoot = join(tempRoot, projectRef)
+    const runtimeRow = await fetchRuntimeRow(db, (await fetchProjectRow(db, projectRef))!.id)
+    const runtimePorts = derivePortAllocation(runtimeRow!.port_base)
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledTimes(1)
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: expect.any(Number),
+      ports: runtimePorts,
       excludedServices: ['logflare', 'vector'],
     })
 

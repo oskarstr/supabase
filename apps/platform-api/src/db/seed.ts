@@ -30,6 +30,7 @@ import {
   nowIso,
 } from '../config/defaults.js'
 import { PROJECTS_ROOT } from '../store/state.js'
+import { BASE_PORT, PORT_STEP } from '../provisioning/ports.js'
 import { getPlatformDb } from './client.js'
 import { sql } from 'kysely'
 
@@ -260,11 +261,13 @@ export const seedDefaults = async () => {
 
     if (!runtime) {
       const rootDir = resolve(PROJECTS_ROOT, DEFAULT_PROJECT_REF)
+      const portBase = BASE_PORT + projectId * PORT_STEP
       await trx
         .insertInto('project_runtimes')
         .values({
           project_id: projectId,
           root_dir: rootDir,
+          port_base: portBase,
         })
         .execute()
     }
@@ -330,11 +333,13 @@ export const seedDefaults = async () => {
 
       if (!runtimeRow) {
         const platformRoot = resolve(PROJECTS_ROOT, PLATFORM_PROJECT_REF)
+        const portBase = BASE_PORT + platformProjectId * PORT_STEP
         await trx
           .insertInto('project_runtimes')
           .values({
             project_id: platformProjectId,
             root_dir: platformRoot,
+            port_base: portBase,
           })
           .execute()
       }

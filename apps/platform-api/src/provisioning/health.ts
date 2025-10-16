@@ -1,15 +1,15 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 
-import { allocateProjectPorts } from './ports.js'
+import type { ProjectPortAllocation } from './ports.js'
 
 const HEALTH_HOST = process.env.PLATFORM_RUNTIME_HEALTH_HOST?.trim() || 'host.docker.internal'
 const HEALTH_TIMEOUT_MS = Number.parseInt(process.env.PLATFORM_RUNTIME_HEALTH_TIMEOUT_MS ?? '', 10)
 const DEFAULT_TIMEOUT_MS =
-  Number.isFinite(HEALTH_TIMEOUT_MS) && HEALTH_TIMEOUT_MS > 0 ? HEALTH_TIMEOUT_MS : 120_000
+  Number.isFinite(HEALTH_TIMEOUT_MS) && HEALTH_TIMEOUT_MS > 0 ? HEALTH_TIMEOUT_MS : 600_000
 const DEFAULT_INTERVAL_MS = 2_000
 
 interface WaitForHealthOptions {
-  projectId: number
+  ports: ProjectPortAllocation
   excludedServices: string[]
   timeoutMs?: number
   intervalMs?: number
@@ -33,12 +33,11 @@ const checkEdgeFunctions = async (port: number, abortSignal: AbortSignal) => {
 }
 
 export const waitForRuntimeHealth = async ({
-  projectId,
+  ports,
   excludedServices,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   intervalMs = DEFAULT_INTERVAL_MS,
 }: WaitForHealthOptions): Promise<void> => {
-  const ports = allocateProjectPorts(projectId)
   const deadline = Date.now() + timeoutMs
   const shouldCheckFunctions = !excludedServices.includes('edge-runtime')
   const shouldCheckRest =
