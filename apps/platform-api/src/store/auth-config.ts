@@ -401,17 +401,12 @@ const AUTH_SETTINGS_PATHS = ['admin/settings', 'settings']
 const AUTH_HOOKS_PATHS = ['admin/settings/hooks', 'admin/hooks']
 
 export const getAuthConfig = async (ref: string): Promise<GoTrueConfig> => {
-  try {
-    const payload = await requestGoTrueWithFallback<Record<string, unknown> | undefined>(
-      ref,
-      'GET',
-      AUTH_SETTINGS_PATHS
-    )
-    return mergeConfigWithDefaults(ref, payload)
-  } catch (error) {
-    console.error('[platform-api] failed to load auth config from GoTrue', { ref, error })
-    return computeDefaultConfig(ref)
-  }
+  const payload = await requestGoTrueWithFallback<Record<string, unknown> | undefined>(
+    ref,
+    'GET',
+    AUTH_SETTINGS_PATHS
+  )
+  return mergeConfigWithDefaults(ref, payload)
 }
 
 export const updateAuthConfig = async (ref: string, body: unknown): Promise<GoTrueConfig> => {
