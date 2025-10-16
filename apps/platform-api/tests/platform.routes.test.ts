@@ -16,12 +16,57 @@ async function buildApp() {
   return app
 }
 
+type PlatformDb = Awaited<ReturnType<typeof import('../src/db/client.js')['getPlatformDb']>>
+
+const toUrl = (input: Parameters<typeof fetch>[0]) => {
+  if (typeof input === 'string') {
+    return new URL(input)
+  }
+  if (input instanceof URL) {
+    return input
+  }
+  return new URL(input.url)
+}
+
 describe('platform routes', () => {
   let app: FastifyInstance
   let defaultProjectRef = ''
   let defaultOrganizationSlug = ''
   let platformProjectRef = ''
   let platformProjectSchema = ''
+  let platformDb: PlatformDb
+  let originalProjectStatus = 'ACTIVE_HEALTHY'
+  let originalProjectServiceKey = ''
+
+  const loadDefaultProject = async () => {
+    if (!platformDb) {
+      throw new Error('platformDb not initialized')
+    }
+
+    const project = await platformDb
+      .selectFrom('projects')
+      .select(['ref', 'status', 'service_key'])
+      .where('ref', '=', defaultProjectRef)
+      .executeTakeFirst()
+
+    if (!project) {
+      throw new Error(`Failed to load project ${defaultProjectRef}`)
+    }
+
+    return project
+  }
+
+  const updateDefaultProject = async (patch: Partial<{ status: string; service_key: string }>) => {
+    if (!platformDb) {
+      throw new Error('platformDb not initialized')
+    }
+
+    await platformDb
+      .updateTable('projects')
+      .set(patch)
+      .where('ref', '=', defaultProjectRef)
+      .execute()
+  }
 
   beforeAll(async () => {
     vi.resetModules()
@@ -66,6 +111,12 @@ describe('platform routes', () => {
       const fallbackPlatform = projects.find((project) => project.ref !== defaultProjectRef)
       platformProjectRef = fallbackPlatform?.ref ?? platformProjectRef
     }
+
+    const { getPlatformDb } = await import('../src/db/client.js')
+    platformDb = getPlatformDb()
+    const project = await loadDefaultProject()
+    originalProjectStatus = project.status
+    originalProjectServiceKey = project.service_key
   })
 
   afterAll(async () => {
@@ -76,10 +127,23 @@ describe('platform routes', () => {
 
   beforeEach(async () => {
     process.env.PLATFORM_API_REPO_ROOT = process.cwd()
+    if (defaultProjectRef) {
+      await updateDefaultProject({
+        status: originalProjectStatus,
+        service_key: originalProjectServiceKey,
+      })
+    }
     app = await buildApp()
   })
 
   afterEach(async () => {
+    vi.restoreAllMocks()
+    if (defaultProjectRef) {
+      await updateDefaultProject({
+        status: originalProjectStatus,
+        service_key: originalProjectServiceKey,
+      })
+    }
     await app.close()
   })
 
@@ -703,6 +767,342 @@ describe('platform routes', () => {
     expect(payload[0]).toMatchObject({
       schema: expect.any(String),
       name: expect.any(String),
+    })
+  })
+
+  describe('platform auth configuration guards', () => {
+    it('returns 503 while the project is provisioning', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+        throw new Error('fetch should not be called when the auth guard fails')
+      })
+
+      await updateDefaultProject({ status: 'COMING_UP' })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/platform/auth/${projectRef}/config`,
+      })
+
+      expect(response.statusCode).toBe(503)
+      expect(response.json()).toMatchObject({
+        message: `Project ${projectRef} is still provisioning; auth config unavailable`,
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('returns 503 when the project is missing its service key', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+        throw new Error('fetch should not be called without a service key')
+      })
+
+      await updateDefaultProject({
+        status: originalProjectStatus,
+        service_key: '',
+      })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/platform/auth/${projectRef}/config`,
+      })
+
+      expect(response.statusCode).toBe(503)
+      expect(response.json()).toMatchObject({
+        message: `Project ${projectRef} is missing a service role key for auth config access`,
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('merges the GoTrue payload with defaults when the guard passes', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      await updateDefaultProject({
+        status: 'ACTIVE_HEALTHY',
+        service_key: originalProjectServiceKey,
+      })
+
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = toUrl(input)
+        expect(url.pathname).toBe(`/auth/v1/admin/settings`)
+        expect(init?.method).toBe('GET')
+        expect(init?.headers).toMatchObject({
+          Accept: 'application/json',
+          apikey: originalProjectServiceKey,
+          Authorization: `Bearer ${originalProjectServiceKey}`,
+        })
+        expect(init?.body).toBeUndefined()
+
+        return new Response(
+          JSON.stringify({
+            DISABLE_SIGNUP: true,
+            MFA_MAX_ENROLLED_FACTORS: 4,
+            SITE_URL: 'https://external.example',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
+      })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/platform/auth/${projectRef}/config`,
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.DISABLE_SIGNUP).toBe(true)
+      expect(body.MFA_MAX_ENROLLED_FACTORS).toBe(4)
+      expect(body.SITE_URL).toBe('https://external.example')
+      expect(body.URI_ALLOW_LIST).toBe(`https://${projectRef}.supabase.local`)
+    })
+
+    it('falls back to the legacy settings path when the admin endpoint is unavailable', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      let callCount = 0
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const url = toUrl(input)
+        callCount += 1
+        if (callCount === 1) {
+          expect(url.pathname).toBe(`/auth/v1/admin/settings`)
+          return new Response(JSON.stringify({ message: 'not found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+
+        expect(url.pathname).toBe(`/auth/v1/settings`)
+        return new Response(JSON.stringify({ DISABLE_SIGNUP: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/platform/auth/${projectRef}/config`,
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().DISABLE_SIGNUP).toBe(false)
+    })
+
+    it('strips undefined values when patching the auth config', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      const payload = {
+        DISABLE_SIGNUP: undefined,
+        RATE_LIMIT_VERIFY: 9,
+      }
+
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = toUrl(input)
+        expect(url.pathname).toBe(`/auth/v1/admin/settings`)
+        expect(init?.method).toBe('PATCH')
+        expect(init?.headers).toMatchObject({
+          'Content-Type': 'application/json',
+          apikey: originalProjectServiceKey,
+        })
+
+        const body = JSON.parse((init?.body as string) ?? '{}')
+        expect(body).toEqual({ RATE_LIMIT_VERIFY: 9 })
+
+        return new Response(JSON.stringify({ RATE_LIMIT_VERIFY: 9 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      })
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/platform/auth/${projectRef}/config`,
+        payload,
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().RATE_LIMIT_VERIFY).toBe(9)
+    })
+  })
+
+  describe('platform storage guards', () => {
+    it('returns 503 while storage is unavailable during provisioning', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+        throw new Error('storage fetch should not run during provisioning guard failure')
+      })
+
+      await updateDefaultProject({ status: 'PAUSING' })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/platform/storage/${projectRef}/buckets`,
+      })
+
+      expect(response.statusCode).toBe(503)
+      expect(response.json()).toMatchObject({
+        message: `Project ${projectRef} is still provisioning; storage API unavailable`,
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('returns 503 when the project does not have a storage service key', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+        throw new Error('storage fetch should not run without service key')
+      })
+
+      await updateDefaultProject({
+        status: originalProjectStatus,
+        service_key: '',
+      })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/platform/storage/${projectRef}/buckets`,
+      })
+
+      expect(response.statusCode).toBe(503)
+      expect(response.json()).toMatchObject({
+        message: `Project ${projectRef} is missing a service role key`,
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('proxies bucket requests to storage with the expected headers', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = toUrl(input)
+        expect(url.pathname).toBe(`/storage/v1/bucket`)
+        expect(init?.method).toBe('GET')
+        expect(init?.headers).toMatchObject({
+          Accept: 'application/json',
+          Authorization: `Bearer ${originalProjectServiceKey}`,
+          apikey: originalProjectServiceKey,
+        })
+        expect(init?.body).toBeUndefined()
+
+        return new Response(
+          JSON.stringify([
+            { id: 'bucket-one', name: 'bucket-one', owner: 'owner', public: false },
+            { id: 'bucket-two', name: 'bucket-two', owner: 'owner', public: true },
+          ]),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
+      })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/platform/storage/${projectRef}/buckets`,
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(response.statusCode).toBe(200)
+      const buckets = response.json()
+      expect(Array.isArray(buckets)).toBe(true)
+      expect(buckets).toHaveLength(2)
+      expect(buckets[0]).toMatchObject({ id: 'bucket-one', name: 'bucket-one' })
+    })
+
+    it('sanitizes the path and options when listing storage objects', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = toUrl(input)
+        expect(url.pathname).toBe(`/storage/v1/object/list/my-bucket`)
+        expect(init?.method).toBe('POST')
+        const parsed = JSON.parse((init?.body as string) ?? '{}')
+        expect(parsed).toEqual({
+          prefix: 'nested/path',
+          limit: 5,
+          offset: 10,
+          search: 'logo',
+          sortBy: { column: 'name', order: 'asc' },
+        })
+
+        return new Response(JSON.stringify([{ name: 'logo.png' }]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      })
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/platform/storage/${projectRef}/buckets/my-bucket/objects/list`,
+        payload: {
+          path: '/nested/path',
+          options: {
+            limit: 5,
+            offset: 10,
+            search: 'logo',
+            sortBy: { column: 'name', order: 'asc' },
+          },
+        },
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toEqual([{ name: 'logo.png' }])
+    })
+  })
+
+  describe('platform auth signup proxy', () => {
+    it('forwards GoTrue errors without masking the error_description', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = toUrl(input)
+        expect(url.pathname).toBe('/auth/v1/signup')
+        expect(init?.method).toBe('POST')
+        const headers = init?.headers as Record<string, string>
+        expect(headers).toMatchObject({
+          accept: 'application/json',
+          'content-type': 'application/json',
+        })
+        const body = JSON.parse((init?.body as string) ?? '{}')
+        expect(body).toMatchObject({ email: 'new-user@example.com', password: 'super-secret' })
+
+        return new Response(
+          JSON.stringify({ error_description: 'Signups are currently disabled.' }),
+          {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
+      })
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/platform/auth/signup',
+        payload: {
+          email: 'new-user@example.com',
+          password: 'super-secret',
+        },
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toEqual({ message: 'Signups are currently disabled.' })
     })
   })
 })
