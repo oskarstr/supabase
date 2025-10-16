@@ -19,12 +19,20 @@ const REST_PATH_SUFFIX = /\/rest\/v1\/?$/
 const resolveStorageClientContext = async (ref: string): Promise<StorageClientContext> => {
   const project = await db
     .selectFrom('projects')
-    .select(['ref', 'rest_url', 'service_key'])
+    .select(['ref', 'rest_url', 'service_key', 'status'])
     .where('ref', '=', ref)
     .executeTakeFirst()
 
   if (!project) {
     throw new Error(`Project ${ref} not found when resolving storage endpoint`)
+  }
+
+  if (project.status !== 'ACTIVE_HEALTHY') {
+    // Mirror the auth guard: avoid piling requests onto a storage backend that may
+    // still be booting. If provisioning flows change, revisit this shortcut.
+    const error = new Error(`Project ${ref} is still provisioning; storage API unavailable`)
+    ;(error as Error & { statusCode?: number }).statusCode = 503
+    throw error
   }
 
   const baseRestUrl = project.rest_url ?? `https://${project.ref}.supabase.local/rest/v1/`
@@ -33,7 +41,9 @@ const resolveStorageClientContext = async (ref: string): Promise<StorageClientCo
   const storageUrl = `${trimmedBase}/storage/v1`
 
   if (!project.service_key) {
-    throw new Error(`Project ${ref} is missing a service role key`)
+    const error = new Error(`Project ${ref} is missing a service role key`)
+    ;(error as Error & { statusCode?: number }).statusCode = 503
+    throw error
   }
 
   return { storageUrl, serviceKey: project.service_key }

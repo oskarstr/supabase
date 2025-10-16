@@ -261,12 +261,20 @@ class GoTrueRequestError extends Error {
 const resolveAuthClientContext = async (ref: string): Promise<AuthClientContext> => {
   const project = await db
     .selectFrom('projects')
-    .select(['ref', 'rest_url', 'service_key'])
+    .select(['ref', 'rest_url', 'service_key', 'status'])
     .where('ref', '=', ref)
     .executeTakeFirst()
 
   if (!project) {
     throw new Error(`Project ${ref} not found when resolving auth config`)
+  }
+
+  if (project.status !== 'ACTIVE_HEALTHY') {
+    // Block while provisioning so we don't hammer a GoTrue instance that may not
+    // be reachable yet; we can revisit once we stream readiness events instead.
+    const error = new Error(`Project ${ref} is still provisioning; auth config unavailable`)
+    ;(error as Error & { statusCode?: number }).statusCode = 503
+    throw error
   }
 
   const baseRestUrl = project.rest_url ?? `https://${project.ref}.supabase.local/rest/v1/`
@@ -275,7 +283,9 @@ const resolveAuthClientContext = async (ref: string): Promise<AuthClientContext>
   const authBaseUrl = `${trimmedBase}/auth/v1`
 
   if (!project.service_key) {
-    throw new Error(`Project ${ref} is missing a service role key for auth config access`)
+    const error = new Error(`Project ${ref} is missing a service role key for auth config access`)
+    ;(error as Error & { statusCode?: number }).statusCode = 503
+    throw error
   }
 
   return { authBaseUrl, serviceKey: project.service_key }
