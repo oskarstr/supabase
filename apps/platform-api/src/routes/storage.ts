@@ -16,14 +16,16 @@ const storageRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string }; Reply: StorageBucketSummary[] }>(
     '/:ref/buckets',
     async (request, reply) => {
-      return reply.send(listStorageBuckets(request.params.ref))
+      const buckets = await listStorageBuckets(request.params.ref)
+      return reply.send(buckets)
     }
   )
 
   app.get<{ Params: { ref: string }; Reply: StorageCredentialsResponse }>(
     '/:ref/credentials',
     async (request, reply) => {
-      return reply.send(getStorageCredentials(request.params.ref))
+      const credentials = await getStorageCredentials(request.params.ref)
+      return reply.send(credentials)
     }
   )
 
@@ -31,7 +33,12 @@ const storageRoutes: FastifyPluginAsync = async (app) => {
     Params: { ref: string; id: string }
     Body: { path?: string; options?: Record<string, unknown> }
   }>('/:ref/buckets/:id/objects/list', async (request, reply) => {
-    const objects = listStorageObjects(request.params.ref, request.params.id, request.body?.path)
+    const objects = await listStorageObjects(
+      request.params.ref,
+      request.params.id,
+      request.body?.path,
+      request.body?.options as Record<string, unknown> | undefined
+    )
     return reply.send(objects)
   })
 
@@ -40,9 +47,12 @@ const storageRoutes: FastifyPluginAsync = async (app) => {
     Body: { path: string }
     Reply: StoragePublicUrlResponse
   }>('/:ref/buckets/:id/objects/public-url', async (request, reply) => {
-    return reply.send(
-      createStoragePublicUrl(request.params.ref, request.params.id, request.body?.path ?? '')
+    const payload = await createStoragePublicUrl(
+      request.params.ref,
+      request.params.id,
+      request.body?.path ?? ''
     )
+    return reply.send(payload)
   })
 }
 
