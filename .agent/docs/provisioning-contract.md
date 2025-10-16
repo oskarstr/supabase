@@ -19,8 +19,9 @@
   - Project status is set to `INIT_FAILED`.
   - A best-effort `destroyProjectStack` is issued to tear down any partial resources.
   - Error is logged and bubbled to the API response; client should surface failure and allow manual retry.
+  - Control plane HTTP calls to the runtime agent respect `PLATFORM_ORCHESTRATOR_TIMEOUT_MS` (default 15 minutes) to avoid wedged lifecycle jobs.
 - **Health timeout**
-  - After `DEFAULT_TIMEOUT_MS` (2 minutes) if checks never succeed, project status becomes `INIT_FAILED`. Destroy is attempted as above. Excluded services bypass the corresponding checks.
+  - After `DEFAULT_TIMEOUT_MS` (10 minutes by default, configurable via `PLATFORM_RUNTIME_HEALTH_TIMEOUT_MS`) if checks never succeed, project status becomes `INIT_FAILED`. Destroy is attempted as above. Excluded services bypass the corresponding checks.
 - **Destroy path** (`DELETE /api/platform/projects/:ref`)
   - Status flips to `GOING_DOWN`, runtime-agent `/destroy` executes `supabase stop`, project row is removed, `project_runtimes` entry is deleted, and the runtime directory is removed. Failures during cleanup are logged but do not block the DB delete.
 - **Pause/Resume**
@@ -34,6 +35,7 @@
 - `project_runtimes`
   - `root_dir`: absolute path under `${PLATFORM_PROJECTS_ROOT}`.
   - `excluded_services`: text array (requires migrations ≥ `0003_add_project_runtime_settings.sql`).
+  - `port_base`: reserved API port anchor; the DB, Studio, and Inbucket ports are derived offsets (`+1`, `+2`, `+3`). Persisting the base prevents port exhaustion as projects churn.
 - On-disk runtime
   - `supabase/config.toml`: generated ports/config.
   - `supabase/.env`: runtime credentials persisted back to DB after provisioning.

@@ -4,15 +4,15 @@ import { dirname, resolve } from 'node:path'
 
 import { repoRoot } from '../store/env.js'
 import { renderSupabaseConfig } from './config.js'
-import { allocateProjectPorts, type ProjectPortAllocation } from './ports.js'
+import type { ProjectPortAllocation } from './ports.js'
 import { parse as parseEnv } from 'dotenv'
 
 export interface PrepareRuntimeOptions {
-  projectId: number
   projectRef: string
   projectName: string
   projectRoot: string
   databasePassword: string
+  ports: ProjectPortAllocation
 }
 
 export interface PreparedRuntime {
@@ -78,7 +78,7 @@ export const prepareSupabaseRuntime = async (
   const supabaseDir = resolve(options.projectRoot, 'supabase')
   await copySupabaseTemplate(supabaseDir)
 
-  const ports = allocateProjectPorts(options.projectId)
+  const ports = options.ports
   const siteUrl = `http://127.0.0.1:${ports.api}`
 
   const configPath = resolve(supabaseDir, 'config.toml')

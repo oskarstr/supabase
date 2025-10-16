@@ -107,6 +107,7 @@ const scheduleProvisioning = async (
 ) => {
   const runtimeRoot = options.runtime.root_dir
   const excludedServices = options.runtime.excluded_services ?? []
+  const ports = options.runtime.ports
   const existingEnv = readProvisionedEnv(runtimeRoot)
   const databasePassword =
     options.dbPassword && options.dbPassword.length > 0
@@ -123,6 +124,7 @@ const scheduleProvisioning = async (
       databasePassword,
       projectRoot: runtimeRoot,
       excludedServices,
+      ports,
     })
 
     const parsedEnv = readProvisionedEnv(runtimeRoot)
@@ -155,7 +157,7 @@ const scheduleProvisioning = async (
     }
 
     await waitForRuntimeHealth({
-      projectId: project.id,
+      ports,
       excludedServices,
     })
 
