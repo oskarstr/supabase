@@ -412,6 +412,8 @@ services:
       - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
       # Changes required for Pooler support
       - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
+      # Platform-specific grants to restore admin access to the platform schema
+      - ./volumes/db/platform-grants.sql:/docker-entrypoint-initdb.d/init-scripts/100-platform-grants.sql:Z
       # Use named volume to persist pgsodium decryption key between restarts
       - db-config:/etc/postgresql-custom
     healthcheck:
