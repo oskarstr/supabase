@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify'
+import { readdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -27,6 +28,15 @@ const toUrl = (input: Parameters<typeof fetch>[0]) => {
   }
   return new URL(input.url)
 }
+
+const sanitizeMigrationSql = (sql: string) =>
+  sql
+    .replace(/CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\s*/g, '')
+    .replace(/CREATE EXTENSION IF NOT EXISTS "pgcrypto";\s*/g, '')
+    .replace(/ADD VALUE IF NOT EXISTS/g, 'ADD VALUE')
+    .replace(/COMMENT ON SCHEMA platform IS 'Supabase platform control-plane schema.';\s*/g, '')
+
+const MIGRATIONS_DIR = resolve(process.cwd(), 'migrations')
 
 describe('platform routes', () => {
   let app: FastifyInstance
@@ -83,19 +93,25 @@ describe('platform routes', () => {
     platformProjectSchema = defaults.PLATFORM_PROJECT_SCHEMA
 
     const memDb = newDb()
-    const migrationPath = resolve(process.cwd(), 'migrations/0001_initial.sql')
     memDb.public.registerFunction({
       name: 'gen_random_uuid',
       returns: DataType.uuid,
       implementation: () => randomUUID(),
     })
 
-    const migrationSql = await readFile(migrationPath, 'utf-8')
-    const sanitizedSql = migrationSql
-      .replace(/CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\s*/g, '')
-      .replace(/CREATE EXTENSION IF NOT EXISTS "pgcrypto";\s*/g, '')
-      .replace(/COMMENT ON SCHEMA platform IS 'Supabase platform control-plane schema.';\s*/g, '')
-    memDb.public.none(sanitizedSql)
+    const migrationFiles = readdirSync(MIGRATIONS_DIR)
+      .filter((file) => file.endsWith('.sql'))
+      .sort()
+
+    for (const file of migrationFiles) {
+      const sql = await readFile(resolve(MIGRATIONS_DIR, file), 'utf-8')
+      memDb.public.none(sanitizeMigrationSql(sql))
+    }
+    try {
+      memDb.public.none("ALTER TYPE platform.cloud_provider ADD VALUE 'LOCAL';")
+    } catch {
+      /* ignore if value already exists */
+    }
 
     const { Pool: MemPool } = memDb.adapters.createPg()
     globalThis.__PLATFORM_TEST_POOL__ = new MemPool()
@@ -540,6 +556,44 @@ describe('platform routes', () => {
     expect(projectRef).toBeTruthy()
     expect(organizationSlug).toBeTruthy()
 
+    let disableSignup = true
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = toUrl(input)
+      const method = (init?.method ?? 'GET').toUpperCase()
+
+      if (url.pathname === '/auth/v1/admin/settings' && method === 'GET') {
+        return new Response(
+          JSON.stringify({
+            DISABLE_SIGNUP: disableSignup,
+            SITE_URL: `https://${projectRef}.supabase.local`,
+            MAILER_SUBJECTS_INVITE: 'Invite',
+            EXTERNAL_EMAIL_ENABLED: true,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (url.pathname === '/auth/v1/admin/settings' && method === 'PATCH') {
+        const body =
+          typeof init?.body === 'string' && init.body.length > 0 ? JSON.parse(init.body) : {}
+        if (typeof body.DISABLE_SIGNUP === 'boolean') {
+          disableSignup = body.DISABLE_SIGNUP
+        }
+        return new Response(
+          JSON.stringify({
+            DISABLE_SIGNUP: disableSignup,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (url.pathname === '/auth/v1/admin/settings/hooks' && method === 'PATCH') {
+        return new Response(null, { status: 204 })
+      }
+
+      throw new Error(`Unexpected auth fetch: ${method} ${url.toString()}`)
+    })
+
     const disk = await app.inject({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/disk`,
@@ -628,6 +682,7 @@ describe('platform routes', () => {
       payload: {},
     })
     expect(authHooks.statusCode).toBe(200)
+    fetchMock.mockRestore()
 
     const combinedStats = await app.inject({
       method: 'GET',
@@ -863,6 +918,7 @@ describe('platform routes', () => {
       expect(body.MFA_MAX_ENROLLED_FACTORS).toBe(4)
       expect(body.SITE_URL).toBe('https://external.example')
       expect(body.URI_ALLOW_LIST).toBe(`https://${projectRef}.supabase.local`)
+      fetchMock.mockRestore()
     })
 
     it('falls back to the legacy settings path when the admin endpoint is unavailable', async () => {
@@ -896,6 +952,7 @@ describe('platform routes', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2)
       expect(response.statusCode).toBe(200)
       expect(response.json().DISABLE_SIGNUP).toBe(false)
+      fetchMock.mockRestore()
     })
 
     it('strips undefined values when patching the auth config', async () => {
@@ -934,6 +991,7 @@ describe('platform routes', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1)
       expect(response.statusCode).toBe(200)
       expect(response.json().RATE_LIMIT_VERIFY).toBe(9)
+      fetchMock.mockRestore()
     })
   })
 
@@ -1012,18 +1070,19 @@ describe('platform routes', () => {
         )
       })
 
-      const response = await app.inject({
-        method: 'GET',
-        url: `/api/platform/storage/${projectRef}/buckets`,
-      })
-
-      expect(fetchMock).toHaveBeenCalledTimes(1)
-      expect(response.statusCode).toBe(200)
-      const buckets = response.json()
-      expect(Array.isArray(buckets)).toBe(true)
-      expect(buckets).toHaveLength(2)
-      expect(buckets[0]).toMatchObject({ id: 'bucket-one', name: 'bucket-one' })
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/platform/storage/${projectRef}/buckets`,
     })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(response.statusCode).toBe(200)
+    const buckets = response.json()
+    expect(Array.isArray(buckets)).toBe(true)
+    expect(buckets).toHaveLength(2)
+    expect(buckets[0]).toMatchObject({ id: 'bucket-one', name: 'bucket-one' })
+    fetchMock.mockRestore()
+  })
 
     it('sanitizes the path and options when listing storage objects', async () => {
       const projectRef = defaultProjectRef
@@ -1048,11 +1107,11 @@ describe('platform routes', () => {
         })
       })
 
-      const response = await app.inject({
-        method: 'POST',
-        url: `/api/platform/storage/${projectRef}/buckets/my-bucket/objects/list`,
-        payload: {
-          path: '/nested/path',
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/platform/storage/${projectRef}/buckets/my-bucket/objects/list`,
+      payload: {
+        path: '/nested/path',
           options: {
             limit: 5,
             offset: 10,
@@ -1062,9 +1121,36 @@ describe('platform routes', () => {
         },
       })
 
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual([{ name: 'logo.png' }])
+    fetchMock.mockRestore()
+  })
+
+    it('propagates storage API failures with the original status text', async () => {
+      const projectRef = defaultProjectRef
+      expect(projectRef).toBeTruthy()
+
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const url = toUrl(input)
+        expect(url.pathname).toBe(`/storage/v1/bucket`)
+
+        return new Response('storage is down', {
+          status: 502,
+          statusText: 'Bad Gateway',
+          headers: { 'Content-Type': 'text/plain' },
+        })
+      })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/platform/storage/${projectRef}/buckets`,
+      })
+
       expect(fetchMock).toHaveBeenCalledTimes(1)
-      expect(response.statusCode).toBe(200)
-      expect(response.json()).toEqual([{ name: 'logo.png' }])
+      expect(response.statusCode).toBe(500)
+      expect(String(response.json().message)).toContain('failed with 502')
+      fetchMock.mockRestore()
     })
   })
 
