@@ -31,17 +31,20 @@ type SignUpBody = {
 
 const authRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { ref: string } }>('/:ref/config', async (request, reply) => {
-    return reply.send(getAuthConfig(request.params.ref))
+    const config = await getAuthConfig(request.params.ref)
+    return reply.send(config)
   })
 
   app.patch<{ Params: { ref: string }; Body: unknown }>('/:ref/config', async (request, reply) => {
-    return reply.send(updateAuthConfig(request.params.ref, request.body))
+    const config = await updateAuthConfig(request.params.ref, request.body)
+    return reply.send(config)
   })
 
   app.patch<{ Params: { ref: string }; Body: unknown }>(
     '/:ref/config/hooks',
     async (request, reply) => {
-      return reply.send(updateAuthHooks(request.params.ref, request.body))
+      const config = await updateAuthHooks(request.params.ref, request.body)
+      return reply.send(config)
     }
   )
 

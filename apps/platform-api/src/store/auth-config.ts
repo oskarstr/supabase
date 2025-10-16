@@ -1,6 +1,11 @@
+import { URL } from 'node:url'
+
+import { getPlatformDb } from '../db/client.js'
 import type { AuthConfig, AuthConfigUpdate, AuthHooksUpdate } from './types.js'
 
 type GoTrueConfig = AuthConfig
+
+const db = getPlatformDb()
 
 const DEFAULT_AUTH_CONFIG: GoTrueConfig = {
   API_MAX_REQUEST_DURATION: 10,
@@ -225,9 +230,6 @@ const DEFAULT_AUTH_CONFIG: GoTrueConfig = {
 }
 
 const CONFIG_KEYS = Object.keys(DEFAULT_AUTH_CONFIG) as Array<keyof GoTrueConfig>
-const CONFIG_KEY_SET = new Set<keyof GoTrueConfig>(CONFIG_KEYS)
-
-const authConfigs = new Map<string, GoTrueConfig>()
 
 const cloneConfig = (config: GoTrueConfig): GoTrueConfig => ({ ...config })
 
@@ -237,43 +239,209 @@ const computeDefaultConfig = (ref: string): GoTrueConfig => ({
   URI_ALLOW_LIST: `https://${ref}.supabase.local`,
 })
 
-const getOrCreateConfig = (ref: string): GoTrueConfig => {
-  if (!authConfigs.has(ref)) {
-    authConfigs.set(ref, computeDefaultConfig(ref))
-  }
-  return authConfigs.get(ref)!
+const REST_PATH_SUFFIX = /\/rest\/v1\/?$/i
+
+type AuthClientContext = {
+  authBaseUrl: string
+  serviceKey: string
 }
 
-const applyPatch = (ref: string, patch: Partial<AuthConfigUpdate>): GoTrueConfig => {
-  const current = getOrCreateConfig(ref)
-  const next: GoTrueConfig = { ...current }
-
-  for (const [rawKey, value] of Object.entries(patch) as [keyof AuthConfigUpdate, unknown][]) {
-    if (value === undefined) continue
-    const key = rawKey as keyof GoTrueConfig
-    if (!CONFIG_KEY_SET.has(key)) continue
-    ;(next as Record<string, unknown>)[key as string] = value
+class GoTrueRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly path: string,
+    readonly responseBody?: string
+  ) {
+    super(message)
+    this.name = 'GoTrueRequestError'
   }
-
-  authConfigs.set(ref, next)
-  return next
 }
 
-export const getAuthConfig = (ref: string): GoTrueConfig => cloneConfig(getOrCreateConfig(ref))
+const resolveAuthClientContext = async (ref: string): Promise<AuthClientContext> => {
+  const project = await db
+    .selectFrom('projects')
+    .select(['ref', 'rest_url', 'service_key'])
+    .where('ref', '=', ref)
+    .executeTakeFirst()
 
-export const updateAuthConfig = (ref: string, body: unknown): GoTrueConfig => {
-  if (body && typeof body === 'object') {
-    applyPatch(ref, body as Partial<AuthConfigUpdate>)
+  if (!project) {
+    throw new Error(`Project ${ref} not found when resolving auth config`)
   }
+
+  const baseRestUrl = project.rest_url ?? `https://${project.ref}.supabase.local/rest/v1/`
+  const normalizedBase = baseRestUrl.replace(REST_PATH_SUFFIX, '')
+  const trimmedBase = normalizedBase.replace(/\/+$/, '')
+  const authBaseUrl = `${trimmedBase}/auth/v1`
+
+  if (!project.service_key) {
+    throw new Error(`Project ${ref} is missing a service role key for auth config access`)
+  }
+
+  return { authBaseUrl, serviceKey: project.service_key }
+}
+
+type GoTrueRequestOptions = {
+  method: 'GET' | 'PATCH'
+  path: string
+  body?: unknown
+}
+
+const performGoTrueRequest = async <T>(
+  ref: string,
+  { method, path, body }: GoTrueRequestOptions
+): Promise<T> => {
+  const { authBaseUrl, serviceKey } = await resolveAuthClientContext(ref)
+
+  const url = new URL(path.replace(/^\/+/, ''), `${authBaseUrl.replace(/\/+$/, '')}/`)
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+  }
+
+  const requestInit: RequestInit = {
+    method,
+    headers,
+  }
+
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    requestInit.body = JSON.stringify(body)
+  }
+
+  const response = await fetch(url, requestInit)
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText)
+    throw new GoTrueRequestError(
+      `GoTrue request ${method} ${url.pathname} failed with ${response.status}`,
+      response.status,
+      url.pathname,
+      message
+    )
+  }
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  const text = await response.text()
+  if (text.length === 0) {
+    return undefined as T
+  }
+
+  try {
+    return JSON.parse(text) as T
+  } catch (error) {
+    throw new GoTrueRequestError(
+      `Failed to parse GoTrue response from ${url.pathname}`,
+      response.status,
+      url.pathname,
+      text
+    )
+  }
+}
+
+const requestGoTrueWithFallback = async <T>(
+  ref: string,
+  method: 'GET' | 'PATCH',
+  paths: string[],
+  body?: unknown
+): Promise<T> => {
+  let lastError: GoTrueRequestError | undefined
+
+  for (const path of paths) {
+    try {
+      return await performGoTrueRequest<T>(ref, { method, path, body })
+    } catch (error) {
+      if (error instanceof GoTrueRequestError && error.status === 404) {
+        lastError = error
+        continue
+      }
+      throw error
+    }
+  }
+
+  if (lastError) {
+    throw lastError
+  }
+
+  throw new Error(`GoTrue request ${method} for ${ref} failed for all candidate paths: ${paths.join(', ')}`)
+}
+
+const mergeConfigWithDefaults = (
+  ref: string,
+  payload: Record<string, unknown> | undefined
+): GoTrueConfig => {
+  const defaults = computeDefaultConfig(ref)
+  if (!payload || typeof payload !== 'object') {
+    return cloneConfig(defaults)
+  }
+
+  const result: GoTrueConfig = { ...defaults }
+  for (const key of CONFIG_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(payload, key)) {
+      ;(result as Record<string, unknown>)[key as string] = (payload as Record<string, unknown>)[
+        key as string
+      ]
+    }
+  }
+
+  return result
+}
+
+const sanitizePatchPayload = <T extends Record<string, unknown>>(payload: T | undefined) => {
+  if (!payload) return {}
+  const entries = Object.entries(payload).filter(([, value]) => value !== undefined)
+  return Object.fromEntries(entries)
+}
+
+const AUTH_SETTINGS_PATHS = ['admin/settings', 'settings']
+const AUTH_HOOKS_PATHS = ['admin/settings/hooks', 'admin/hooks']
+
+export const getAuthConfig = async (ref: string): Promise<GoTrueConfig> => {
+  try {
+    const payload = await requestGoTrueWithFallback<Record<string, unknown> | undefined>(
+      ref,
+      'GET',
+      AUTH_SETTINGS_PATHS
+    )
+    return mergeConfigWithDefaults(ref, payload)
+  } catch (error) {
+    console.error('[platform-api] failed to load auth config from GoTrue', { ref, error })
+    return computeDefaultConfig(ref)
+  }
+}
+
+export const updateAuthConfig = async (ref: string, body: unknown): Promise<GoTrueConfig> => {
+  const patchBody =
+    body && typeof body === 'object'
+      ? sanitizePatchPayload(body as Partial<AuthConfigUpdate>)
+      : {}
+
+  const payload = await requestGoTrueWithFallback<Record<string, unknown> | undefined>(
+    ref,
+    'PATCH',
+    AUTH_SETTINGS_PATHS,
+    patchBody
+  )
+
+  return mergeConfigWithDefaults(ref, payload)
+}
+
+export const updateAuthHooks = async (ref: string, body: unknown): Promise<GoTrueConfig> => {
+  const patchBody =
+    body && typeof body === 'object'
+      ? sanitizePatchPayload(body as Partial<AuthHooksUpdate>)
+      : {}
+
+  await requestGoTrueWithFallback<Record<string, unknown> | undefined>(
+    ref,
+    'PATCH',
+    AUTH_HOOKS_PATHS,
+    patchBody
+  )
+
   return getAuthConfig(ref)
-}
-
-export const updateAuthHooks = (ref: string, body: unknown) => {
-  if (body && typeof body === 'object') {
-    applyPatch(ref, body as Partial<AuthHooksUpdate>)
-  }
-  return {
-    webhook_secret: 'stub-webhook-secret',
-    events: [],
-  }
 }
