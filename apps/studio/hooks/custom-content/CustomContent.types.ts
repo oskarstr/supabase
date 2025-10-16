@@ -43,6 +43,20 @@ export type CustomContentTypes = {
         defaultEnabled?: boolean
       }[]
     | null
+  projectCreationDeploymentTargetOptions:
+    | {
+        id: string
+        label?: string
+        description?: string
+        badge?: string
+        docsUrl?: string
+        defaults?: {
+          cloudProvider?: CloudProvider | 'LOCAL'
+          dbRegion?: string
+          instanceSize?: string
+        }
+      }[]
+    | null
 
   sslCertificateUrl: string
 }
