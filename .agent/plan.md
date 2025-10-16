@@ -10,6 +10,7 @@
 - Audit authentication/authorization touchpoints for the superuser (env-defined admin) versus scoped users to understand required guards in the orchestrator.
 - Catalogue failure/retry surfaces (runtime-agent errors, network timeouts, health polling) and how they propagate back to Studio.
 - Compare our implementation with upstream Supabase runtime behaviour to note deliberate divergences we must justify or eventually upstream.
+- Investigate lingering Studio permission banner: despite platform schema grants (migration `20250421084702_platform_grants.sql` + seed re-grants) the default admin still sees “You need additional permissions...”. Confirm Kong/GoTrue session or permissions API isn’t dropping slugs/refs.
 
 ### Phase 4 – Provisioning Integration *(in progress)*
 - Async lifecycle hooks mark `COMING_UP → ACTIVE_HEALTHY` (or failure states) and read generated `.env` files when available.
