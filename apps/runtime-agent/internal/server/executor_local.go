@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"sync"
@@ -19,12 +20,32 @@ import (
 	"github.com/supabase/supabase/apps/runtime-agent/pkg/config"
 )
 
+type supabaseRunner interface {
+	Start(ctx context.Context, fsys afero.Fs, excluded []string, ignoreHealth bool) error
+	Stop(ctx context.Context, backup bool, projectRef string, all bool, fsys afero.Fs) error
+}
+
+type cliRunner struct{}
+
+func (cliRunner) Start(ctx context.Context, fsys afero.Fs, excluded []string, ignoreHealth bool) error {
+	return start.Run(ctx, fsys, excluded, ignoreHealth)
+}
+
+func (cliRunner) Stop(ctx context.Context, backup bool, projectRef string, all bool, fsys afero.Fs) error {
+	return stop.Run(ctx, backup, projectRef, all, fsys)
+}
+
 type localExecutor struct {
-	mu sync.Mutex
+	mu     sync.Mutex
+	runner supabaseRunner
 }
 
 func newLocalExecutor() *localExecutor {
-	return &localExecutor{}
+	return &localExecutor{runner: cliRunner{}}
+}
+
+func newLocalExecutorWithRunner(r supabaseRunner) *localExecutor {
+	return &localExecutor{runner: r}
 }
 
 func (e *localExecutor) Provision(ctx context.Context, req provisionRequest) (operationResult, error) {
@@ -33,8 +54,13 @@ func (e *localExecutor) Provision(ctx context.Context, req provisionRequest) (op
 
 	return e.runWithLogs(func() error {
 		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, req.NetworkID, func(fsys afero.Fs) error {
+			const backupVolumes = false
+			if err := e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys); err != nil && !isNotRunningError(err) {
+				return err
+			}
+
 			excluded := append([]string(nil), req.ExcludedServices...)
-			return start.Run(ctx, fsys, excluded, req.IgnoreHealthCheck)
+			return e.runner.Start(ctx, fsys, excluded, req.IgnoreHealthCheck)
 		})
 	})
 }
@@ -46,7 +72,7 @@ func (e *localExecutor) Stop(ctx context.Context, req stopRequest) (operationRes
 	return e.runWithLogs(func() error {
 		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
 			const backupVolumes = false
-			return stop.Run(ctx, backupVolumes, req.ProjectRef, false, fsys)
+			return e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys)
 		})
 	})
 }
@@ -58,7 +84,7 @@ func (e *localExecutor) Destroy(ctx context.Context, req destroyRequest) (operat
 	return e.runWithLogs(func() error {
 		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
 			const backupVolumes = false
-			return stop.Run(ctx, backupVolumes, req.ProjectRef, false, fsys)
+			return e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys)
 		})
 	})
 }
@@ -147,6 +173,16 @@ func (e *localExecutor) withProjectEnvironment(
 
 	fsys := afero.NewOsFs()
 	return fn(fsys)
+}
+
+func isNotRunningError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, utils.ErrNotRunning) {
+		return true
+	}
+	return err.Error() == utils.ErrNotRunning.Error()
 }
 
 func resetSupabaseGlobals() {
