@@ -1,5 +1,3 @@
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 import { prepareSupabaseRuntime } from './provisioning/runtime.js'
@@ -42,7 +40,6 @@ const parseDelay = (value: string | undefined, fallback: number) => {
 
 const PROVISION_DELAY_MS = parseDelay(process.env.PROVISIONING_DELAY_MS, 1_000)
 const DESTRUCTION_DELAY_MS = parseDelay(process.env.DESTRUCTION_DELAY_MS, 1_000)
-const SUPABASE_BIN = process.env.SUPABASE_CLI_PATH?.trim() || 'supabase'
 const ORCHESTRATOR_URL = process.env.PLATFORM_ORCHESTRATOR_URL?.trim() || ''
 const ORCHESTRATOR_TOKEN = process.env.PLATFORM_ORCHESTRATOR_TOKEN?.trim()
 
@@ -129,31 +126,6 @@ const useOrchestrator = () => {
   }
 }
 
-const runSupabaseCli = async (
-  args: string[],
-  options: { cwd: string; env?: Record<string, string> }
-) => {
-  const { spawn } = await import('node:child_process')
-
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(SUPABASE_BIN, args, {
-      stdio: 'inherit',
-      cwd: options.cwd,
-      env: {
-        ...process.env,
-        SUPABASE_TELEMETRY_DISABLED: 'true',
-        ...options.env,
-      },
-    })
-
-    child.on('error', reject)
-    child.on('exit', (code) => {
-      if (code === 0) resolve()
-      else reject(new Error(`supabase ${args.join(' ')} exited with code ${code}`))
-    })
-  })
-}
-
 export async function provisionProjectStack(context: ProvisionContext) {
   const logEnabled = process.env.PLATFORM_API_LOG_PROVISIONING === 'true'
   if (logEnabled) {
@@ -167,6 +139,11 @@ export async function provisionProjectStack(context: ProvisionContext) {
     projectRoot: context.projectRoot,
     databasePassword: context.databasePassword,
   })
+
+  if (process.env.FAIL_PROVISIONING === 'true') {
+    await sleep(PROVISION_DELAY_MS)
+    throw new Error('Provisioning failed due to FAIL_PROVISIONING flag')
+  }
 
   const explicitNetwork = process.env.PLATFORM_DOCKER_NETWORK?.trim()
   const composeProject = process.env.COMPOSE_PROJECT_NAME?.trim()
@@ -199,6 +176,11 @@ export async function provisionProjectStack(context: ProvisionContext) {
         duration_ms: response.result.duration_ms,
       })
     }
+    if (response?.status !== 'completed') {
+      throw new Error(
+        `orchestrator did not return a completed status (received: ${response?.status ?? 'unknown'})`
+      )
+    }
   } else if (process.env.PLATFORM_API_PROVISION_CMD) {
     const provisionCommand = process.env.PLATFORM_API_PROVISION_CMD
     await runCommand(
@@ -215,39 +197,9 @@ export async function provisionProjectStack(context: ProvisionContext) {
       { cwd: context.projectRoot }
     )
   } else {
-    if (process.env.FAIL_PROVISIONING === 'true') {
-      await sleep(PROVISION_DELAY_MS)
-      throw new Error('Provisioning failed due to FAIL_PROVISIONING flag')
-    }
-
-    try {
-      await runSupabaseCli(['stop', '--yes'], {
-        cwd: context.projectRoot,
-      })
-    } catch (error) {
-      if (logEnabled) {
-        console.warn('[provisioning] initial stop failed (continuing)', {
-          ref: context.ref,
-          error,
-        })
-      }
-    }
-
-    // NOTE: Until the platform owns provisioning end-to-end, we rely on the Supabase CLI to
-    // bootstrap the local stack. We bind it to the same docker network as our compose overlay so
-    // the control plane can talk to the runtime without host-only port shims. Once the dedicated
-    // orchestrator lands, this call becomes the integration point to swap the backend out.
-    // The CLI probes 127.0.0.1 from inside its process, which fails when it runs inside the
-    // platform-api container. We skip that built-in probe and run platform-managed health checks
-    // instead so the future orchestrator can plug into the same lifecycle.
-    const startArgs = ['start', '--ignore-health-check', '--yes', '--network-id', networkId]
-    if (context.excludedServices.length > 0) {
-      startArgs.push('-x', context.excludedServices.join(','))
-    }
-
-    await runSupabaseCli(startArgs, {
-      cwd: context.projectRoot,
-    })
+    throw new Error(
+      'Runtime orchestrator not configured. Set PLATFORM_ORCHESTRATOR_URL or PLATFORM_API_PROVISION_CMD.'
+    )
   }
 
   if (logEnabled) {
@@ -259,6 +211,11 @@ export async function destroyProjectStack(context: DestroyContext) {
   const logEnabled = process.env.PLATFORM_API_LOG_PROVISIONING === 'true'
   if (logEnabled) {
     console.log('[provisioning] destroy start', context)
+  }
+
+  if (process.env.FAIL_DESTRUCTION === 'true') {
+    await sleep(DESTRUCTION_DELAY_MS)
+    throw new Error('Destruction failed due to FAIL_DESTRUCTION flag')
   }
 
   const orchestrator = useOrchestrator()
@@ -275,6 +232,11 @@ export async function destroyProjectStack(context: DestroyContext) {
         duration_ms: response.result.duration_ms,
       })
     }
+    if (response?.status !== 'completed') {
+      throw new Error(
+        `orchestrator did not return a completed status (received: ${response?.status ?? 'unknown'})`
+      )
+    }
   } else if (process.env.PLATFORM_API_DESTROY_CMD) {
     const destroyCommand = process.env.PLATFORM_API_DESTROY_CMD
     await runCommand(
@@ -288,27 +250,9 @@ export async function destroyProjectStack(context: DestroyContext) {
       { cwd: context.projectRoot }
     )
   } else {
-    const supabaseDir = resolve(context.projectRoot, 'supabase')
-    if (existsSync(supabaseDir)) {
-      try {
-        await runSupabaseCli(['stop', '--yes'], {
-          cwd: context.projectRoot,
-        })
-      } catch (error) {
-        if (process.env.FAIL_DESTRUCTION === 'true') {
-          throw error
-        }
-        console.warn('[provisioning] supabase stop failed during destroy', {
-          ref: context.ref,
-          error,
-        })
-      }
-    }
-
-    if (process.env.FAIL_DESTRUCTION === 'true') {
-      await sleep(DESTRUCTION_DELAY_MS)
-      throw new Error('Destruction failed due to FAIL_DESTRUCTION flag')
-    }
+    throw new Error(
+      'Runtime orchestrator not configured. Set PLATFORM_ORCHESTRATOR_URL or PLATFORM_API_DESTROY_CMD.'
+    )
   }
 
   if (logEnabled) {
@@ -340,10 +284,13 @@ export async function stopProjectStack(context: StopContext) {
         duration_ms: response.result.duration_ms,
       })
     }
+    if (response?.status !== 'completed') {
+      throw new Error(
+        `orchestrator did not return a completed status (received: ${response?.status ?? 'unknown'})`
+      )
+    }
   } else {
-    await runSupabaseCli(['stop', '--yes'], {
-      cwd: context.projectRoot,
-    })
+    throw new Error('Runtime orchestrator not configured. Set PLATFORM_ORCHESTRATOR_URL.')
   }
 
   if (logEnabled) {

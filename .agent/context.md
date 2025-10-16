@@ -7,13 +7,37 @@
 - Introduce test seams: dependency-injected provisioner/destroyer and deterministic failure toggles to enable mocked provisioning in contract tests.
 - Align Studio’s project wizard with the control plane by serving deployment targets via API/custom content, clamping LOCAL defaults, and surfacing user guidance.
 
+## System Mapping *(2025-10-15 · codex)*
+
+### High-level flow
+1. **Studio (apps/studio)** – Initiates project create/pause/resume/destroy via the project wizard. Requests hit Kong, which proxies `/api/platform/**` to the control plane (`platform-api`). Studio expects per-service health telemetry and generated credentials to hydrate UI state.
+2. **Platform API (apps/platform-api)** – Fastify service backed by Postgres. Handles provisioning endpoints, persists runtime metadata to `project_runtimes`, prepares filesystem roots under `${PLATFORM_PROJECTS_ROOT}` (`docker/docker-compose.platform*.yml` mounts this to the host `platform-projects/` directory), and orchestrates provisioning via either the runtime agent, custom shell hooks, or direct Supabase CLI calls.
+3. **Runtime Agent (apps/runtime-agent)** – Go HTTP service mounted in compose as `runtime-agent`. Receives `/v1/projects/*` commands from platform-api when `PLATFORM_ORCHESTRATOR_URL` is set. Internally shells out to the mirrored Supabase CLI packages (`internal/start`, `internal/stop`) while capturing stdout/stderr/duration metadata. Requires host Docker socket, runtime directory mount, and a hostname override (`RUNTIME_AGENT_SUPABASE_HOST`) so CLI health checks target the gateway.
+4. **Supabase CLI / Docker** – CLI executes `supabase start/stop` against the runtime project directory. Docker resources live on the compose network determined by either `PLATFORM_DOCKER_NETWORK` or `${COMPOSE_PROJECT_NAME}_default`, allowing the control plane to reach service containers without additional port shims.
+5. **Persistence and Secrets** – Provisioning reads/writes `.env` files under each project runtime (`apps/platform-api/src/store/projects.ts`), storing derived data back to Postgres for Studio consumption. Superuser credentials come from env (`SUPABASE_DB_URL`, admin email/password) and must remain synchronized with the db container’s password-sync entrypoint.
+
+### Key contracts & dependencies
+- **Project runtime roots**: `prepareSupabaseRuntime` ensures directories and baseline config exist before orchestration. Missing roots or drifted `.env` values lead to CLI misconfigurations; health polling relies on these env files being up to date.
+- **Network expectations**: Runtime agent enforces `network_id` and resets Viper global state before invoking CLI commands; failure to set `RUNTIME_AGENT_SUPABASE_HOST` causes health probes to hit `127.0.0.1` and fail inside containers.
+- **Auth model**: Single superuser derived from environment variables must retain unrestricted access (platform API seeds enforce this). Other users map to org/project scopes; provisioning responses should never leak superuser credentials beyond intended consumers.
+- **Fallback execution paths**: Platform-api now requires the runtime agent (or explicit override hooks) for lifecycle operations; the Supabase CLI is no longer bundled in the platform image. Custom `PLATFORM_API_PROVISION_CMD`/`DESTROY_CMD` hooks remain supported and must mimic the orchestrator’s side-effects.
+- **Telemetry/logging**: Agent returns structured logs (`stdout`, `stderr`, `duration_ms`); platform-api conditionally logs them when `PLATFORM_API_LOG_PROVISIONING` is enabled. Downstream tests should assert on these fields rather than raw console output.
+
+### Risks & weak points
+- **Global CLI state leakage**: Runtime agent mutates Viper globals and process env per request; if a panic or early return occurs before `resetSupabaseGlobals`, subsequent commands may inherit stale config.
+- **Credential drift**: Platform-api and runtime agent both depend on `.env`-driven passwords. Any external mutation (manual `psql` changes, CLI resets) can desynchronize `SUPABASE_DB_URL` secrets; compose’s password-sync wrapper mitigates but does not eliminate this risk.
+- **Health enforcement gaps**: Agent currently runs with `ignore_health_check` true; platform-api is responsible for post-start polling (`apps/platform-api/src/provisioning/health.ts`). Missing or flaky health probes can leave Studio reporting success while services remain unhealthy.
+- **Timeout handling**: `RUNTIME_AGENT_COMMAND_TIMEOUT` defaults to 15m; platform-api lacks matching client-side timeouts when calling the orchestrator, risking hanging requests if the agent wedges.
+- **Docker socket dependency**: Both platform-api (when falling back to CLI) and runtime-agent require Docker socket access. Host permission issues or socket contention will cause opaque CLI failures unless surfaced through richer error handling.
+
 ## Key Facts
 - **Goal**: restore multi-project management to the open-source distribution without forking upstream Studio; the control plane lives in `apps/platform-api`.
 - **Architecture**: Fastify + TypeScript service backed by Postgres (Kysely). Boot runs migrations (`apps/platform-api/migrations`) and seeds core data (`db/seed.ts`).
-- **Provisioning**: Supabase CLI is bundled in the platform-api image (`b5ca522836`) and runs against a host-visible `platform-projects/` directory with shared Docker networking (`12c266ec81`).
+- **Provisioning**: The runtime agent executes the mirrored Supabase CLI packages in-process against a host-visible `platform-projects/` directory with shared Docker networking (`12c266ec81`), eliminating the need for the `supabase` binary inside platform-api.
 - **Runtime agent**: A standalone Go HTTP service (`apps/runtime-agent`) now accepts provision/stop/destroy requests so the control plane can talk to a host-visible orchestrator over HTTP instead of shelling out directly. Supabase CLI internal packages are mirrored under `apps/runtime-agent/internal/...` and the agent executes them in-process, returning structured stdout/stderr/duration metadata to callers. Compose overlays (`docker/docker-compose.platform*.yml`) run this service as `runtime-agent` with Docker socket + `platform-projects/` mounts so platform-api can reach it via `PLATFORM_ORCHESTRATOR_URL=http://runtime-agent:8085`.
 - **Local runtime defaults**: Platform API now excludes `logflare` and `vector` by default when provisioning local projects to avoid port collisions with the base Supabase stack. Projects still surface the exclude list via `local_runtime.exclude_services`.
 - **Known issue**: The platform API connects to the main Postgres instance using `SUPABASE_DB_URL`; that password occasionally drifts when other components mutate the `postgres` role. If API responses start returning `28P01`, reset the password inside the DB container (`psql -U supabase_admin -c "ALTER USER postgres WITH PASSWORD '…';"`). A long-term fix is still pending.
+- **Runtime authentication**: The runtime agent enforces `Authorization: Bearer <token>` when `RUNTIME_AGENT_AUTH_TOKEN` is set. Compose defaults wire this through `PLATFORM_ORCHESTRATOR_TOKEN` so platform-api and the agent share the same secret.
 - **Studio integration**: Docker compose overlays route `/api/platform/**` via Kong. The project wizard can expose local/remote deployment targets, currently gated by `NEXT_PUBLIC_PLATFORM_ENABLE_LOCAL_TARGET`.
 - **Auth/Kong**: Kong entrypoint injects the anonymous consumer, preserving Studio’s stock AuthClient flow (`/auth/v1/**` mirrors Supabase Cloud).
 
@@ -26,8 +50,7 @@
 - do not commit before user has tested functionality or given feedback.
 - Minimize upstream Studio/infra edits: prefer data-driven overrides (custom content, env flags) and only touch upstream components when absolutely unavoidable—document any divergence.
 - Custom Studio UI tweaks should be driven by custom content keys (e.g. `project_creation:deployment_targets`, `project_creation:local_runtime_services`) plus platform guards (`NEXT_PUBLIC_IS_PLATFORM`). Keep JSX additions minimal and gated so upstream builds remain unchanged when the content keys are absent.
-- Provisioning still shells out to the Supabase CLI inside the platform container. Because the CLI’s health probes are hardcoded to `127.0.0.1`, we currently rely on a `socat` port forward hack. Long-term fix is to move provisioning into a host-side agent (or native orchestrator) that drives Docker directly; note this in Phase 4 roadmap.
-- Set `PLATFORM_ORCHESTRATOR_URL` (and optional `PLATFORM_ORCHESTRATOR_TOKEN`) to route provisioning calls through the runtime agent; the platform falls back to CLI shell-outs when the agent is unavailable. The agent shells out to the Supabase CLI binary (configure via `RUNTIME_AGENT_SUPABASE_CLI_PATH`) so it should run in a container with `/var/run/docker.sock` mounted and host networking enabled.
+- Provisioning now routes through the runtime agent; ensure the compose overlay exposes Docker socket access to the agent container and keep `PLATFORM_ORCHESTRATOR_URL`/`PLATFORM_ORCHESTRATOR_TOKEN` in sync with the server’s auth settings.
 
 ## Gotchas & Quick Tips
 - Project creation requires `organization_slug` and assumes async provisioning; the API intentionally ignores raw `organization_id`. Tests must inject slugs or create orgs first.
@@ -35,6 +58,7 @@
 - Studio wizard toggles `LOCAL` via feature flag, but the long-term source of truth should be platform API custom content; don’t hardcode local-only logic in React components.
 - Custom content now surfaces the `local` deployment target and runtime toggles; `logflare`/`vector` default to off but can be re-enabled from the wizard.
 - Platform API shares the stack’s `SUPABASE_DB_URL`; the db container now wraps the Supabase image with a tiny password-sync entrypoint so restarting `db` re-applies the `.env` password.
+- Platform API images and dev containers no longer install the Supabase CLI; all provisioning flows must go through the runtime agent or the scripted override hooks.
 - Kong patch auto-injects the anonymous consumer; avoid editing upstream Kong templates directly.
 - Studio container must talk to the host’s Kong via `host.docker.internal`; use that host in `NEXT_PUBLIC_*` URLs or Studio will try `127.0.0.1:8000` and fail the health check.
 - Docker’s port-forwarding occasionally wedges after compose changes; a `docker compose ... restart kong` restored `localhost:8000` when the host started getting `ERR_CONNECTION_RESET`.

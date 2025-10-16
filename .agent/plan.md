@@ -79,6 +79,7 @@
 
 ## Change Log
 - **2025-10-15 21:05 UTC · codex** – Updated Studio/Kong host URLs to `host.docker.internal` so the Studio container hits the gateway instead of `127.0.0.1`; stack comes up with Studio healthy again.
+- **2025-10-16 04:20 UTC · codex** – Removed Supabase CLI dependencies from platform-api images/compose, enforced runtime-agent bearer auth, and made orchestration flows require the agent or explicit override hooks.
 - **2025-10-15 22:02 UTC · codex** – Restarted `supabase-kong` to clear a stale Docker port-forward so `localhost:8000` stopped returning `ERR_CONNECTION_RESET`.
 - **2025-10-15 22:20 UTC · codex** – Surfaced the local deployment target + runtime toggles via custom content, aligned the wizard defaults with runtime exclusions, and fixed `normalizeExcludedServices` so opting back into Logflare/Vector works.
 - **2025-10-15 22:40 UTC · codex** – (reverted) Dedicated platform DB role experiment removed; the db service now wraps the Supabase image with a password-sync entrypoint so restarting it realigns credentials with `.env`.

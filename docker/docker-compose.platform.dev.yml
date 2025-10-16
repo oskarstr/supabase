@@ -2,22 +2,16 @@ services:
   platform-api:
     image: node:22-alpine
     environment:
-      SUPABASE_CLI_VERSION: "2.51.0"
       SUPABASE_TELEMETRY_DISABLED: "true"
       PLATFORM_API_REPO_ROOT: /workspace
       PLATFORM_PROJECTS_ROOT: ${PWD}/platform-projects
       PLATFORM_ORCHESTRATOR_URL: http://runtime-agent:8085
+      PLATFORM_ORCHESTRATOR_TOKEN: ${PLATFORM_ORCHESTRATOR_TOKEN:-supabase-runtime-agent}
       PORT: "4210"
       HOST: "0.0.0.0"
       CI: "true"
     command: >
-      sh -c "apk add --no-cache bash curl docker-cli docker-cli-compose git jq openssl tar \
-        && ARCH=$$(uname -m) \
-        && case \$$ARCH in x86_64) BIN_ARCH=amd64 ;; aarch64) BIN_ARCH=arm64 ;; *) echo 'unsupported arch' \$$ARCH && exit 1 ;; esac \
-        && curl -fsSL https://github.com/supabase/cli/releases/download/v$${SUPABASE_CLI_VERSION}/supabase_linux_$${BIN_ARCH}.tar.gz -o /tmp/supabase.tgz \
-        && tar -xzf /tmp/supabase.tgz -C /usr/local/bin supabase \
-        && chmod +x /usr/local/bin/supabase \
-        && rm /tmp/supabase.tgz \
+      sh -c "apk add --no-cache bash curl git jq openssl tar \
         && corepack enable pnpm \
         && pnpm install --filter platform-api... \
         && pnpm --filter platform-api... dev"
@@ -27,7 +21,6 @@ services:
     volumes:
       - ..:/workspace
       - platform-api-data:/workspace/apps/platform-api/data
-      - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}/platform-projects:${PWD}/platform-projects
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -46,8 +39,8 @@ services:
     environment:
       RUNTIME_AGENT_LISTEN_ADDR: ":8085"
       RUNTIME_AGENT_COMMAND_TIMEOUT: 15m
-      RUNTIME_AGENT_SUPABASE_CLI_PATH: supabase
       RUNTIME_AGENT_SUPABASE_HOST: host.docker.internal
+      RUNTIME_AGENT_AUTH_TOKEN: ${PLATFORM_ORCHESTRATOR_TOKEN:-supabase-runtime-agent}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}/platform-projects:${PWD}/platform-projects

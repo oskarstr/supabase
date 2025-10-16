@@ -1,13 +1,14 @@
 package server
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"io"
-	"net/http"
-	"strings"
-	"time"
+        "context"
+        "crypto/subtle"
+        "encoding/json"
+        "errors"
+        "io"
+        "net/http"
+        "strings"
+        "time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -51,12 +52,12 @@ func (s *Server) Stop(ctx context.Context) error {
 }
 
 func (s *Server) routes() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/projects/provision", s.handleProvision)
-	mux.HandleFunc("POST /v1/projects/stop", s.handleStop)
-	mux.HandleFunc("POST /v1/projects/destroy", s.handleDestroy)
-	mux.HandleFunc("GET /healthz", s.handleHealthz)
-	return loggingMiddleware(mux)
+        mux := http.NewServeMux()
+        mux.HandleFunc("POST /v1/projects/provision", s.requireAuth(s.handleProvision))
+        mux.HandleFunc("POST /v1/projects/stop", s.requireAuth(s.handleStop))
+        mux.HandleFunc("POST /v1/projects/destroy", s.requireAuth(s.handleDestroy))
+        mux.HandleFunc("GET /healthz", s.handleHealthz)
+        return loggingMiddleware(mux)
 }
 
 type provisionRequest struct {
@@ -159,11 +160,11 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
-	var req destroyRequest
-	if err := decodeJSON(r, &req); err != nil {
-		httpError(w, http.StatusBadRequest, "invalid json payload")
-		return
-	}
+        var req destroyRequest
+        if err := decodeJSON(r, &req); err != nil {
+                httpError(w, http.StatusBadRequest, "invalid json payload")
+                return
+        }
 	if strings.TrimSpace(req.ProjectRef) == "" {
 		httpError(w, http.StatusBadRequest, "project_ref is required")
 		return
@@ -197,7 +198,40 @@ func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+        respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
+        if strings.TrimSpace(s.cfg.AuthToken) == "" {
+                return next
+        }
+
+        expected := []byte(s.cfg.AuthToken)
+
+        return func(w http.ResponseWriter, r *http.Request) {
+                header := strings.TrimSpace(r.Header.Get("Authorization"))
+                if header == "" {
+                        log.Warn().Str("path", r.URL.Path).Msg("missing authorization header")
+                        httpError(w, http.StatusUnauthorized, "unauthorized")
+                        return
+                }
+
+                const prefix = "Bearer "
+                if len(header) <= len(prefix) || !strings.EqualFold(header[:len(prefix)], prefix) {
+                        log.Warn().Str("path", r.URL.Path).Msg("invalid authorization scheme")
+                        httpError(w, http.StatusUnauthorized, "unauthorized")
+                        return
+                }
+
+                token := strings.TrimSpace(header[len(prefix):])
+                if subtle.ConstantTimeCompare([]byte(token), expected) != 1 {
+                        log.Warn().Str("path", r.URL.Path).Msg("invalid authorization token")
+                        httpError(w, http.StatusUnauthorized, "unauthorized")
+                        return
+                }
+
+                next(w, r)
+        }
 }
 
 func validateProvisionRequest(req provisionRequest) error {
