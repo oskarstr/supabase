@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -72,7 +73,13 @@ func (e *localExecutor) Stop(ctx context.Context, req stopRequest) (operationRes
 	return e.runWithLogs(func() error {
 		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
 			const backupVolumes = false
-			return e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys)
+			if err := e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys); err != nil {
+				if isNotRunningError(err) {
+					return nil
+				}
+				return err
+			}
+			return nil
 		})
 	})
 }
@@ -84,7 +91,13 @@ func (e *localExecutor) Destroy(ctx context.Context, req destroyRequest) (operat
 	return e.runWithLogs(func() error {
 		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
 			const backupVolumes = false
-			return e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys)
+			if err := e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys); err != nil {
+				if isNotRunningError(err) {
+					return nil
+				}
+				return err
+			}
+			return nil
 		})
 	})
 }
@@ -109,6 +122,10 @@ func (e *localExecutor) runWithLogs(fn func() error) (operationResult, error) {
 
 	os.Stdout = stdoutWriter
 	os.Stderr = stderrWriter
+	defer func() {
+		os.Stdout = originalStdout
+		os.Stderr = originalStderr
+	}()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	var wg sync.WaitGroup
@@ -122,7 +139,16 @@ func (e *localExecutor) runWithLogs(fn func() error) (operationResult, error) {
 		_, _ = io.Copy(&stderrBuf, stderrReader)
 	}()
 
-	runErr := fn()
+	var runErr error
+	var panicValue any
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicValue = r
+			}
+		}()
+		runErr = fn()
+	}()
 
 	stdoutWriter.Close()
 	stderrWriter.Close()
@@ -130,12 +156,14 @@ func (e *localExecutor) runWithLogs(fn func() error) (operationResult, error) {
 	stdoutReader.Close()
 	stderrReader.Close()
 
-	os.Stdout = originalStdout
-	os.Stderr = originalStderr
-
 	result.Stdout = stdoutBuf.String()
 	result.Stderr = stderrBuf.String()
 	result.DurationMs = time.Since(startTime).Milliseconds()
+
+	if panicValue != nil {
+		return result, fmt.Errorf("executor panic: %v", panicValue)
+	}
+
 	return result, runErr
 }
 
