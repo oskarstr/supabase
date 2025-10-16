@@ -100,6 +100,21 @@ function useGetProjectPermissions(
     organizationSlugOverride === undefined ? organizationData : { slug: organizationSlugOverride }
   const organizationSlug = organization?.slug
 
+  const derivedOrganizationSlug = useMemo(() => {
+    if (organizationSlug) return organizationSlug
+    if (!permissions || permissions.length === 0) return undefined
+
+    const uniqueSlugs = Array.from(
+      new Set(
+        permissions
+          .map((permission) => permission.organization_slug)
+          .filter((slug): slug is string => typeof slug === 'string' && slug.length > 0)
+      )
+    )
+
+    return uniqueSlugs.length === 1 ? uniqueSlugs[0] : undefined
+  }, [organizationSlug, permissions])
+
   const { ref: urlProjectRef } = useParams()
   const getProjectDataFromParamsRef = !!urlProjectRef && projectRefOverride === undefined && enabled
   const {
@@ -116,6 +131,24 @@ function useGetProjectPermissions(
 
   const projectRef = project?.parent_project_ref ? project.parent_project_ref : project?.ref
 
+  const derivedProjectRef = useMemo(() => {
+    if (projectRef) return projectRef
+    if (!permissions || permissions.length === 0) return undefined
+
+    const projectRefs = new Set<string>()
+    for (const permission of permissions) {
+      if (Array.isArray(permission.project_refs)) {
+        for (const ref of permission.project_refs) {
+          if (typeof ref === 'string' && ref.length > 0) {
+            projectRefs.add(ref)
+          }
+        }
+      }
+    }
+
+    return projectRefs.size === 1 ? Array.from(projectRefs)[0] : undefined
+  }, [projectRef, permissions])
+
   const isLoading =
     isLoadingPermissions ||
     (getOrganizationDataFromParamsSlug && isLoadingOrganization) ||
@@ -127,8 +160,8 @@ function useGetProjectPermissions(
 
   return {
     permissions,
-    organizationSlug,
-    projectRef,
+    organizationSlug: derivedOrganizationSlug,
+    projectRef: derivedProjectRef,
     isLoading,
     isSuccess,
   }
