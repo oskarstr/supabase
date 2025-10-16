@@ -15,7 +15,7 @@
 - Async lifecycle hooks mark `COMING_UP → ACTIVE_HEALTHY` (or failure states) and read generated `.env` files when available.
 - Supabase CLI now runs inside the platform-api container with deterministic port allocation and host-visible runtime dirs (`b5ca522836`, `12c266ec81`).
 - **Open tasks**
-  - Document the full provisioning contract (status transitions, response payload fields, failure semantics) so Studio/tests share a single spec.
+- Document the full provisioning contract (status transitions, response payload fields, failure semantics) so Studio/tests share a single spec. *(Draft captured in `.agent/docs/provisioning-contract.md`; end-to-end tests still pending.)*
   - Inject provisioner/destroyer dependencies to enable mocked success/failure paths; expose a deterministic “fail next provision/destroy” toggle for testing.
   - Persist generated artefacts (anon/service keys, REST URL, connection string, port ranges, runtime root) back into Postgres.
   - Capture structured CLI output/error metadata for operators and tests.
