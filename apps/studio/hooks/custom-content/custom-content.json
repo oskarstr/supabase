@@ -57,6 +57,23 @@
   "infra:aws_nimbus_label": "AWS Nimbus",
 
   "project_creation:deployment_targets": ["remote", "local"],
+  "project_creation:deployment_target_options": [
+    {
+      "id": "remote",
+      "label": "Remote (Supabase Cloud)",
+      "description": "Deploy to Supabase-managed infrastructure."
+    },
+    {
+      "id": "local",
+      "label": "Local (this machine)",
+      "description": "Run Supabase locally using Docker Desktop.",
+      "defaults": {
+        "cloudProvider": "LOCAL",
+        "dbRegion": "local-dev"
+      },
+      "docsUrl": "https://supabase.com/docs/guides/platform/local-development"
+    }
+  ],
   "project_creation:local_runtime_services": [
     {
       "id": "studio",

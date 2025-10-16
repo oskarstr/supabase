@@ -114,6 +114,41 @@
       }
     },
 
+    "project_creation:deployment_target_options": {
+      "type": ["array", "null"],
+      "description": "Allows overriding deployment target presentation and defaults",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "badge": { "type": "string" },
+          "docsUrl": { "type": "string" },
+          "defaults": {
+            "type": "object",
+            "properties": {
+              "cloudProvider": {
+                "type": "string",
+                "description": "Cloud provider id to select when this target is chosen"
+              },
+              "dbRegion": {
+                "type": "string",
+                "description": "Database region id to select when this target is chosen"
+              },
+              "instanceSize": {
+                "type": "string",
+                "description": "Instance size to select when this target is chosen"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      }
+    },
+
     "ssl:certificate_url": {
       "type": "string",
       "description": "The URL of the SSL certificate"

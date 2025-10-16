@@ -48,6 +48,7 @@ import {
 } from 'data/projects/project-create-mutation'
 import { useSendEventMutation } from 'data/telemetry/send-event-mutation'
 import { useCustomContent } from 'hooks/custom-content/useCustomContent'
+import type { CustomContentTypes } from 'hooks/custom-content/CustomContent.types'
 import { useAsyncCheckPermissions } from 'hooks/misc/useCheckPermissions'
 import { useIsFeatureEnabled } from 'hooks/misc/useIsFeatureEnabled'
 import { useLocalStorageQuery } from 'hooks/misc/useLocalStorage'
@@ -126,6 +127,26 @@ const FALLBACK_LOCAL_RUNTIME_SERVICES = [
   },
 ]
 
+type DeploymentTargetOption =
+  NonNullable<CustomContentTypes['projectCreationDeploymentTargetOptions']>[number] & {
+    id: string
+  }
+
+const DEFAULT_DEPLOYMENT_TARGET_OPTIONS: Record<string, DeploymentTargetOption> = {
+  remote: {
+    id: 'remote',
+    label: 'Remote (Supabase Cloud)',
+  },
+  local: {
+    id: 'local',
+    label: 'Local (this machine)',
+    defaults: {
+      cloudProvider: 'LOCAL',
+      dbRegion: 'local-dev',
+    },
+  },
+}
+
 const FormSchema = z.object({
   organization: z.string({
     required_error: 'Please select an organization',
@@ -174,10 +195,12 @@ const Wizard: NextPageWithLayout = () => {
     infraCloudProviders: validCloudProviders,
     projectCreationDeploymentTargets,
     projectCreationLocalRuntimeServices,
+    projectCreationDeploymentTargetOptions,
   } = useCustomContent([
     'infra:cloud_providers',
     'project_creation:deployment_targets',
     'project_creation:local_runtime_services',
+    'project_creation:deployment_target_options',
   ])
   const isPlatform = process.env.NEXT_PUBLIC_IS_PLATFORM === 'true'
   const localRuntimeServiceOptions = isPlatform
@@ -189,6 +212,35 @@ const Wizard: NextPageWithLayout = () => {
   const defaultLocalServiceSelection = localRuntimeServiceOptions
     .filter((service) => service.defaultEnabled !== false)
     .map((service) => service.id)
+
+  const deploymentTargetOptionsMap = useMemo(() => {
+    const baseEntries = Object.entries(DEFAULT_DEPLOYMENT_TARGET_OPTIONS).map(
+      ([key, option]) => [
+        key,
+        {
+          ...option,
+          defaults: option.defaults ? { ...option.defaults } : undefined,
+        } as DeploymentTargetOption,
+      ]
+    )
+
+    const options = Object.fromEntries(baseEntries) as Record<string, DeploymentTargetOption>
+
+    projectCreationDeploymentTargetOptions?.forEach((option) => {
+      if (!option?.id) return
+      const existing = options[option.id]
+      options[option.id] = {
+        ...(existing ?? { id: option.id }),
+        ...option,
+        defaults: {
+          ...(existing?.defaults ?? {}),
+          ...(option.defaults ?? {}),
+        },
+      } as DeploymentTargetOption
+    })
+
+    return options
+  }, [projectCreationDeploymentTargetOptions])
 
   const deploymentTargets = (projectCreationDeploymentTargets ?? ['remote']).filter(
     (target, index, array) => array.indexOf(target) === index
@@ -205,6 +257,9 @@ const Wizard: NextPageWithLayout = () => {
   const defaultDeploymentTarget = deploymentTargetsWithOverrides.includes('remote')
     ? 'remote'
     : deploymentTargetsWithOverrides[0] ?? 'remote'
+
+  const defaultDeploymentTargetOption = deploymentTargetOptionsMap[defaultDeploymentTarget]
+  const defaultDeploymentTargetDefaults = defaultDeploymentTargetOption?.defaults ?? {}
 
   const showAdvancedConfig = useIsFeatureEnabled('project_creation:show_advanced_config')
 
@@ -381,11 +436,16 @@ const Wizard: NextPageWithLayout = () => {
       deploymentTarget: defaultDeploymentTarget,
       projectName: projectName || '',
       postgresVersion: '',
-      cloudProvider: PROVIDERS[defaultProvider].id,
+      cloudProvider:
+        defaultDeploymentTargetDefaults.cloudProvider ??
+        (defaultDeploymentTarget === 'local' ? 'LOCAL' : PROVIDERS[defaultProvider].id),
       dbPass: '',
       dbPassStrength: 0,
-      dbRegion: defaultRegion || undefined,
-      instanceSize: sizes[0],
+      dbRegion:
+        defaultDeploymentTargetDefaults.dbRegion ??
+        (defaultDeploymentTarget === 'local' ? 'local-dev' : defaultRegion || undefined),
+      instanceSize:
+        defaultDeploymentTargetDefaults.instanceSize ?? sizes[0],
       dataApi: true,
       useApiSchema: false,
       postgresVersionSelection: '',
@@ -395,7 +455,56 @@ const Wizard: NextPageWithLayout = () => {
   })
 
   const { instanceSize, cloudProvider, dbRegion, organization, deploymentTarget } = form.watch()
+  const selectedDeploymentTargetOption = deploymentTargetOptionsMap[deploymentTarget]
   const isLocalDeployment = deploymentTarget === 'local'
+  const deploymentTargetDescription = selectedDeploymentTargetOption?.description
+  const deploymentTargetDocsUrl = selectedDeploymentTargetOption?.docsUrl
+  const deploymentTargetDescriptionNode =
+    deploymentTargetDescription || deploymentTargetDocsUrl ? (
+      <span>
+        {deploymentTargetDescription ?? 'Choose where new services should run.'}
+        {deploymentTargetDocsUrl && (
+          <>
+            {' '}
+            <InlineLink
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-inherit hover:text-foreground transition-colors"
+              href={deploymentTargetDocsUrl}
+            >
+              Learn more
+            </InlineLink>
+          </>
+        )}
+      </span>
+    ) : (
+      'Choose where new services should run.'
+    )
+  const applyDeploymentTargetDefaults = (target: string) => {
+    const option = deploymentTargetOptionsMap[target]
+    const defaults = option?.defaults ?? {}
+
+    const fallbackRemoteProvider = PROVIDERS[defaultProvider].id
+    const fallbackRemoteRegion =
+      defaultRegion ?? PROVIDERS[defaultProvider].default_region.displayName
+
+    const derivedCloudProvider =
+      defaults.cloudProvider ?? (target === 'local' ? 'LOCAL' : fallbackRemoteProvider)
+    const derivedRegion =
+      defaults.dbRegion ?? (target === 'local' ? 'local-dev' : fallbackRemoteRegion)
+
+    if (derivedCloudProvider) {
+      form.setValue('cloudProvider', derivedCloudProvider, { shouldValidate: true })
+    }
+
+    if (derivedRegion) {
+      form.setValue('dbRegion', derivedRegion, { shouldValidate: true })
+    }
+
+    if (defaults.instanceSize) {
+      form.setValue('instanceSize', defaults.instanceSize, { shouldValidate: true })
+    }
+  }
   const dbRegionExact = smartRegionToExactRegion(dbRegion)
 
   const availableOrioleVersion = useAvailableOrioleImageVersion(
@@ -797,32 +906,12 @@ const Wizard: NextPageWithLayout = () => {
                             <FormItemLayout
                               label="Deployment target"
                               layout="horizontal"
-                              description="Choose where new services should run."
+                              description={deploymentTargetDescriptionNode}
                             >
                               <Select_Shadcn_
                                 onValueChange={(value) => {
                                   field.onChange(value)
-
-                                  if (value === 'local') {
-                                    form.setValue('cloudProvider', 'LOCAL', {
-                                      shouldValidate: true,
-                                    })
-                                    form.setValue('dbRegion', 'local-dev', {
-                                      shouldValidate: true,
-                                    })
-                                  } else {
-                                    const remoteProvider = PROVIDERS[defaultProvider].id
-                                    const fallbackRegion =
-                                      defaultRegion ??
-                                      PROVIDERS[defaultProvider].default_region.displayName
-
-                                    form.setValue('cloudProvider', remoteProvider, {
-                                      shouldValidate: true,
-                                    })
-                                    form.setValue('dbRegion', fallbackRegion, {
-                                      shouldValidate: true,
-                                    })
-                                  }
+                                  applyDeploymentTargetDefaults(value)
                                 }}
                                 value={field.value}
                               >
@@ -832,13 +921,17 @@ const Wizard: NextPageWithLayout = () => {
                                   </SelectTrigger_Shadcn_>
                                 </FormControl_Shadcn_>
                                 <SelectContent_Shadcn_>
-                                  {deploymentTargetsWithOverrides.map((target) => (
-                                    <SelectItem_Shadcn_ key={target} value={target}>
-                                      {target === 'local'
-                                        ? 'Local (this machine)'
-                                        : 'Remote (Supabase Cloud)'}
-                                    </SelectItem_Shadcn_>
-                                  ))}
+                                  {deploymentTargetsWithOverrides.map((target) => {
+                                    const option = deploymentTargetOptionsMap[target]
+                                    return (
+                                      <SelectItem_Shadcn_ key={target} value={target}>
+                                        {option?.label ??
+                                          (target === 'local'
+                                            ? 'Local (this machine)'
+                                            : 'Remote (Supabase Cloud)')}
+                                      </SelectItem_Shadcn_>
+                                    )
+                                  })}
                                 </SelectContent_Shadcn_>
                               </Select_Shadcn_>
                             </FormItemLayout>
