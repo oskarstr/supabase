@@ -60,6 +60,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      '@rollup/rollup-darwin-arm64':
+        specifier: 4.50.2
+        version: 4.50.2
     devDependencies:
       '@aws-sdk/client-secrets-manager':
         specifier: ^3.410.0
@@ -27754,8 +27758,7 @@ snapshots:
   '@rollup/rollup-darwin-arm64@4.38.0':
     optional: true
 
-  '@rollup/rollup-darwin-arm64@4.50.2':
-    optional: true
+  '@rollup/rollup-darwin-arm64@4.50.2': {}
 
   '@rollup/rollup-darwin-x64@4.38.0':
     optional: true
