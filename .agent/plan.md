@@ -54,7 +54,7 @@
 
 ### Phase 5 – Docker & Compose Integration ✅
 - Production overlay (`docker-compose.platform.yml`) adds the platform service and routes traffic through Kong.
-- Platform API now runs via the host dev server (`pnpm --filter platform-api dev`); the Docker dev overlay was removed to avoid node_modules/esbuild mismatch.
+- Platform API now runs via the host dev server (`pnpm --filter platform-api dev`); the Docker dev overlay was removed to avoid node_modules/esbuild mismatch. Use `scripts/platform-stack.sh` to sync env files, validate secrets, re-apply platform grants, and launch/tear down the stack consistently.
 - Added `docker/.env.platform.example` capturing required platform variables.
 
 ## Backlog & Future Phases

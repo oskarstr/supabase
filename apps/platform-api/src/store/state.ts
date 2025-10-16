@@ -164,11 +164,16 @@ const defaultState = (): State => {
   }
 }
 
+const writeStateToDisk = (current: State) => {
+  ensureDataDir()
+  writeFileSync(STATE_FILE, JSON.stringify(current, null, 2), 'utf-8')
+}
+
 const loadState = (): State => {
   ensureDataDir()
   if (!existsSync(STATE_FILE)) {
     const initial = defaultState()
-    saveState(initial)
+    writeStateToDisk(initial)
     return initial
   }
 
@@ -218,11 +223,10 @@ const loadState = (): State => {
   }
 }
 
-export const state: State = loadState()
+export let state: State = loadState()
 
 export const saveState = (current: State = state) => {
-  ensureDataDir()
-  writeFileSync(STATE_FILE, JSON.stringify(current, null, 2), 'utf-8')
+  writeStateToDisk(current)
 }
 
 export const ensureProjectRuntime = (ref: string): ProjectRuntime => {

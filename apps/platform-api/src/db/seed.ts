@@ -379,6 +379,25 @@ export const seedDefaults = async () => {
     }
   })
 
+  // Ensure superuser access to the platform schema so admin accounts retain
+  // visibility after resets.
+  const grantStatements = [
+    sql`grant usage on schema platform to postgres`,
+    sql`grant all privileges on all tables in schema platform to postgres`,
+    sql`grant all privileges on all sequences in schema platform to postgres`,
+    sql`alter default privileges in schema platform grant all on tables to postgres`,
+    sql`alter default privileges in schema platform grant all on sequences to postgres`,
+    sql`grant usage on schema platform to supabase_admin`,
+    sql`grant all privileges on all tables in schema platform to supabase_admin`,
+    sql`grant all privileges on all sequences in schema platform to supabase_admin`,
+    sql`alter default privileges in schema platform grant all on tables to supabase_admin`,
+    sql`alter default privileges in schema platform grant all on sequences to supabase_admin`,
+  ] as const
+
+  for (const statement of grantStatements) {
+    await statement.execute(db)
+  }
+
   await ensureAdminAuthUser(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD)
 
   console.log('[platform-db] default seed complete')

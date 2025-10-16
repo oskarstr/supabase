@@ -21,8 +21,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      - db
-      - runtime-agent
+      db:
+        condition: service_healthy
+      runtime-agent:
+        condition: service_started
+      kong:
+        condition: service_healthy
     restart: unless-stopped
     container_name: platform
 
