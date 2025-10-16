@@ -75,7 +75,6 @@ import {
   FormControl_Shadcn_,
   FormField_Shadcn_,
   Input_Shadcn_,
-  Checkbox_Shadcn_,
   Select_Shadcn_,
   SelectContent_Shadcn_,
   SelectGroup_Shadcn_,
@@ -95,36 +94,15 @@ import ConfirmationModal from 'ui-patterns/Dialogs/ConfirmationModal'
 import { FormItemLayout } from 'ui-patterns/form/FormItemLayout/FormItemLayout'
 import { InfoTooltip } from 'ui-patterns/info-tooltip'
 
+import {
+  applyLocalRuntimeServicesToPayload,
+  createLocalRuntimeServicesConfig,
+  LocalRuntimeServicesField,
+} from 'components/interfaces/ProjectCreation/LocalRuntimeServicesField'
+
 const sizes: DesiredInstanceSize[] = ['micro', 'small', 'medium']
 
 const sizesWithNoCostConfirmationRequired: DesiredInstanceSize[] = ['micro', 'small']
-
-const FALLBACK_LOCAL_RUNTIME_SERVICES = [
-  {
-    id: 'studio',
-    label: 'Supabase Studio',
-    description: 'Local dashboard for managing your project (http://localhost:3000).',
-    defaultEnabled: true,
-  },
-  {
-    id: 'mailpit',
-    label: 'Mailpit',
-    description: 'SMTP capture inbox for testing email flows locally.',
-    defaultEnabled: true,
-  },
-  {
-    id: 'logflare',
-    label: 'Logflare',
-    description: 'Analytics UI used by Studio for log drains and log exploration.',
-    defaultEnabled: false,
-  },
-  {
-    id: 'vector',
-    label: 'Vector',
-    description: 'Log forwarder that ships logs into Logflare and other destinations.',
-    defaultEnabled: false,
-  },
-]
 
 const FormSchema = z.object({
   organization: z.string({
@@ -180,15 +158,14 @@ const Wizard: NextPageWithLayout = () => {
     'project_creation:local_runtime_services',
   ])
   const isPlatform = process.env.NEXT_PUBLIC_IS_PLATFORM === 'true'
-  const localRuntimeServiceOptions = isPlatform
-    ? projectCreationLocalRuntimeServices && projectCreationLocalRuntimeServices.length > 0
-      ? projectCreationLocalRuntimeServices
-      : FALLBACK_LOCAL_RUNTIME_SERVICES
-    : []
-  const localRuntimeServiceIds = localRuntimeServiceOptions.map((service) => service.id)
-  const defaultLocalServiceSelection = localRuntimeServiceOptions
-    .filter((service) => service.defaultEnabled !== false)
-    .map((service) => service.id)
+  const localRuntimeConfig = useMemo(
+    () =>
+      createLocalRuntimeServicesConfig({
+        isPlatform,
+        services: projectCreationLocalRuntimeServices,
+      }),
+    [isPlatform, projectCreationLocalRuntimeServices]
+  )
 
   const deploymentTargets = (projectCreationDeploymentTargets ?? ['remote']).filter(
     (target, index, array) => array.indexOf(target) === index
@@ -390,9 +367,32 @@ const Wizard: NextPageWithLayout = () => {
       useApiSchema: false,
       postgresVersionSelection: '',
       useOrioleDb: false,
-      localServices: defaultLocalServiceSelection,
+      localServices: localRuntimeConfig.defaultSelection,
     },
   })
+
+  useEffect(() => {
+    if (localRuntimeConfig.options.length === 0) return
+
+    const current = form.getValues('localServices') ?? []
+    const validIds = new Set(localRuntimeConfig.optionIds)
+    const sanitizedSelection = current.filter((id) => validIds.has(id))
+
+    if (sanitizedSelection.length === 0 && localRuntimeConfig.defaultSelection.length > 0) {
+      form.setValue('localServices', localRuntimeConfig.defaultSelection, {
+        shouldDirty: false,
+        shouldTouch: false,
+      })
+      return
+    }
+
+    if (sanitizedSelection.length !== current.length) {
+      form.setValue('localServices', sanitizedSelection, {
+        shouldDirty: false,
+        shouldTouch: false,
+      })
+    }
+  }, [form, localRuntimeConfig])
 
   const { instanceSize, cloudProvider, dbRegion, organization, deploymentTarget } = form.watch()
   const isLocalDeployment = deploymentTarget === 'local'
@@ -490,13 +490,11 @@ const Wizard: NextPageWithLayout = () => {
 
     if (isLocal) {
       data.cloudProvider = 'LOCAL'
-      const selectedServices = localServices?.length ? localServices : defaultLocalServiceSelection
-      const excludedServices = localRuntimeServiceIds.filter(
-        (serviceId) => !selectedServices.includes(serviceId)
-      )
-      if (excludedServices.length > 0) {
-        data.localRuntimeExclude = excludedServices
-      }
+      applyLocalRuntimeServicesToPayload({
+        payload: data,
+        selectedServices: localServices,
+        config: localRuntimeConfig,
+      })
     } else {
       const { postgresEngine, releaseChannel } =
         extractPostgresVersionDetails(postgresVersionSelection)
@@ -861,51 +859,8 @@ const Wizard: NextPageWithLayout = () => {
                       />
                     </Panel.Content>
 
-                    {isPlatform && isLocalDeployment && localRuntimeServiceOptions.length > 0 && (
-                      <Panel.Content>
-                        <FormField_Shadcn_
-                          control={form.control}
-                          name="localServices"
-                          render={({ field }) => (
-                            <FormItemLayout
-                              label="Local runtime services"
-                              layout="vertical"
-                              description="Choose which services should start when provisioning locally."
-                            >
-                              <div className="space-y-3">
-                                {localRuntimeServiceOptions.map((service) => {
-                                  const checked = (
-                                    field.value ?? defaultLocalServiceSelection
-                                  ).includes(service.id)
-                                  return (
-                                    <label key={service.id} className="flex items-start gap-3">
-                                      <Checkbox_Shadcn_
-                                        checked={checked}
-                                        onCheckedChange={(next) => {
-                                          const current = new Set(
-                                            field.value ?? defaultLocalServiceSelection
-                                          )
-                                          if (next) current.add(service.id)
-                                          else current.delete(service.id)
-                                          field.onChange(Array.from(current))
-                                        }}
-                                      />
-                                      <span>
-                                        <p className="font-medium text-sm">{service.label}</p>
-                                        {service.description && (
-                                          <p className="text-foreground-lighter text-sm leading-snug">
-                                            {service.description}
-                                          </p>
-                                        )}
-                                      </span>
-                                    </label>
-                                  )
-                                })}
-                              </div>
-                            </FormItemLayout>
-                          )}
-                        />
-                      </Panel.Content>
+                    {isLocalDeployment && localRuntimeConfig.options.length > 0 && (
+                      <LocalRuntimeServicesField form={form} config={localRuntimeConfig} />
                     )}
 
                     {!isLocalDeployment && cloudProviderEnabled && showNonProdFields && (
