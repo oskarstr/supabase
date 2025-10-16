@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   waitForRuntimeHealth: vi.fn(),
 }))
 
+// NOTE: These tests still mock the runtime agent. Keep adding cases until we can
+// swap in the real agent/Docker harness for an end-to-end provisioning run.
+
 const stateModuleMock = vi.hoisted(() => ({
   PROJECTS_ROOT: '',
   DATA_DIR: '',

@@ -13,10 +13,10 @@
 
 ### Phase 4 – Provisioning Integration *(in progress)*
 - Async lifecycle hooks mark `COMING_UP → ACTIVE_HEALTHY` (or failure states) and read generated `.env` files when available.
-- Supabase CLI now runs inside the platform-api container with deterministic port allocation and host-visible runtime dirs (`b5ca522836`, `12c266ec81`).
+- Runtime agent drives the CLI-backed provisioning flow with deterministic port allocation and host-visible runtime dirs (`b5ca522836`, `12c266ec81`).
 - **Open tasks**
 - Document the full provisioning contract (status transitions, response payload fields, failure semantics) so Studio/tests share a single spec. *(Draft captured in `.agent/docs/provisioning-contract.md`; end-to-end tests still pending.)*
-  - Inject provisioner/destroyer dependencies to enable mocked success/failure paths; expose a deterministic “fail next provision/destroy” toggle for testing.
+  - Lifecycle tests now exercise mocked success/failure paths; real runtime-agent/Docker harness still needed for end-to-end coverage and deterministic failure injection.
   - Persist generated artefacts (anon/service keys, REST URL, connection string, port ranges, runtime root) back into Postgres.
   - Capture structured CLI output/error metadata for operators and tests.
 - Ensure deletions are idempotent and INIT_FAILED/RESTORE_FAILED states are observable with retry timestamps.
@@ -27,8 +27,8 @@
 
 ### Phase 6 – Feature Coverage & Hardening *(in progress alongside Phase 4)*
 - Replace stubbed Studio endpoints with real data sources; immediate priorities:
-  - Storage routes (`store/storage.ts`) still return synthetic buckets/objects/credentials. Wire these to the provisioned project's storage service using the stored service key + REST URL once provisioning persists them, and surface real pagination/error semantics.
-  - Auth configuration endpoints (`store/auth-config.ts`) hold config in memory. Persist/read updates via GoTrue (or Postgres once the config tables exist) so Studio reads actual project settings and hook secrets instead of the hardcoded defaults.
+  - Storage routes (`store/storage.ts`) now proxy to project Storage via service keys; add guard-aware tests, error shaping, and pagination/credential coverage before calling them production-ready.
+  - Auth configuration endpoints (`store/auth-config.ts`) now forward to GoTrue with project service keys; add tests around the new guards/timeouts and surface real error payloads to Studio.
   - Project analytics/logging routes (`store/project-analytics.ts`) emit placeholder metrics. Proxy the observability pipeline (Logflare/Vector replacement) or clearly gate the routes until telemetry is available so Studio charts don't render misleading zeroes.
   - Telemetry routes (`store/telemetry.ts`) are currently no-ops. Either forward these calls to the segment-compatible sink Studio expects or disable the endpoints behind `NEXT_PUBLIC_IS_PLATFORM` until instrumentation exists.
 - Expand telemetry/logging, RBAC, and access token features as they come online, using `packages/api-types` as the contract reference instead of bespoke DTOs.
@@ -78,6 +78,7 @@
 - Integrate contract test harness under `apps/platform-api/tests/auto-generated`, ensuring behaviour matches Studio expectations once provisioning is stable.
 
 ## Change Log
+- **2025-10-16 06:50 UTC · codex** – Landed pg-mem-backed project lifecycle suite covering provision/pause/destroy happy paths and failure states; auth/storage routes now guard against pre-provision access and need follow-up fetch-based tests.
 - **2025-10-15 21:05 UTC · codex** – Updated Studio/Kong host URLs to `host.docker.internal` so the Studio container hits the gateway instead of `127.0.0.1`; stack comes up with Studio healthy again.
 - **2025-10-16 05:15 UTC · codex** – Removed the auto-generated route smoke suite; will reintroduce via a dedicated workflow once schema/migration replay is wired up for pg-mem.
 - **2025-10-16 04:20 UTC · codex** – Removed Supabase CLI dependencies from platform-api images/compose, enforced runtime-agent bearer auth, and made orchestration flows require the agent or explicit override hooks.
