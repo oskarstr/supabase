@@ -4,6 +4,13 @@
 
 ## Active Workstreams
 
+### Current Review Checklist *(2025-10-15 · codex)*
+- Reconstruct the orchestration dataflow end-to-end (Studio → platform-api → runtime-agent → Supabase CLI → Docker) and confirm each hop’s contracts and assumptions.
+- Inventory runtime-related persistence (Postgres `project_runtimes`, on-disk `platform-projects/`, generated `.env` files) and verify how provisioning writes/reads across layers.
+- Audit authentication/authorization touchpoints for the superuser (env-defined admin) versus scoped users to understand required guards in the orchestrator.
+- Catalogue failure/retry surfaces (CLI exit codes, network timeouts, health polling) and how they propagate back to Studio.
+- Compare our implementation with upstream Supabase CLI/runtime behaviour to note deliberate divergences we must justify or eventually upstream.
+
 ### Phase 4 – Provisioning Integration *(in progress)*
 - Async lifecycle hooks mark `COMING_UP → ACTIVE_HEALTHY` (or failure states) and read generated `.env` files when available.
 - Supabase CLI now runs inside the platform-api container with deterministic port allocation and host-visible runtime dirs (`b5ca522836`, `12c266ec81`).
@@ -67,6 +74,7 @@
 
 ## Change Log
 - **2025-10-15 21:05 UTC · codex** – Updated Studio/Kong host URLs to `host.docker.internal` so the Studio container hits the gateway instead of `127.0.0.1`; stack comes up with Studio healthy again.
+- **2025-10-16 04:20 UTC · codex** – Removed Supabase CLI dependencies from platform-api images/compose, enforced runtime-agent bearer auth, and made orchestration flows require the agent or explicit override hooks.
 - **2025-10-15 22:02 UTC · codex** – Restarted `supabase-kong` to clear a stale Docker port-forward so `localhost:8000` stopped returning `ERR_CONNECTION_RESET`.
 - **2025-10-15 22:20 UTC · codex** – Surfaced the local deployment target + runtime toggles via custom content, aligned the wizard defaults with runtime exclusions, and fixed `normalizeExcludedServices` so opting back into Logflare/Vector works.
 - **2025-10-15 22:40 UTC · codex** – (reverted) Dedicated platform DB role experiment removed; the db service now wraps the Supabase image with a password-sync entrypoint so restarting it realigns credentials with `.env`.

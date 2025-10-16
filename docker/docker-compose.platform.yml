@@ -11,12 +11,12 @@ services:
       PLATFORM_API_REPO_ROOT: /workspace
       PLATFORM_PROJECTS_ROOT: ${PWD}/platform-projects
       PLATFORM_ORCHESTRATOR_URL: http://runtime-agent:8085
+      PLATFORM_ORCHESTRATOR_TOKEN: ${PLATFORM_ORCHESTRATOR_TOKEN:-supabase-runtime-agent}
       SUPABASE_URL: http://kong:8000
       SUPABASE_GOTRUE_URL: http://kong:8000/auth/v1
     volumes:
       - platform-api-data:/app/apps/platform-api/data
       - ..:/workspace:ro
-      - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}/platform-projects:${PWD}/platform-projects
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -34,8 +34,8 @@ services:
     environment:
       RUNTIME_AGENT_LISTEN_ADDR: ":8085"
       RUNTIME_AGENT_COMMAND_TIMEOUT: 15m
-      RUNTIME_AGENT_SUPABASE_CLI_PATH: supabase
       RUNTIME_AGENT_SUPABASE_HOST: host.docker.internal
+      RUNTIME_AGENT_AUTH_TOKEN: ${PLATFORM_ORCHESTRATOR_TOKEN:-supabase-runtime-agent}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}/platform-projects:${PWD}/platform-projects

@@ -8,40 +8,37 @@ import (
 )
 
 type Config struct {
-	ListenAddr        string
-	ReadTimeout       time.Duration
-	ReadHeaderTimeout time.Duration
-	WriteTimeout      time.Duration
-	IdleTimeout       time.Duration
-	CommandTimeout    time.Duration
-	CLIBinary         string
+        ListenAddr        string
+        ReadTimeout       time.Duration
+        ReadHeaderTimeout time.Duration
+        WriteTimeout      time.Duration
+        IdleTimeout       time.Duration
+        CommandTimeout    time.Duration
+        AuthToken         string
 }
 
 func ConfigFromEnv() Config {
-	addr := strings.TrimSpace(os.Getenv("RUNTIME_AGENT_LISTEN_ADDR"))
-	if addr == "" {
-		addr = ":8085"
-	}
+        addr := strings.TrimSpace(os.Getenv("RUNTIME_AGENT_LISTEN_ADDR"))
+        if addr == "" {
+                addr = ":8085"
+        }
 
-	readTimeout := parseDuration("RUNTIME_AGENT_READ_TIMEOUT", 30*time.Second)
-	readHeaderTimeout := parseDuration("RUNTIME_AGENT_READ_HEADER_TIMEOUT", 10*time.Second)
-	writeTimeout := parseDuration("RUNTIME_AGENT_WRITE_TIMEOUT", 30*time.Second)
-	idleTimeout := parseDuration("RUNTIME_AGENT_IDLE_TIMEOUT", time.Minute)
-	commandTimeout := parseDuration("RUNTIME_AGENT_COMMAND_TIMEOUT", 15*time.Minute)
-	cliBinary := strings.TrimSpace(os.Getenv("RUNTIME_AGENT_SUPABASE_CLI_PATH"))
-	if cliBinary == "" {
-		cliBinary = "supabase"
-	}
+        readTimeout := parseDuration("RUNTIME_AGENT_READ_TIMEOUT", 30*time.Second)
+        readHeaderTimeout := parseDuration("RUNTIME_AGENT_READ_HEADER_TIMEOUT", 10*time.Second)
+        writeTimeout := parseDuration("RUNTIME_AGENT_WRITE_TIMEOUT", 30*time.Second)
+        idleTimeout := parseDuration("RUNTIME_AGENT_IDLE_TIMEOUT", time.Minute)
+        commandTimeout := parseDuration("RUNTIME_AGENT_COMMAND_TIMEOUT", 15*time.Minute)
+        authToken := strings.TrimSpace(os.Getenv("RUNTIME_AGENT_AUTH_TOKEN"))
 
-	return Config{
-		ListenAddr:        normalizeAddr(addr),
-		ReadTimeout:       readTimeout,
-		ReadHeaderTimeout: readHeaderTimeout,
-		WriteTimeout:      writeTimeout,
-		IdleTimeout:       idleTimeout,
-		CommandTimeout:    commandTimeout,
-		CLIBinary:         cliBinary,
-	}
+        return Config{
+                ListenAddr:        normalizeAddr(addr),
+                ReadTimeout:       readTimeout,
+                ReadHeaderTimeout: readHeaderTimeout,
+                WriteTimeout:      writeTimeout,
+                IdleTimeout:       idleTimeout,
+                CommandTimeout:    commandTimeout,
+                AuthToken:         authToken,
+        }
 }
 
 func parseDuration(key string, fallback time.Duration) time.Duration {
