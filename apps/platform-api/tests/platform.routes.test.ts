@@ -227,45 +227,116 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const buckets = await app.inject({
-      method: 'GET',
-      url: `/api/platform/storage/${projectRef}/buckets`,
-    })
-    expect(buckets.statusCode).toBe(200)
-    const bucketPayload = buckets.json()
-    expect(Array.isArray(bucketPayload)).toBe(true)
-    expect(bucketPayload[0]).toMatchObject({
-      id: 'bucket-default',
-      public: true,
+    const storageTimestamp = '2024-01-01T00:00:00.000Z'
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    fetchSpy.mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? new URL(input)
+          : input instanceof URL
+            ? input
+            : new URL(String(input))
+
+      if (url.pathname.endsWith('/bucket')) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'bucket-default',
+              name: 'public',
+              owner: 'service_role',
+              public: true,
+              created_at: storageTimestamp,
+              updated_at: storageTimestamp,
+              allowed_mime_types: ['image/png'],
+              file_size_limit: 1048576,
+              type: 'STANDARD',
+            },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      }
+
+      if (url.pathname.endsWith('/s3')) {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: 'cred-1',
+                description: 'Supabase Storage access key',
+                created_at: storageTimestamp,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      }
+
+      if (url.pathname.includes('/object/list/')) {
+        const parsedBody = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
+        expect(parsedBody).toMatchObject({ prefix: '' })
+
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'object-1',
+              name: 'hello.sql',
+              created_at: storageTimestamp,
+              updated_at: storageTimestamp,
+              last_accessed_at: storageTimestamp,
+              metadata: { mimetype: 'text/plain' },
+            },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      }
+
+      throw new Error(`Unexpected storage fetch: ${url.toString()}`)
     })
 
-    const credentials = await app.inject({
-      method: 'GET',
-      url: `/api/platform/storage/${projectRef}/credentials`,
-    })
-    expect(credentials.statusCode).toBe(200)
-    const credentialPayload = credentials.json()
-    expect(Array.isArray(credentialPayload.data)).toBe(true)
-    expect(credentialPayload.data[0]).toMatchObject({
-      id: expect.any(String),
-      description: expect.stringContaining('Supabase'),
-    })
+    try {
+      const buckets = await app.inject({
+        method: 'GET',
+        url: `/api/platform/storage/${projectRef}/buckets`,
+      })
+      expect(buckets.statusCode).toBe(200)
+      const bucketPayload = buckets.json()
+      expect(Array.isArray(bucketPayload)).toBe(true)
+      expect(bucketPayload[0]).toMatchObject({
+        id: 'bucket-default',
+        public: true,
+      })
 
-    const objectsResponse = await app.inject({
-      method: 'POST',
-      url: `/api/platform/storage/${projectRef}/buckets/bucket-default/objects/list`,
-      payload: { path: '', options: { limit: 10 } },
-    })
-    expect(objectsResponse.statusCode).toBe(200)
-    expect(Array.isArray(objectsResponse.json())).toBe(true)
+      const credentials = await app.inject({
+        method: 'GET',
+        url: `/api/platform/storage/${projectRef}/credentials`,
+      })
+      expect(credentials.statusCode).toBe(200)
+      const credentialPayload = credentials.json()
+      expect(Array.isArray(credentialPayload.data)).toBe(true)
+      expect(credentialPayload.data[0]).toMatchObject({
+        id: expect.any(String),
+        description: expect.stringContaining('Supabase'),
+      })
 
-    const publicUrl = await app.inject({
-      method: 'POST',
-      url: `/api/platform/storage/${projectRef}/buckets/bucket-default/objects/public-url`,
-      payload: { path: 'hello.sql' },
-    })
-    expect(publicUrl.statusCode).toBe(200)
-    expect(publicUrl.json()).toMatchObject({ publicUrl: expect.any(String) })
+      const objectsResponse = await app.inject({
+        method: 'POST',
+        url: `/api/platform/storage/${projectRef}/buckets/bucket-default/objects/list`,
+        payload: { path: '', options: { limit: 10 } },
+      })
+      expect(objectsResponse.statusCode).toBe(200)
+      expect(Array.isArray(objectsResponse.json())).toBe(true)
+
+      const publicUrl = await app.inject({
+        method: 'POST',
+        url: `/api/platform/storage/${projectRef}/buckets/bucket-default/objects/public-url`,
+        payload: { path: 'hello.sql' },
+      })
+      expect(publicUrl.statusCode).toBe(200)
+      expect(publicUrl.json()).toMatchObject({ publicUrl: expect.any(String) })
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   it('executes pg-meta queries against the project database', async () => {

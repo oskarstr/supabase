@@ -19,8 +19,13 @@
   - Runtime agent (`apps/runtime-agent`) now drives the mirrored Supabase CLI packages in-process, captures stdout/stderr/duration, and returns that metadata via the orchestrator API. Next step is to mount it in compose with docker socket + host network and stream results into persistence.
 
 ### Phase 6 – Feature Coverage & Hardening *(in progress alongside Phase 4)*
-- Continue filling in Studio-dependent endpoints (storage, logs, auth config, analytics) and replace temporary stubs with real integrations.
-- Expand telemetry/logging, RBAC, and access token features as they come online.
+- Replace stubbed Studio endpoints with real data sources; immediate priorities:
+  - Storage routes (`store/storage.ts`) still return synthetic buckets/objects/credentials. Wire these to the provisioned project's storage service using the stored service key + REST URL once provisioning persists them, and surface real pagination/error semantics.
+  - Auth configuration endpoints (`store/auth-config.ts`) hold config in memory. Persist/read updates via GoTrue (or Postgres once the config tables exist) so Studio reads actual project settings and hook secrets instead of the hardcoded defaults.
+  - Project analytics/logging routes (`store/project-analytics.ts`) emit placeholder metrics. Proxy the observability pipeline (Logflare/Vector replacement) or clearly gate the routes until telemetry is available so Studio charts don't render misleading zeroes.
+  - Telemetry routes (`store/telemetry.ts`) are currently no-ops. Either forward these calls to the segment-compatible sink Studio expects or disable the endpoints behind `NEXT_PUBLIC_IS_PLATFORM` until instrumentation exists.
+- Expand telemetry/logging, RBAC, and access token features as they come online, using `packages/api-types` as the contract reference instead of bespoke DTOs.
+- Fix the auto-generated contract tests so Studio endpoint extraction matches implemented Fastify routes (`tests/auto-generated/scripts/generate-tests.ts`); once path normalization works, start converting the smoke tests from `it.skip` to real assertions backed by deterministic fixtures.
 - Prepare integration/contract tests once provisioning seams are injectable.
 - **Studio alignment**
   - Serve deployment targets (`remote`, `local`) through custom content/API rather than hardcoding; keep `NEXT_PUBLIC_PLATFORM_ENABLE_LOCAL_TARGET` as a platform toggle only.
@@ -79,3 +84,4 @@
 - **2025-10-15 05:33 UTC · b5ca522836** – Bundled Supabase CLI + Docker client into platform-api image, added port allocation + config scaffolding, and exposed Studio deployment-target toggle.
 - **2025-10-14 17:31 MDT** – Migrated persistence to Postgres with auto-migrations, seeds, and pg-mem-based tests; JSON store deprecated.
 - **c7a83d305c** – `/pg-meta/**` re-encrypts connection strings via `PG_META_CRYPTO_KEY`; seeds reuse anon/service keys for Studio debug visibility.
+- **2025-10-16 03:20 UTC · codex** – Audited Phase 6 scope; flagged stubbed storage/auth/logs/telemetry routes and auto-generated test coverage gaps so next work focuses on real integrations.
