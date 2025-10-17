@@ -701,6 +701,16 @@ export const acceptInvitationByToken = async (
     throw new InvitationError('Invitation email does not match the authenticated user')
   }
 
+  const invitationRoleId = Number(invitation.role_id ?? 0)
+  if (!Number.isFinite(invitationRoleId) || invitationRoleId <= 0) {
+    throw new InvitationError('Invitation role is no longer available')
+  }
+
+  const existingRole = await loadOrgRole(organization.id, invitationRoleId)
+  if (!existingRole) {
+    throw new InvitationError('Invitation role is no longer available')
+  }
+
   return db.transaction().execute(async (trx) => {
     const existingMember = await trx
       .selectFrom('organization_members')
@@ -711,17 +721,17 @@ export const acceptInvitationByToken = async (
 
     const invitationMetadata = (invitation.metadata as Record<string, unknown>) ?? {}
     const scopedProjects =
-      extractRoleScopedProjects(invitationMetadata, invitation.role_id as number) ?? null
+      extractRoleScopedProjects(invitationMetadata, invitationRoleId) ?? null
 
     if (existingMember) {
       const existingMetadata = (existingMember.metadata as Record<string, unknown>) ?? {}
       const mergedMetadata = composeMemberMetadata(
         existingMetadata,
-        invitation.role_id as number,
+        invitationRoleId,
         scopedProjects
       )
       const mergedRoleIds = mergeRoleIds(existingMember.role_ids ?? [], [
-        invitation.role_id as number,
+        invitationRoleId,
       ])
 
       await trx
@@ -736,10 +746,10 @@ export const acceptInvitationByToken = async (
     } else {
       const newMetadata = composeMemberMetadata(
         invitationMetadata,
-        invitation.role_id as number,
+        invitationRoleId,
         scopedProjects
       )
-      const newRoleIds = mergeRoleIds([invitation.role_id as number])
+      const newRoleIds = mergeRoleIds([invitationRoleId])
 
       let values: Insertable<PlatformDatabase['organization_members']> = {
         organization_id: organization.id,
@@ -772,7 +782,7 @@ export const acceptInvitationByToken = async (
     return {
       organizationId: organization.id,
       invitationId: invitation.id,
-      roleId: invitation.role_id as number,
+      roleId: invitationRoleId,
       profileId: profile.id,
       roleScopedProjects: scopedProjects,
     }

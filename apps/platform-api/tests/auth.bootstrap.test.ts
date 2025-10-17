@@ -6,6 +6,8 @@ import { readdirSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
+import { baseProfile, DEFAULT_ORG_ID } from '../src/config/defaults.js'
+
 const MIGRATIONS_DIR = new URL('../migrations', import.meta.url)
 const MIGRATIONS_PATH = fileURLToPath(MIGRATIONS_DIR)
 
@@ -278,5 +280,224 @@ describe('bootstrap admin reconciliation', () => {
     expect(membership?.profile_id).toBe(1)
     expect(membership?.role_ids).toEqual([1])
     expect(membership?.is_owner).toBe(true)
+  })
+
+  it('fails when GoTrue never returns the admin user', async () => {
+    await initMemDatabase()
+
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url.endsWith('/admin/users')) {
+        return new Response('temporarily unavailable', { status: 503 })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
+    vi.stubGlobal('fetch', fetchSpy)
+
+    setEnv({
+      PLATFORM_ADMIN_EMAIL: 'admin@example.com',
+      PLATFORM_ADMIN_SEED_RETRY_ATTEMPTS: '2',
+      PLATFORM_ADMIN_SEED_RETRY_DELAY_MS: '0',
+      PLATFORM_ADMIN_SEED_MAX_DELAY_MS: '0',
+    })
+
+    const { seedDefaults } = await import('../src/db/seed.js')
+    await expect(seedDefaults()).rejects.toThrow(/Failed to ensure platform admin account/)
+
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+    const profileRows = await db.selectFrom('profiles').select(['id']).execute()
+    expect(profileRows).toHaveLength(0)
+  })
+
+  it('merges duplicate admin memberships and retains invitations', async () => {
+    await initMemDatabase()
+
+    const adminUserId = 'cccccccc-dddd-eeee-ffff-000000000000'
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url.endsWith('/admin/users')) {
+        return new Response(JSON.stringify({ user: { id: adminUserId } }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { seedDefaults } = await import('../src/db/seed.js')
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+
+    setEnv({ PLATFORM_ADMIN_EMAIL: 'admin@example.com' })
+    await seedDefaults()
+
+    const roles = await db
+      .selectFrom('organization_roles')
+      .select(['id', 'base_role_id'])
+      .where('organization_id', '=', DEFAULT_ORG_ID)
+      .execute()
+    const ownerRoleId = Number(roles.find((role) => role.base_role_id === 1)?.id)
+    const developerRoleId = Number(roles.find((role) => role.base_role_id === 3)?.id)
+    expect(ownerRoleId).toBeGreaterThan(0)
+    expect(developerRoleId).toBeGreaterThan(0)
+
+    await db
+      .updateTable('organization_members')
+      .set({
+        role_ids: [ownerRoleId, developerRoleId],
+        metadata: {
+          role_scoped_projects: {
+            [String(developerRoleId)]: ['existing-project'],
+          },
+        },
+      })
+      .where('organization_id', '=', DEFAULT_ORG_ID)
+      .where('profile_id', '=', baseProfile.id)
+      .execute()
+
+    const duplicateProfileId = 998
+    const duplicateGotrueId = randomUUID()
+
+    await db
+      .insertInto('profiles')
+      .values({
+        id: duplicateProfileId,
+        gotrue_id: duplicateGotrueId,
+        auth0_id: 'duplicate|auth0',
+        username: 'admin-duplicate',
+        first_name: 'Dupe',
+        last_name: 'Admin',
+        primary_email: baseProfile.primary_email,
+        mobile: baseProfile.mobile ?? '',
+        free_project_limit: baseProfile.free_project_limit,
+        is_alpha_user: baseProfile.is_alpha_user,
+        is_sso_user: baseProfile.is_sso_user,
+        disabled_features: [],
+      })
+      .execute()
+
+    await db
+      .insertInto('organization_members')
+      .values({
+        organization_id: DEFAULT_ORG_ID,
+        profile_id: duplicateProfileId,
+        role_ids: [developerRoleId],
+        metadata: {
+          role_scoped_projects: {
+            [String(developerRoleId)]: ['dup-project'],
+          },
+        },
+        mfa_enabled: false,
+        is_owner: false,
+      })
+      .execute()
+
+    const invitationToken = randomUUID()
+    await db
+      .insertInto('organization_invitations')
+      .values({
+        organization_id: DEFAULT_ORG_ID,
+        invited_email: 'duplicate-invitee@example.com',
+        role_id: developerRoleId,
+        token: invitationToken,
+        metadata: {},
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+        invited_by_profile_id: duplicateProfileId,
+      })
+      .execute()
+
+    await seedDefaults()
+
+    const mergedMembership = await db
+      .selectFrom('organization_members')
+      .select(['metadata', 'role_ids'])
+      .where('organization_id', '=', DEFAULT_ORG_ID)
+      .where('profile_id', '=', baseProfile.id)
+      .executeTakeFirst()
+
+    expect(mergedMembership?.role_ids).toEqual(
+      expect.arrayContaining([ownerRoleId, developerRoleId])
+    )
+    const mergedMetadata = (mergedMembership?.metadata as Record<string, unknown>) ?? {}
+    const mergedScopes = mergedMetadata.role_scoped_projects as Record<string, string[]> | undefined
+    expect(mergedScopes?.[String(developerRoleId)]).toEqual(['dup-project', 'existing-project'])
+
+    const invitationRow = await db
+      .selectFrom('organization_invitations')
+      .select(['invited_by_profile_id'])
+      .where('token', '=', invitationToken)
+      .executeTakeFirst()
+    expect(invitationRow?.invited_by_profile_id).toBe(baseProfile.id)
+
+    const duplicateProfiles = await db
+      .selectFrom('profiles')
+      .select(['id'])
+      .where('id', '=', duplicateProfileId)
+      .execute()
+    expect(duplicateProfiles).toHaveLength(0)
+  })
+
+  it('preserves owner metadata when reasserting ownership', async () => {
+    await initMemDatabase()
+
+    const adminUserId = 'dddddddd-eeee-ffff-1111-222222222222'
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url.endsWith('/admin/users')) {
+        return new Response(JSON.stringify({ user: { id: adminUserId } }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { seedDefaults } = await import('../src/db/seed.js')
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+
+    setEnv({ PLATFORM_ADMIN_EMAIL: 'admin@example.com' })
+    await seedDefaults()
+
+    const complexMetadata = {
+      nested: { flag: true },
+      role_scoped_projects: {
+        '1': ['project-x'],
+      },
+    }
+
+    await db
+      .updateTable('organization_members')
+      .set({
+        is_owner: false,
+        metadata: complexMetadata,
+      })
+      .where('organization_id', '=', DEFAULT_ORG_ID)
+      .where('profile_id', '=', baseProfile.id)
+      .execute()
+
+    await seedDefaults()
+
+    const membership = await db
+      .selectFrom('organization_members')
+      .select(['metadata', 'is_owner'])
+      .where('organization_id', '=', DEFAULT_ORG_ID)
+      .where('profile_id', '=', baseProfile.id)
+      .executeTakeFirst()
+
+    expect(membership?.is_owner).toBe(true)
+    expect(membership?.metadata).toEqual({
+      nested: { flag: true },
+      role_scoped_projects: { '1': ['project-x'] },
+    })
   })
 })

@@ -6,6 +6,8 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DataType, newDb } from 'pg-mem'
 
+import { constants } from '@supabase/shared-types'
+
 import { PERMISSION_MATRIX } from '../src/config/permission-matrix.js'
 
 import { authenticateRequest } from '../src/plugins/authenticate.js'
@@ -18,6 +20,7 @@ import {
 } from './utils/auth.js'
 
 const MIGRATIONS_DIR = resolve(process.cwd(), 'migrations')
+const { PermissionAction } = constants
 
 const sanitizeMigrationSql = (sql: string) =>
   sql
@@ -198,6 +201,57 @@ describe('profile permissions route', () => {
       permission.resources.some((resource) => resource !== '%')
     )
     expect(hasNonWildcardResource).toBe(true)
+
+    const organizationPermissions = permissions.filter(
+      (entry) =>
+        entry.organization_slug === defaultOrganizationSlug && entry.project_refs === null
+    )
+
+    const integrationPermissions = organizationPermissions.filter((permission) =>
+      permission.resources.some((resource) =>
+        ['integrations.github_connections', 'integrations.vercel_connections'].includes(resource)
+      )
+    )
+    expect(integrationPermissions.length).toBe(0)
+
+    const previewBranchPermissions = permissions.filter((permission) =>
+      permission.resources.includes('preview_branches')
+    )
+    expect(previewBranchPermissions.length).toBe(0)
+  })
+
+  it('grants billing management permissions to organization-level developers', async () => {
+    const developerId = randomUUID()
+    const developerEmail = 'org-developer@example.com'
+    const { ensureProfile } = await import('../src/store/profile.js')
+    const developerProfile = await ensureProfile(developerId, developerEmail)
+
+    const developerRoleId = await roleIdForBaseRole(defaultOrganizationId, 3)
+    const { upsertOrganizationMemberRole } = await import(
+      '../src/store/organization-members.js'
+    )
+
+    await upsertOrganizationMemberRole(defaultOrganizationSlug, developerProfile, developerRoleId)
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/platform/profile/permissions',
+      headers: headersForSubject(developerId, developerEmail),
+    })
+
+    expect(response.statusCode).toBe(200)
+    const permissions = response.json() as AccessControlPermissionResponse[]
+    const organizationPermissions = permissions.filter(
+      (entry) =>
+        entry.organization_slug === defaultOrganizationSlug && entry.project_refs === null
+    )
+
+    const billingWrite = organizationPermissions.find(
+      (permission) =>
+        permission.resources.includes('stripe.customer') &&
+        permission.actions.includes(PermissionAction.BILLING_WRITE)
+    )
+    expect(billingWrite).toBeDefined()
   })
 
   it('unions permissions across multiple organization memberships', async () => {
@@ -323,6 +377,11 @@ describe('profile permissions route', () => {
         })
       })
     })
+
+    const hasStorageContentAccess = permissions.some((permission) =>
+      permission.resources.includes('user_content')
+    )
+    expect(hasStorageContentAccess).toBe(false)
   })
 })
 

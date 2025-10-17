@@ -89,6 +89,74 @@ const mergeRoleIds = (...roleSets: Array<readonly unknown[] | null | undefined>)
   return Array.from(seen).sort((a, b) => a - b)
 }
 
+const sanitizeProjectRefs = (input: unknown): string[] => {
+  if (!Array.isArray(input)) return []
+  const refs = new Set<string>()
+  for (const value of input) {
+    if (typeof value !== 'string') continue
+    const normalized = value.trim()
+    if (normalized.length > 0) {
+      refs.add(normalized)
+    }
+  }
+  return Array.from(refs).sort()
+}
+
+const normalizeRoleScopedRecord = (value: unknown): Record<string, string[]> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const record: Record<string, string[]> = {}
+  for (const [roleId, refs] of Object.entries(value as Record<string, unknown>)) {
+    const sanitized = sanitizeProjectRefs(refs)
+    if (sanitized.length > 0) {
+      record[roleId] = sanitized
+    }
+  }
+  return record
+}
+
+const mergeMemberMetadata = (
+  primary: Record<string, unknown> | null | undefined,
+  secondary: Record<string, unknown> | null | undefined
+): Record<string, unknown> => {
+  const primaryRecord = (primary ?? {}) as Record<string, unknown>
+  const secondaryRecord = (secondary ?? {}) as Record<string, unknown>
+  const merged: Record<string, unknown> = { ...secondaryRecord, ...primaryRecord }
+
+  const scopedUnion = new Map<string, Set<string>>()
+  const addEntries = (value: unknown) => {
+    const normalized = normalizeRoleScopedRecord(value)
+    for (const [roleId, refs] of Object.entries(normalized)) {
+      if (!scopedUnion.has(roleId)) {
+        scopedUnion.set(roleId, new Set<string>())
+      }
+      const bucket = scopedUnion.get(roleId)!
+      refs.forEach((ref) => bucket.add(ref))
+    }
+  }
+
+  addEntries(secondaryRecord['role_scoped_projects'])
+  addEntries(primaryRecord['role_scoped_projects'])
+
+  if (scopedUnion.size > 0) {
+    const roleScopedProjects: Record<string, string[]> = {}
+    for (const [roleId, refs] of scopedUnion.entries()) {
+      const values = Array.from(refs).sort()
+      if (values.length > 0) {
+        roleScopedProjects[roleId] = values
+      }
+    }
+    if (Object.keys(roleScopedProjects).length > 0) {
+      merged.role_scoped_projects = roleScopedProjects
+    } else {
+      delete merged.role_scoped_projects
+    }
+  } else if ('role_scoped_projects' in merged) {
+    delete merged.role_scoped_projects
+  }
+
+  return merged
+}
+
 const normalizeBillingPartner = (
   value: string | null | undefined
 ): 'fly' | 'aws_marketplace' | 'vercel_marketplace' | null => {
@@ -657,7 +725,10 @@ const migrateDuplicateAdminProfiles = async (
         .updateTable('organization_members')
         .set({
           role_ids: mergedRoles,
-          metadata: (existing.metadata as Record<string, unknown> | null) ?? {},
+          metadata: mergeMemberMetadata(
+            (existing.metadata as Record<string, unknown> | null) ?? null,
+            (membership.metadata as Record<string, unknown> | null) ?? null
+          ),
           is_owner: true,
         })
         .where('id', '=', existing.id)
@@ -673,12 +744,23 @@ const migrateDuplicateAdminProfiles = async (
         .set({
           profile_id: baseProfile.id,
           role_ids: mergedRoles,
-          metadata: (membership.metadata as Record<string, unknown> | null) ?? {},
+          metadata: mergeMemberMetadata(
+            (membership.metadata as Record<string, unknown> | null) ?? null,
+            null
+          ),
           is_owner: true,
         })
         .where('id', '=', membership.id)
         .execute()
     }
+  }
+
+  if (duplicateIds.length > 0) {
+    await db
+      .updateTable('organization_invitations')
+      .set({ invited_by_profile_id: baseProfile.id })
+      .where('invited_by_profile_id', 'in', duplicateIds)
+      .execute()
   }
 
   await db.deleteFrom('profiles').where('id', 'in', duplicateIds).execute()

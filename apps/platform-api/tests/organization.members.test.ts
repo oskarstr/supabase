@@ -526,6 +526,39 @@ describe('organization member routes', () => {
     expect(lookup.json()).toMatchObject({ token_does_not_exist: true })
   })
 
+  it('rejects invitation acceptance when the assigned role no longer exists', async () => {
+    const roleId = await developerRoleId()
+    const inviteEmail = 'missing-role@example.com'
+    const targetUserId = randomUUID()
+
+    const create = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+      payload: {
+        email: inviteEmail,
+        role_id: roleId,
+      },
+    })
+    expect(create.statusCode).toBe(201)
+    const invitation = create.json() as { token: string }
+
+    await platformDb
+      .deleteFrom('organization_roles')
+      .where('id', '=', roleId)
+      .execute()
+
+    const { ensureProfile } = await import('../src/store/profile.js')
+    await ensureProfile(targetUserId, inviteEmail)
+
+    const accept = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations/${invitation.token}`,
+      headers: headersForSubject(targetUserId, inviteEmail),
+    })
+    expect(accept.statusCode).toBe(400)
+  })
+
   it('prevents accepting expired invitations', async () => {
     const roleId = await developerRoleId()
     const inviteEmail = 'expired@example.com'
