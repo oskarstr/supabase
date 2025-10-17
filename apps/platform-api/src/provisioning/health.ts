@@ -2,7 +2,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 
 import { allocateProjectPorts } from './ports.js'
 
-const HEALTH_HOST = process.env.PLATFORM_RUNTIME_HEALTH_HOST?.trim() || 'host.docker.internal'
+const HEALTH_HOST = process.env.PLATFORM_RUNTIME_HEALTH_HOST?.trim() || '127.0.0.1'
 const HEALTH_TIMEOUT_MS = Number.parseInt(process.env.PLATFORM_RUNTIME_HEALTH_TIMEOUT_MS ?? '', 10)
 const DEFAULT_TIMEOUT_MS =
   Number.isFinite(HEALTH_TIMEOUT_MS) && HEALTH_TIMEOUT_MS > 0 ? HEALTH_TIMEOUT_MS : 120_000

@@ -69,24 +69,32 @@ func (e *localExecutor) Stop(ctx context.Context, req stopRequest) (operationRes
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	return e.runWithLogs(func() error {
+	result, err := e.runWithLogs(func() error {
 		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
 			const backupVolumes = false
 			return e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys)
 		})
 	})
+	if err != nil && isNotRunningError(err) {
+		return result, nil
+	}
+	return result, err
 }
 
 func (e *localExecutor) Destroy(ctx context.Context, req destroyRequest) (operationResult, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	return e.runWithLogs(func() error {
+	result, err := e.runWithLogs(func() error {
 		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
 			const backupVolumes = false
 			return e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys)
 		})
 	})
+	if err != nil && isNotRunningError(err) {
+		return result, nil
+	}
+	return result, err
 }
 
 func (e *localExecutor) runWithLogs(fn func() error) (operationResult, error) {
@@ -145,6 +153,16 @@ func (e *localExecutor) withProjectEnvironment(
 	networkID string,
 	fn func(afero.Fs) error,
 ) error {
+	if info, err := os.Stat(projectRoot); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Info().Str("project_root", projectRoot).Msg("runtime root missing, skipping operation")
+			return os.ErrNotExist
+		}
+		return err
+	} else if !info.IsDir() {
+		return errors.New("project root is not a directory")
+	}
+
 	originalWD, err := os.Getwd()
 	if err != nil {
 		return err
@@ -178,6 +196,9 @@ func (e *localExecutor) withProjectEnvironment(
 func isNotRunningError(err error) bool {
 	if err == nil {
 		return false
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return true
 	}
 	if errors.Is(err, utils.ErrNotRunning) {
 		return true
