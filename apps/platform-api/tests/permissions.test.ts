@@ -1,3 +1,4 @@
+import { constants } from '@supabase/shared-types'
 import Fastify from 'fastify'
 import { randomUUID } from 'node:crypto'
 import { readdirSync } from 'node:fs'
@@ -5,6 +6,8 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DataType, newDb } from 'pg-mem'
+
+const { PermissionAction } = constants
 
 import { authenticateRequest } from '../src/plugins/authenticate.js'
 import {
@@ -272,20 +275,33 @@ describe('profile permissions route', () => {
         entry.organization_slug === defaultOrganizationSlug
     )
     expect(scoped.length).toBeGreaterThan(0)
-    const disallowed = new Set([
-      'write:update',
-      'write:delete',
-      'storage:write',
-      'analytics:admin:write',
-      'secrets:write',
-      'functions:write',
-      'infra:execute',
+    const disallowed = new Set<string>([
+      PermissionAction.CREATE,
+      PermissionAction.UPDATE,
+      PermissionAction.DELETE,
+      PermissionAction.ANALYTICS_ADMIN_WRITE,
+      PermissionAction.ANALYTICS_WRITE,
+      PermissionAction.AUTH_EXECUTE,
+      PermissionAction.FUNCTIONS_WRITE,
+      PermissionAction.SECRETS_WRITE,
+      PermissionAction.STORAGE_WRITE,
+      PermissionAction.STORAGE_ADMIN_WRITE,
+      PermissionAction.INFRA_EXECUTE,
+      PermissionAction.BILLING_WRITE,
+      PermissionAction.TENANT_SQL_ADMIN_WRITE,
+      PermissionAction.TENANT_SQL_DELETE,
+      PermissionAction.TENANT_SQL_INSERT,
+      PermissionAction.TENANT_SQL_UPDATE,
+      PermissionAction.SQL_DELETE,
+      PermissionAction.SQL_INSERT,
+      PermissionAction.SQL_UPDATE,
+      PermissionAction.REALTIME_ADMIN_WRITE,
+      PermissionAction.REPLICATION_ADMIN_WRITE,
     ])
 
     scoped.forEach((permission) => {
       permission.actions.forEach((action) => {
-        console.log('read-only action', action)
-        expect(disallowed.has(action.toLowerCase())).toBe(false)
+        expect(disallowed.has(action)).toBe(false)
       })
     })
   })

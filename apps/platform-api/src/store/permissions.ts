@@ -1,34 +1,27 @@
+import { constants } from '@supabase/shared-types'
 import { getPlatformDb } from '../db/client.js'
 import type { AccessControlPermission } from './types.js'
 
 const db = getPlatformDb()
+const { PermissionAction } = constants
+type PermissionActionValue = (typeof PermissionAction)[keyof typeof PermissionAction]
 
-const PERMISSION_ACTION = {
-  ANALYTICS_ADMIN_WRITE: 'analytics:Admin:Write',
-  ANALYTICS_READ: 'analytics:Read',
-  AUTH_EXECUTE: 'auth:Execute',
-  BILLING_READ: 'billing:Read',
-  BILLING_WRITE: 'billing:Write',
-  CREATE: 'write:Create',
-  DELETE: 'write:Delete',
-  FUNCTIONS_READ: 'functions:Read',
-  FUNCTIONS_WRITE: 'functions:Write',
-  INFRA_EXECUTE: 'infra:Execute',
-  READ: 'read:Read',
-  REALTIME_ADMIN_READ: 'realtime:Admin:Read',
-  SECRETS_READ: 'secrets:Read',
-  SECRETS_WRITE: 'secrets:Write',
-  STORAGE_ADMIN_READ: 'storage:Admin:Read',
-  STORAGE_ADMIN_WRITE: 'storage:Admin:Write',
-  STORAGE_WRITE: 'storage:Write',
-  TENANT_SQL_ADMIN_READ: 'tenant:Sql:Admin:Read',
-  TENANT_SQL_ADMIN_WRITE: 'tenant:Sql:Admin:Write',
-  TENANT_SQL_DELETE: 'tenant:Sql:Write:Delete',
-  TENANT_SQL_QUERY: 'tenant:Sql:Query',
-  UPDATE: 'write:Update',
-} as const
-
-type PermissionActionValue = (typeof PERMISSION_ACTION)[keyof typeof PERMISSION_ACTION]
+const READ_ONLY_ALLOWED_ACTIONS = new Set<PermissionActionValue>([
+  PermissionAction.READ,
+  PermissionAction.ANALYTICS_READ,
+  PermissionAction.ANALYTICS_ADMIN_READ,
+  PermissionAction.BILLING_READ,
+  PermissionAction.FUNCTIONS_READ,
+  PermissionAction.REALTIME_ADMIN_READ,
+  PermissionAction.REPLICATION_ADMIN_READ,
+  PermissionAction.SECRETS_READ,
+  PermissionAction.STORAGE_ADMIN_READ,
+  PermissionAction.STORAGE_READ,
+  PermissionAction.TENANT_SQL_ADMIN_READ,
+  PermissionAction.TENANT_SQL_QUERY,
+  PermissionAction.TENANT_SQL_SELECT,
+  PermissionAction.SQL_SELECT,
+])
 
 type RoleKey = 'owner' | 'admin' | 'developer' | 'read_only'
 type Scope = 'organization' | 'project'
@@ -88,118 +81,118 @@ const allowRoles = (...roles: RoleKey[]): Record<RoleKey, boolean> => ({
 
 const ORGANIZATION_PERMISSION_TEMPLATES: PermissionTemplate[] = [
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'organizations',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'organizations',
     scope: 'organization',
     allowed: allowRoles('owner'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'approved_oauth_apps',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.CREATE,
+    action: PermissionAction.CREATE,
     resource: 'approved_oauth_apps',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'approved_oauth_apps',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.DELETE,
+    action: PermissionAction.DELETE,
     resource: 'approved_oauth_apps',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'oauth_apps',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.CREATE,
+    action: PermissionAction.CREATE,
     resource: 'projects',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'integrations.github_connections',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.CREATE,
+    action: PermissionAction.CREATE,
     resource: 'integrations.github_connections',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'integrations.github_connections',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.DELETE,
+    action: PermissionAction.DELETE,
     resource: 'integrations.github_connections',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'integrations.vercel_connections',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.CREATE,
+    action: PermissionAction.CREATE,
     resource: 'integrations.vercel_connections',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'integrations.vercel_connections',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.DELETE,
+    action: PermissionAction.DELETE,
     resource: 'integrations.vercel_connections',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'notifications',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.DELETE,
+    action: PermissionAction.DELETE,
     resource: 'user_invites',
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.CREATE,
+    action: PermissionAction.CREATE,
     resource: 'user_invites',
     scope: 'organization',
-    allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
+    allowed: allowRoles('owner', 'admin', 'developer'),
   },
 ]
 
@@ -212,13 +205,13 @@ const BILLING_RESOURCES = [
 
 for (const resource of BILLING_RESOURCES) {
   ORGANIZATION_PERMISSION_TEMPLATES.push({
-    action: PERMISSION_ACTION.BILLING_READ,
+    action: PermissionAction.BILLING_READ,
     resource,
     scope: 'organization',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   })
   ORGANIZATION_PERMISSION_TEMPLATES.push({
-    action: PERMISSION_ACTION.BILLING_WRITE,
+    action: PermissionAction.BILLING_WRITE,
     resource,
     scope: 'organization',
     allowed: allowRoles('owner', 'admin'),
@@ -227,313 +220,313 @@ for (const resource of BILLING_RESOURCES) {
 
 const PROJECT_PERMISSION_TEMPLATES: PermissionTemplate[] = [
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'projects',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.DELETE,
+    action: PermissionAction.DELETE,
     resource: 'projects',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'projects',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.CREATE,
+    action: PermissionAction.CREATE,
     resource: 'preview_branches',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'preview_branches',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.DELETE,
+    action: PermissionAction.DELETE,
     resource: 'preview_branches',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'preview_branches',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.ANALYTICS_ADMIN_WRITE,
+    action: PermissionAction.ANALYTICS_ADMIN_WRITE,
+    resource: 'logflare',
+    scope: 'project',
+    allowed: allowRoles('owner', 'admin', 'developer'),
+  },
+  {
+    action: PermissionAction.ANALYTICS_READ,
     resource: 'logflare',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.ANALYTICS_READ,
-    resource: 'logflare',
-    scope: 'project',
-    allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
-  },
-  {
-    action: PERMISSION_ACTION.AUTH_EXECUTE,
+    action: PermissionAction.AUTH_EXECUTE,
     resource: 'create_user',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.AUTH_EXECUTE,
+    action: PermissionAction.AUTH_EXECUTE,
     resource: 'invite_user',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.AUTH_EXECUTE,
+    action: PermissionAction.AUTH_EXECUTE,
     resource: 'send_magic_link',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.AUTH_EXECUTE,
+    action: PermissionAction.AUTH_EXECUTE,
     resource: 'send_otp',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.AUTH_EXECUTE,
+    action: PermissionAction.AUTH_EXECUTE,
     resource: 'send_recovery',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.AUTH_EXECUTE,
+    action: PermissionAction.AUTH_EXECUTE,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.FUNCTIONS_WRITE,
+    action: PermissionAction.FUNCTIONS_WRITE,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.FUNCTIONS_READ,
+    action: PermissionAction.FUNCTIONS_READ,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.REALTIME_ADMIN_READ,
+    action: PermissionAction.REALTIME_ADMIN_READ,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.SECRETS_WRITE,
+    action: PermissionAction.SECRETS_WRITE,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.SECRETS_READ,
+    action: PermissionAction.SECRETS_READ,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.STORAGE_ADMIN_WRITE,
+    action: PermissionAction.STORAGE_ADMIN_WRITE,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.STORAGE_ADMIN_READ,
+    action: PermissionAction.STORAGE_ADMIN_READ,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.STORAGE_WRITE,
+    action: PermissionAction.STORAGE_WRITE,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'api_keys',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'service_api_keys',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'auth_signing_keys',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'back_ups',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'physical_backups',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'custom_config_gotrue',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'custom_config_gotrue',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'custom_config_postgrest',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'custom_config_postgrest',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'field.jwt_secret',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.CREATE,
+    action: PermissionAction.CREATE,
     resource: 'user_content',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.UPDATE,
+    action: PermissionAction.UPDATE,
     resource: 'user_content',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.READ,
+    action: PermissionAction.READ,
     resource: 'user_content',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_ADMIN_WRITE,
+    action: PermissionAction.TENANT_SQL_ADMIN_WRITE,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_ADMIN_READ,
+    action: PermissionAction.TENANT_SQL_ADMIN_READ,
     resource: 'extensions',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_ADMIN_READ,
+    action: PermissionAction.TENANT_SQL_ADMIN_READ,
     resource: 'functions',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_ADMIN_READ,
+    action: PermissionAction.TENANT_SQL_ADMIN_READ,
     resource: 'policies',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_ADMIN_READ,
+    action: PermissionAction.TENANT_SQL_ADMIN_READ,
     resource: 'publications',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_ADMIN_READ,
+    action: PermissionAction.TENANT_SQL_ADMIN_READ,
     resource: 'tables',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_ADMIN_READ,
+    action: PermissionAction.TENANT_SQL_ADMIN_READ,
     resource: 'triggers',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_DELETE,
+    action: PermissionAction.TENANT_SQL_DELETE,
     resource: 'auth.mfa_factors',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_DELETE,
+    action: PermissionAction.TENANT_SQL_DELETE,
     resource: 'auth.users',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
   },
   {
-    action: PERMISSION_ACTION.TENANT_SQL_QUERY,
+    action: PermissionAction.TENANT_SQL_QUERY,
     resource: '*',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer', 'read_only'),
   },
   {
-    action: PERMISSION_ACTION.INFRA_EXECUTE,
+    action: PermissionAction.INFRA_EXECUTE,
     resource: 'queue_jobs.projects.pause',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.INFRA_EXECUTE,
+    action: PermissionAction.INFRA_EXECUTE,
     resource: 'queue_jobs.projects.initialize_or_resume',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.INFRA_EXECUTE,
+    action: PermissionAction.INFRA_EXECUTE,
     resource: 'queue_job.restore.prepare',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.INFRA_EXECUTE,
+    action: PermissionAction.INFRA_EXECUTE,
     resource: 'queue_job.walg.prepare_restore',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.INFRA_EXECUTE,
+    action: PermissionAction.INFRA_EXECUTE,
     resource: 'queue_job.projects.update_jwt',
     scope: 'project',
     allowed: allowRoles('owner', 'admin'),
   },
   {
-    action: PERMISSION_ACTION.INFRA_EXECUTE,
+    action: PermissionAction.INFRA_EXECUTE,
     resource: 'reboot',
     scope: 'project',
     allowed: allowRoles('owner', 'admin', 'developer'),
@@ -859,6 +852,7 @@ export const listPermissionsForProfile = async (
     for (const template of ORGANIZATION_PERMISSION_TEMPLATES) {
       for (const roleKey of Object.keys(projectScopes) as RoleKey[]) {
         if (!template.allowed[roleKey]) continue
+        if (roleKey === 'read_only' && !READ_ONLY_ALLOWED_ACTIONS.has(template.action)) continue
         if (roleKey === 'owner' && !orgRoleFlags.owner) continue
         if (roleKey !== 'owner' && !orgRoleFlags[roleKey]) continue
         permissions.push(
@@ -878,6 +872,7 @@ export const listPermissionsForProfile = async (
     for (const template of PROJECT_PERMISSION_TEMPLATES) {
       for (const roleKey of Object.keys(projectScopes) as RoleKey[]) {
         if (!template.allowed[roleKey]) continue
+        if (roleKey === 'read_only' && !READ_ONLY_ALLOWED_ACTIONS.has(template.action)) continue
         const scope = extractScopeArrays(projectScopes[roleKey])
         const hasOrgRole = orgRoleFlags[roleKey]
 
@@ -928,7 +923,7 @@ export const listPermissionsForProfile = async (
           buildPermission({
             organizationId,
             organizationSlug,
-            actions: [PERMISSION_ACTION.CREATE],
+            actions: [PermissionAction.CREATE],
             resources: ['auth.subject_roles'],
             projectRefs: null,
             projectIds: null,
@@ -939,7 +934,7 @@ export const listPermissionsForProfile = async (
           buildPermission({
             organizationId,
             organizationSlug,
-            actions: [PERMISSION_ACTION.DELETE],
+            actions: [PermissionAction.DELETE],
             resources: ['auth.subject_roles'],
             projectRefs: null,
             projectIds: null,
@@ -960,7 +955,7 @@ export const listPermissionsForProfile = async (
           buildPermission({
             organizationId,
             organizationSlug,
-            actions: [PERMISSION_ACTION.CREATE],
+            actions: [PermissionAction.CREATE],
             resources: ['auth.subject_roles'],
             projectRefs: null,
             projectIds: null,
@@ -971,7 +966,7 @@ export const listPermissionsForProfile = async (
           buildPermission({
             organizationId,
             organizationSlug,
-            actions: [PERMISSION_ACTION.DELETE],
+            actions: [PermissionAction.DELETE],
             resources: ['auth.subject_roles'],
             projectRefs: null,
             projectIds: null,
@@ -986,7 +981,7 @@ export const listPermissionsForProfile = async (
         buildPermission({
           organizationId,
           organizationSlug,
-          actions: [PERMISSION_ACTION.DELETE],
+          actions: [PermissionAction.DELETE],
           resources: ['user_invites'],
           projectRefs: null,
           projectIds: null,

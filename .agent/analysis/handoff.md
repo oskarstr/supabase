@@ -1,19 +1,17 @@
 # Handoff Summary · 2025-10-17 · codex
 
 ## Current Focus
-- `/platform/profile/permissions` now derives responses from a large role-based template instead of returning wildcards, but the mapping is still handwritten, noisy, and leaking write actions to read-only members. The immediate goal is to tighten that implementation, hook it up to shared constants, and get the new test suite green.
+- `/platform/profile/permissions` now leans on shared `PermissionAction` constants with a read-only safety net. Next up is collapsing the massive template into maintainable data structures and cross-checking the matrix against Studio’s RBAC expectations.
 
 ## What’s Done
-- Added a comprehensive (manual) permission template in `apps/platform-api/src/store/permissions.ts` that inspects memberships, role metadata (`role_scoped_projects`), and project membership to emit permissions.
-- Introduced `apps/platform-api/tests/permissions.test.ts` covering owner, non-member, developer (project scoped), multi-organization union, and read-only scenarios. Developer/multi-org tests pass; the read-only check currently fails.
-- Parsed the public access-control matrix to seed the template and confirmed base role IDs (1–4 org, 5–8 project) align with Studio expectations.
+- Replaced hand-written action strings with `PermissionAction` constants from `@supabase/shared-types` and added an explicit guard so read-only roles only receive read-level permissions.
+- Updated `apps/platform-api/tests/permissions.test.ts` to assert on canonical action names; the entire permission suite now passes without debug logging.
+- Captured the progress in `.agent/analysis/auth-hardening-plan.md` and refreshed dependencies (`@supabase/shared-types@0.1.80`) for the platform API package.
 
 ## What’s Next
-1. Import action constants from `@supabase/shared-types/out/constants` (or another canonical source) and replace the hard-coded strings throughout the template.
-2. Fix the template so read-only roles never receive write-level actions (`analytics:Admin:Write`, `storage:Write`, etc.); adjust the mapping and rerun `tests/permissions.test.ts`.
-3. Remove the temporary `console.log` diagnostics from both `permissions.ts` and the test once behaviour is correct.
-4. Deduplicate/merge permissions more intelligently and consider small refactors (e.g., generate template data) to keep the file maintainable.
-5. Update Phase 5 notes and documentation (Phase 6) once the contract is stable.
+1. Factor the permission templates into a data-driven structure (e.g., resource/action matrices or shared helpers) to remove duplication and make future edits sustainable.
+2. Reconcile the generated permissions with Studio’s RBAC matrix: confirm storage, realtime, and SQL actions align per role, and add targeted tests for admin/project-level roles as gaps appear.
+3. Once the matrix stabilises, document the contract (Phase 6) and consider exposing shared constants so the API and Studio stop drifting.
 
 ## Repo Hygiene & Tests
 - Use `pnpm --filter platform-api test -- tests/organization.members.test.ts` and `pnpm --filter platform-api test -- tests/profile.routes.test.ts` for targeted checks.
@@ -31,4 +29,4 @@
 - Historical notes: `.agent/analysis/agent1.md` … `agent4.md`
 - Invitation flow tests: `apps/platform-api/tests/organization.members.test.ts`
 
-Ping the user if you notice anything “hacky” or unfinished before moving on. They prefer blunt honesty over politeness.  !*** End Patch
+Ping the user if you notice anything “hacky” or unfinished before moving on. They prefer blunt honesty over politeness.

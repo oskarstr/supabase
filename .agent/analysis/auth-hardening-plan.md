@@ -128,8 +128,9 @@ Test file: `apps/platform-api/tests/permissions.test.ts`
 > Progress (2025-10-17):
 > - ✅ `/platform/profile/permissions` now resolves memberships per profile, mapping base role templates (owner/admin wildcard, developer/read-only scoped projects) and unioning results across organizations.
 > - ✅ Project scoped metadata (`role_scoped_projects`) drives the returned `project_refs`/`project_ids`, preventing non-members from inheriting wildcard access.
-> - ✅ Added `tests/permissions.test.ts` covering owner wildcard, non-member denial, scoped developer access, and multi-organization union behaviour.
-> - ☐ Remaining cleanup: move to shared permission constants (currently hard-coded), tighten the template so read-only members never receive write actions, remove debug logging, and re-run the suite until it passes.
+> - ✅ Added `tests/permissions.test.ts` covering owner wildcard, non-member denial, scoped developer access, multi-organization union behaviour, and read-only safeguards.
+> - ✅ Permissions store now relies on `@supabase/shared-types` `PermissionAction` constants and explicitly guards read-only roles from write-level actions.
+> - ☐ Remaining cleanup: collapse the sprawling template into a maintainable data map, move shared role combinations into helpers, and audit the matrix against upstream Studio expectations.
 
 ---
 
