@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -93,5 +95,45 @@ func TestProvisionAllowsStopNotRunning(t *testing.T) {
 
 	if len(runner.calls) < 2 || runner.calls[0] != "stop" || runner.calls[1] != "start" {
 		t.Fatalf("expected stop before start even when stop reports not running, got %v", runner.calls)
+	}
+}
+
+func TestStopIgnoresNotRunning(t *testing.T) {
+	runner := &notRunningStopRunner{}
+	executor := newLocalExecutorWithRunner(runner)
+
+	projectRoot := t.TempDir()
+	req := stopRequest{ProjectRef: "test-ref", ProjectRoot: projectRoot}
+
+	if _, err := executor.Stop(context.Background(), req); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+func TestDestroyIgnoresNotRunning(t *testing.T) {
+	runner := &notRunningStopRunner{}
+	executor := newLocalExecutorWithRunner(runner)
+
+	projectRoot := t.TempDir()
+	req := destroyRequest{ProjectRef: "test-ref", ProjectRoot: projectRoot, OrganizationSlug: "org"}
+
+	if _, err := executor.Destroy(context.Background(), req); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+func TestRunWithLogsRestoresStdIOOnPanic(t *testing.T) {
+	executor := newLocalExecutorWithRunner(cliRunner{})
+	originalStdout := os.Stdout
+	_, err := executor.runWithLogs(func() error {
+		// Use println so the compiler doesn't optimise away stdout writes
+		println("before panic")
+		panic("boom")
+	})
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("expected panic error, got %v", err)
+	}
+	if os.Stdout != originalStdout {
+		t.Fatalf("expected stdout to be restored after panic")
 	}
 }
