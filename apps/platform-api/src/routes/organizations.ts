@@ -3,7 +3,9 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
 import {
   CLOUD_PROVIDERS,
   createOrganization,
+  createOrganizationInvitation,
   deleteOrganizationMember,
+  deleteOrganizationInvitationById,
   ensureProfile,
   getOrganizationCustomer,
   getOrganizationDetail,
@@ -26,6 +28,7 @@ import {
   listOrganizationTaxIds,
   listOrganizations,
   upsertOrganizationMemberRole,
+  InvitationError,
 } from '../store/index.js'
 import type {
   CloudProvider,
@@ -167,6 +170,70 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
 
       const members = await listOrganizationMembers(request.params.slug)
       return reply.send(members)
+    }
+  )
+
+  app.post<{
+    Params: { slug: string }
+    Body: { email?: string; role_id?: number; role_scoped_projects?: string[] }
+  }>('/:slug/members/invitations', async (request, reply) => {
+    const profile = await requireProfile(request, reply)
+    if (!profile) return
+
+    const membership = await requireOrganizationMembership(profile, request.params.slug, reply, request)
+    if (!membership) return
+
+    if (!canManageMembers(membership)) {
+      return reply.code(403).send({ message: 'Forbidden' })
+    }
+
+    const email = request.body?.email?.trim()
+    const roleId = request.body?.role_id
+    if (!email || !Number.isFinite(roleId)) {
+      return reply.code(400).send({ message: 'Email and role_id are required' })
+    }
+
+    try {
+      const invitation = await createOrganizationInvitation(request.params.slug, email, Number(roleId), {
+        invitedByProfileId: profile.id,
+        roleScopedProjects: Array.isArray(request.body?.role_scoped_projects)
+          ? request.body.role_scoped_projects.filter((entry) => typeof entry === 'string')
+          : undefined,
+      })
+
+      return reply.code(201).send(invitation)
+    } catch (error) {
+      if (error instanceof InvitationError) {
+        return reply.code(400).send({ message: error.message })
+      }
+      request.log.error({ err: error }, 'Failed to create organization invitation')
+      return reply.code(500).send({ message: 'Failed to create organization invitation' })
+    }
+  })
+
+  app.delete<{ Params: { slug: string; id: string } }>(
+    '/:slug/members/invitations/:id',
+    async (request, reply) => {
+      const profile = await requireProfile(request, reply)
+      if (!profile) return
+
+      const membership = await requireOrganizationMembership(profile, request.params.slug, reply, request)
+      if (!membership) return
+
+      if (!canManageMembers(membership)) {
+        return reply.code(403).send({ message: 'Forbidden' })
+      }
+
+      const invitationId = Number.parseInt(request.params.id, 10)
+      if (!Number.isFinite(invitationId)) {
+        return reply.code(400).send({ message: 'Invitation id must be a number' })
+      }
+
+      const removed = await deleteOrganizationInvitationById(request.params.slug, invitationId)
+      if (!removed) {
+        return reply.code(404).send({ message: 'Invitation not found' })
+      }
+      return reply.code(204).send()
     }
   )
 

@@ -217,6 +217,7 @@ export const seedDefaults = async () => {
               organization_id: organizationId,
               invited_email: invite.invited_email,
               role_id: role.id,
+              metadata: {},
             })
             .execute()
         }

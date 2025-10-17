@@ -1,3 +1,6 @@
+import isEmail from 'validator/lib/isEmail.js'
+import normalizeEmail from 'validator/lib/normalizeEmail.js'
+
 import { getPlatformDb } from '../db/client.js'
 import { DEFAULT_PRIMARY_EMAIL, DEFAULT_USERNAME } from '../config/defaults.js'
 import type {
@@ -236,6 +239,52 @@ const mapMemberRowToOrganizationMember = (
   }
 }
 
+const normalizeEmailAddress = (raw: string) => {
+  const trimmed = raw.trim()
+  const normalized = normalizeEmail(trimmed, {
+    gmail_remove_dots: false,
+    gmail_remove_subaddress: false,
+    outlookdotcom_remove_subaddress: false,
+    yahoo_remove_subaddress: false,
+    icloud_remove_subaddress: false,
+    all_lowercase: true,
+  })
+  return (normalized ?? trimmed).toLowerCase()
+}
+
+const nextInvitationId = async () => {
+  const maxRow = await db
+    .selectFrom('organization_invitations')
+    .select(({ fn }) => fn.max('id').as('max_id'))
+    .executeTakeFirst()
+  return Number(maxRow?.max_id ?? 0) + 1
+}
+
+const mapInvitationRow = (row: {
+  id: number
+  invited_email: string
+  role_id: number | null
+  invited_at: Date
+  metadata?: unknown
+}): InvitationOutput => ({
+  id: row.id,
+  invited_at: row.invited_at.toISOString(),
+  invited_email: row.invited_email,
+  role_id: Number(row.role_id ?? 0),
+  metadata: (row.metadata as Record<string, unknown>) ?? {},
+})
+
+type InvitationOutput = OrganizationInvitationsResponse['invitations'][number] & {
+  metadata: Record<string, unknown>
+}
+
+export class InvitationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'InvitationError'
+  }
+}
+
 export const upsertOrganizationMemberRole = async (
   slug: string,
   targetProfile: Profile,
@@ -312,4 +361,110 @@ export const deleteOrganizationMember = async (
     .where('id', '=', existing.id)
     .execute()
   return true
+}
+
+export const createOrganizationInvitation = async (
+  slug: string,
+  email: string,
+  roleId: number,
+  options: { invitedByProfileId?: number; roleScopedProjects?: string[] } = {}
+): Promise<InvitationOutput> => {
+  const organizationId = await loadOrganizationId(slug)
+  if (!organizationId) {
+    throw new InvitationError('Organization not found')
+  }
+
+  const normalizedEmail = normalizeEmailAddress(email)
+  if (!isEmail(normalizedEmail)) {
+    throw new InvitationError('A valid email address is required')
+  }
+
+  const role = await loadOrgRole(organizationId, roleId)
+  if (!role) {
+    throw new InvitationError('Role does not exist for this organization')
+  }
+
+  const existingMember = await db
+    .selectFrom('organization_members')
+    .innerJoin('profiles', 'profiles.id', 'organization_members.profile_id')
+    .select(['profiles.primary_email'])
+    .where('organization_members.organization_id', '=', organizationId)
+    .where('profiles.primary_email', '=', normalizedEmail)
+    .executeTakeFirst()
+
+  if (existingMember) {
+    throw new InvitationError('A member with this email already exists in the organization')
+  }
+
+  const existingInvitation = await db
+    .selectFrom('organization_invitations')
+    .selectAll()
+    .where('organization_id', '=', organizationId)
+    .where('invited_email', '=', normalizedEmail)
+    .executeTakeFirst()
+
+  const metadata = {
+    ...(existingInvitation?.metadata as Record<string, unknown> | undefined),
+    role_scoped_projects: options.roleScopedProjects ?? null,
+    invited_by_profile_id: options.invitedByProfileId ?? null,
+  }
+
+  if (existingInvitation) {
+    const updated = await db
+      .updateTable('organization_invitations')
+      .set({
+        role_id: roleId,
+        invited_at: new Date().toISOString(),
+        metadata,
+      })
+      .where('id', '=', existingInvitation.id)
+      .returning([
+        'id',
+        'invited_email',
+        'role_id',
+        'invited_at',
+        'metadata',
+      ])
+      .executeTakeFirstOrThrow()
+
+    return mapInvitationRow(updated)
+  }
+
+  const values: Record<string, unknown> = {
+    organization_id: organizationId,
+    invited_email: normalizedEmail,
+    role_id: roleId,
+    invited_at: new Date().toISOString(),
+    metadata,
+  }
+
+  if (isPgMem()) {
+    values.id = await nextInvitationId()
+  }
+
+  const inserted = await db
+    .insertInto('organization_invitations')
+    .values(values)
+    .returning(['id', 'invited_email', 'role_id', 'invited_at', 'metadata'])
+    .executeTakeFirstOrThrow()
+
+  return mapInvitationRow(inserted)
+}
+
+export const deleteOrganizationInvitationById = async (
+  slug: string,
+  invitationId: number
+): Promise<boolean> => {
+  const organizationId = await loadOrganizationId(slug)
+  if (!organizationId) {
+    return false
+  }
+
+  const deleted = await db
+    .deleteFrom('organization_invitations')
+    .where('organization_id', '=', organizationId)
+    .where('id', '=', invitationId)
+    .executeTakeFirst()
+
+  return Boolean(deleted?.numDeletedRows)
 }

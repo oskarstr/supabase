@@ -59,6 +59,16 @@ describe('organization member routes', () => {
     return row.id
   }
 
+  const invitationList = async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+    })
+    expect(response.statusCode).toBe(200)
+    return response.json() as { invitations: Array<{ id: number; invited_email: string }> }
+  }
+
   const ownerHeaders = () => withAuth()
 
   const headersForSubject = (sub: string) => ({
@@ -245,5 +255,84 @@ describe('organization member routes', () => {
     })
     const parsed = members.json() as Array<{ gotrue_id: string }>
     expect(parsed.find((member) => member.gotrue_id === targetUserId)).toBeUndefined()
+  })
+
+  it('allows an owner to create an invitation', async () => {
+    const roleId = await developerRoleId()
+
+    const create = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+      payload: {
+        email: 'invitee@example.com',
+        role_id: roleId,
+        role_scoped_projects: ['project-one', 'project-two'],
+      },
+    })
+
+    expect(create.statusCode).toBe(201)
+    const created = create.json() as { invited_email: string; role_id: number; metadata?: { role_scoped_projects?: string[] } }
+    expect(created.invited_email).toBe('invitee@example.com')
+    expect(created.role_id).toBe(roleId)
+    expect(created.metadata?.role_scoped_projects).toEqual(['project-one', 'project-two'])
+
+    const invitations = await invitationList()
+    expect(invitations.invitations.some((invite) => invite.invited_email === 'invitee@example.com')).toBe(true)
+  })
+
+  it('prevents non-admin members from creating invitations', async () => {
+    const developerId = randomUUID()
+    const { ensureProfile } = await import('../src/store/profile.js')
+    const devProfile = await ensureProfile(developerId, 'dev-invite@example.com')
+
+    await platformDb
+      .insertInto('organization_members')
+      .values({
+        organization_id: defaultOrganizationId,
+        profile_id: devProfile.id,
+        role_ids: [3],
+        metadata: {},
+        mfa_enabled: false,
+        is_owner: false,
+      })
+      .execute()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: withAuth(headersForSubject(developerId)),
+      payload: {
+        email: 'reject@example.com',
+        role_id: await developerRoleId(),
+      },
+    })
+
+    expect(response.statusCode).toBe(403)
+  })
+
+  it('removes invitations by id', async () => {
+    const roleId = await developerRoleId()
+    const create = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+      payload: {
+        email: 'delete-me@example.com',
+        role_id: roleId,
+      },
+    })
+    expect(create.statusCode).toBe(201)
+    const created = create.json() as { id: number }
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations/${created.id}`,
+      headers: ownerHeaders(),
+    })
+    expect(del.statusCode).toBe(204)
+
+    const invitations = await invitationList()
+    expect(invitations.invitations.some((invite) => invite.invited_email === 'delete-me@example.com')).toBe(false)
   })
 })

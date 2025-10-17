@@ -142,6 +142,9 @@ export {
   listOrganizationDailyUsage,
   upsertOrganizationMemberRole,
   deleteOrganizationMember,
+  createOrganizationInvitation,
+  deleteOrganizationInvitationById,
+  InvitationError,
 } from './organization-members.js'
 
 export {

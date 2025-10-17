@@ -106,7 +106,8 @@ Tests:
 > Progress (2025-10-17):
 > - ✅ Added ownership-guarded `PATCH`/`DELETE` membership routes backed by new store helpers that upsert or remove organization member records.
 > - ✅ Introduced `tests/organization.members.test.ts` to cover role assignment, permission denials, and owner deletion protections.
-> - ☐ Still need invitation flows and scoped-role metadata management to match Studio’s full contract.
+> - ✅ Wired up invitation create/delete flows with metadata storage, plus regression coverage ensuring only owners/admins can mutate invitations.
+> - ☐ Follow-up: invitation token acceptance + scoped-project enforcement on acceptance still pending.
 
 Each test should prepare fixtures via the seed helper, use the auth middleware with mocked JWTs, and assert DB state after the route executes.
 
