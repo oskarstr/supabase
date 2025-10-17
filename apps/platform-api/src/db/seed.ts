@@ -30,8 +30,13 @@ import {
   nowIso,
 } from '../config/defaults.js'
 import { PROJECTS_ROOT } from '../store/state.js'
+import {
+  PROJECT_PORT_BASE,
+  PROJECT_PORT_MAX,
+  PROJECT_PORT_STEP,
+} from '../provisioning/ports.js'
 import { getPlatformDb } from './client.js'
-import { sql } from 'kysely'
+import { Kysely, sql } from 'kysely'
 
 const OWNER_ROLE = {
   base_role_id: 1,
@@ -64,6 +69,38 @@ const DEFAULT_INVITATIONS = [
     role_base_id: 3,
   },
 ]
+
+const selectNextSeedPortBase = async (
+  trx: Kysely<PlatformDatabase>,
+  excludeProjectId?: number
+): Promise<number> => {
+  let query = trx
+    .selectFrom('project_runtimes')
+    .select('port_base')
+    .where('port_base', 'is not', null)
+
+  if (excludeProjectId !== undefined) {
+    query = query.where('project_id', '!=', excludeProjectId)
+  }
+
+  const rows = await query.orderBy('port_base', 'asc').execute()
+  const used = new Set<number>()
+  for (const row of rows) {
+    if (typeof row.port_base === 'number') {
+      used.add(row.port_base)
+    }
+  }
+
+  let candidate = PROJECT_PORT_BASE
+  while (used.has(candidate)) {
+    candidate += PROJECT_PORT_STEP
+    if (candidate + 3 > PROJECT_PORT_MAX) {
+      throw new Error('No available project runtime port ranges remain during seeding')
+    }
+  }
+
+  return candidate
+}
 
 const normalizeBillingPartner = (
   value: string | null | undefined
@@ -260,11 +297,13 @@ export const seedDefaults = async () => {
 
     if (!runtime) {
       const rootDir = resolve(PROJECTS_ROOT, DEFAULT_PROJECT_REF)
+      const portBase = await selectNextSeedPortBase(trx)
       await trx
         .insertInto('project_runtimes')
         .values({
           project_id: projectId,
           root_dir: rootDir,
+          port_base: portBase,
         })
         .execute()
     }
@@ -330,11 +369,13 @@ export const seedDefaults = async () => {
 
       if (!runtimeRow) {
         const platformRoot = resolve(PROJECTS_ROOT, PLATFORM_PROJECT_REF)
+        const portBase = await selectNextSeedPortBase(trx, platformProjectId)
         await trx
           .insertInto('project_runtimes')
           .values({
             project_id: platformProjectId,
             root_dir: platformRoot,
+            port_base: portBase,
           })
           .execute()
       }

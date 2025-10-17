@@ -107,6 +107,7 @@ const scheduleProvisioning = async (
 ) => {
   const runtimeRoot = options.runtime.root_dir
   const excludedServices = options.runtime.excluded_services ?? []
+  const portBase = options.runtime.port_base
   const existingEnv = readProvisionedEnv(runtimeRoot)
   const databasePassword =
     options.dbPassword && options.dbPassword.length > 0
@@ -123,41 +124,52 @@ const scheduleProvisioning = async (
       databasePassword,
       projectRoot: runtimeRoot,
       excludedServices,
+      portBase,
+    })
+
+    await waitForRuntimeHealth({
+      portBase,
+      excludedServices,
     })
 
     const parsedEnv = readProvisionedEnv(runtimeRoot)
-    const updates: ProjectUpdate = {}
-
-    if (parsedEnv?.SUPABASE_ANON_KEY) {
-      updates.anon_key = parsedEnv.SUPABASE_ANON_KEY
-    }
-    if (parsedEnv?.SUPABASE_SERVICE_KEY) {
-      updates.service_key = parsedEnv.SUPABASE_SERVICE_KEY
+    if (!parsedEnv) {
+      throw new Error('Supabase runtime .env not found after provisioning')
     }
 
-    const supabaseUrl = parsedEnv?.SUPABASE_URL ?? parsedEnv?.SUPABASE_PUBLIC_URL
-    if (supabaseUrl) {
-      updates.rest_url = buildRestUrl(supabaseUrl)
+    const anonKey = parsedEnv.SUPABASE_ANON_KEY
+    const serviceKey = parsedEnv.SUPABASE_SERVICE_KEY
+    const supabaseUrl = parsedEnv.SUPABASE_URL ?? parsedEnv.SUPABASE_PUBLIC_URL
+    const dbUrl = parsedEnv.DATABASE_URL ?? parsedEnv.SUPABASE_DB_URL
+
+    const missing: string[] = []
+    if (!anonKey) missing.push('SUPABASE_ANON_KEY')
+    if (!serviceKey) missing.push('SUPABASE_SERVICE_KEY')
+    if (!dbUrl) missing.push('SUPABASE_DB_URL')
+    if (!supabaseUrl) missing.push('SUPABASE_URL')
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Provisioned runtime missing required env values: ${missing.join(', ')}`
+      )
     }
 
-    const dbUrl = parsedEnv?.DATABASE_URL ?? parsedEnv?.SUPABASE_DB_URL
-    if (dbUrl) {
-      updates.connection_string = dbUrl
-      try {
-        updates.db_host = new URL(dbUrl).hostname
-      } catch {
-        /* noop */
-      }
+    const updates: ProjectUpdate = {
+      anon_key: anonKey!,
+      service_key: serviceKey!,
+      connection_string: dbUrl!,
+      rest_url: buildRestUrl(supabaseUrl!),
     }
 
-    if (parsedEnv?.POSTGRES_VERSION) {
+    try {
+      updates.db_host = new URL(dbUrl!).hostname
+    } catch {
+      /* noop */
+    }
+
+    if (parsedEnv.POSTGRES_VERSION) {
       updates.db_version = parsedEnv.POSTGRES_VERSION
     }
-
-    await waitForRuntimeHealth({
-      projectId: project.id,
-      excludedServices,
-    })
 
     updates.status = 'ACTIVE_HEALTHY'
     await updateProject(project.ref, updates)
