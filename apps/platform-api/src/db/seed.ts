@@ -66,6 +66,29 @@ const DEFAULT_INVITATIONS = [
   },
 ]
 
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    if (ms <= 0) {
+      resolve()
+      return
+    }
+    setTimeout(resolve, ms)
+  })
+
+const mergeRoleIds = (...roleSets: Array<readonly unknown[] | null | undefined>): number[] => {
+  const seen = new Set<number>()
+  for (const roles of roleSets) {
+    if (!Array.isArray(roles)) continue
+    for (const role of roles) {
+      const value = Number(role)
+      if (Number.isFinite(value)) {
+        seen.add(value)
+      }
+    }
+  }
+  return Array.from(seen).sort((a, b) => a - b)
+}
+
 const normalizeBillingPartner = (
   value: string | null | undefined
 ): 'fly' | 'aws_marketplace' | 'vercel_marketplace' | null => {
@@ -75,15 +98,63 @@ const normalizeBillingPartner = (
   return null
 }
 
+const parsePositiveIntEnv = (value: string | undefined, fallback: number, min = 1, max?: number) => {
+  const parsed = Number.parseInt(value ?? '', 10)
+  if (!Number.isFinite(parsed) || parsed < min) return Math.max(min, fallback)
+  if (typeof max === 'number' && parsed > max) return max
+  return parsed
+}
+
+const adminSeedRetryAttempts = () => {
+  if (
+    process.env.PLATFORM_DB_URL === 'pg-mem' &&
+    process.env.PLATFORM_ADMIN_SEED_RETRY_ATTEMPTS === undefined
+  ) {
+    return 1
+  }
+  return parsePositiveIntEnv(process.env.PLATFORM_ADMIN_SEED_RETRY_ATTEMPTS, 5)
+}
+
+const adminSeedRetryDelayMs = () => {
+  if (
+    process.env.PLATFORM_DB_URL === 'pg-mem' &&
+    process.env.PLATFORM_ADMIN_SEED_RETRY_DELAY_MS === undefined
+  ) {
+    return 0
+  }
+  return parsePositiveIntEnv(process.env.PLATFORM_ADMIN_SEED_RETRY_DELAY_MS, 1000, 0)
+}
+
+const adminSeedMaxDelayMs = () => {
+  if (
+    process.env.PLATFORM_DB_URL === 'pg-mem' &&
+    process.env.PLATFORM_ADMIN_SEED_MAX_DELAY_MS === undefined
+  ) {
+    return 0
+  }
+  return parsePositiveIntEnv(process.env.PLATFORM_ADMIN_SEED_MAX_DELAY_MS, 10000, 100, 60000)
+}
+
+const hasAdminBootstrapConfiguration = (email: string, password: string) => {
+  const gotrueUrl =
+    process.env.SUPABASE_GOTRUE_URL?.trim() || process.env.GOTRUE_URL?.trim()
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_KEY?.trim() || process.env.SERVICE_ROLE_KEY?.trim()
+  return Boolean(gotrueUrl && serviceKey && email && password)
+}
+
 export const seedDefaults = async () => {
   const runtimeAdminEmail =
     process.env.PLATFORM_ADMIN_EMAIL?.trim() || DEFAULT_ADMIN_EMAIL
   const runtimeAdminPassword =
     process.env.PLATFORM_ADMIN_PASSWORD?.trim() || DEFAULT_ADMIN_PASSWORD
 
-  const adminIdentity = await ensureAdminAuthUser(runtimeAdminEmail, runtimeAdminPassword)
-  const adminUserId = adminIdentity?.userId ?? null
-  const adminEmail = adminIdentity?.email ?? runtimeAdminEmail
+  const adminIdentity = await ensureAdminIdentityWithRetry(
+    runtimeAdminEmail,
+    runtimeAdminPassword
+  )
+  const adminUserId = adminIdentity.userId
+  const adminEmail = adminIdentity.email ?? runtimeAdminEmail
 
   const db = getPlatformDb()
 
@@ -154,7 +225,7 @@ export const seedDefaults = async () => {
 
       const member = await trx
         .selectFrom('organization_members')
-        .select(['id'])
+        .select(['id', 'role_ids'])
         .where('organization_id', '=', organizationId)
         .where('profile_id', '=', baseProfile.id)
         .executeTakeFirst()
@@ -170,6 +241,16 @@ export const seedDefaults = async () => {
             mfa_enabled: false,
             is_owner: true,
           })
+          .execute()
+      } else {
+        const mergedRoles = mergeRoleIds(member.role_ids, [OWNER_ROLE.base_role_id])
+        await trx
+          .updateTable('organization_members')
+          .set({
+            role_ids: mergedRoles,
+            is_owner: true,
+          })
+          .where('id', '=', member.id)
           .execute()
       }
 
@@ -405,16 +486,7 @@ export const seedDefaults = async () => {
     }
   })
 
-  if (adminUserId) {
-    await db
-      .updateTable('profiles')
-      .set({
-        gotrue_id: adminUserId,
-        primary_email: adminEmail,
-      })
-      .where('id', '=', baseProfile.id)
-      .execute()
-  }
+  await reconcileAdminState(db, adminUserId, adminEmail)
 
   console.log('[platform-db] default seed complete')
 }
@@ -422,6 +494,194 @@ export const seedDefaults = async () => {
 type AdminUserIdentity = {
   userId: string
   email: string
+}
+
+const ensureAdminIdentityWithRetry = async (
+  email: string,
+  password: string
+): Promise<AdminUserIdentity> => {
+  if (!hasAdminBootstrapConfiguration(email, password)) {
+    console.warn(
+      '[platform-db] admin bootstrap skipped: SUPABASE_GOTRUE_URL or service key not configured'
+    )
+    const fallback = await getPlatformDb()
+      .selectFrom('profiles')
+      .select(['gotrue_id'])
+      .where('id', '=', baseProfile.id)
+      .executeTakeFirst()
+    return { userId: fallback?.gotrue_id ?? baseProfile.gotrue_id, email }
+  }
+
+  const attempts = adminSeedRetryAttempts()
+  const baseDelay = adminSeedRetryDelayMs()
+  const maxDelay = Math.max(baseDelay, adminSeedMaxDelayMs())
+
+  let attempt = 0
+  let delay = baseDelay
+  while (attempt < attempts) {
+    const identity = await ensureAdminAuthUser(email, password)
+    if (identity) {
+      return identity
+    }
+
+    attempt += 1
+    if (attempt >= attempts) {
+      break
+    }
+
+    console.warn(
+      `[platform-db] failed to ensure admin user (attempt ${attempt}/${attempts}), retrying...`
+    )
+
+    const waitFor = Math.max(0, Math.min(delay, maxDelay))
+    if (waitFor > 0) {
+      await sleep(waitFor)
+    }
+    delay = Math.min(delay * 2 || baseDelay || 1000, maxDelay)
+  }
+
+  throw new Error(
+    `Failed to ensure platform admin account after ${attempts} attempt${attempts === 1 ? '' : 's'}. ` +
+      'Confirm GoTrue is reachable and the PLATFORM_ADMIN_* credentials are correct.'
+  )
+}
+
+const reconcileAdminState = async (
+  db: ReturnType<typeof getPlatformDb>,
+  adminUserId: string,
+  adminEmail: string
+) => {
+  await migrateDuplicateAdminProfiles(db, adminUserId, adminEmail)
+
+  await db
+    .updateTable('profiles')
+    .set({
+      gotrue_id: adminUserId,
+      primary_email: adminEmail,
+    })
+    .where('id', '=', baseProfile.id)
+    .execute()
+
+  await ensureAdminOwnerMembership(db)
+}
+
+const ensureAdminOwnerMembership = async (db: ReturnType<typeof getPlatformDb>) => {
+  const memberships = await db
+    .selectFrom('organization_members')
+    .select(['id', 'role_ids', 'is_owner', 'organization_id', 'metadata'])
+    .where('profile_id', '=', baseProfile.id)
+    .execute()
+
+  if (memberships.length === 0) {
+    await db
+      .insertInto('organization_members')
+      .values({
+        organization_id: DEFAULT_ORG_ID,
+        profile_id: baseProfile.id,
+        role_ids: [OWNER_ROLE.base_role_id],
+        metadata: {},
+        mfa_enabled: false,
+        is_owner: true,
+      })
+      .execute()
+    return
+  }
+
+  for (const membership of memberships) {
+    const mergedRoles = mergeRoleIds(membership.role_ids, [OWNER_ROLE.base_role_id])
+    const shouldUpdateRoles =
+      membership.role_ids?.length !== mergedRoles.length ||
+      mergedRoles.some((role, index) => membership.role_ids?.[index] !== role)
+
+    if (!shouldUpdateRoles && membership.is_owner) {
+      continue
+    }
+
+    await db
+      .updateTable('organization_members')
+      .set({
+        role_ids: mergedRoles,
+        is_owner: true,
+        metadata: (membership.metadata as Record<string, unknown> | null) ?? {},
+      })
+      .where('id', '=', membership.id)
+      .execute()
+  }
+}
+
+const migrateDuplicateAdminProfiles = async (
+  db: ReturnType<typeof getPlatformDb>,
+  adminUserId: string,
+  adminEmail: string
+) => {
+  const duplicates = await db
+    .selectFrom('profiles')
+    .select(['id'])
+    .where('id', '!=', baseProfile.id)
+    .where((eb) =>
+      eb.or([
+        eb('gotrue_id', '=', adminUserId),
+        eb('primary_email', '=', adminEmail),
+      ])
+    )
+    .execute()
+
+  if (duplicates.length === 0) return
+
+  const duplicateIds = duplicates.map((row) => Number(row.id))
+
+  const duplicateMemberships = duplicateIds.length
+    ? await db
+        .selectFrom('organization_members')
+        .select(['id', 'organization_id', 'role_ids', 'metadata'])
+        .where('profile_id', 'in', duplicateIds)
+        .execute()
+    : []
+
+  for (const membership of duplicateMemberships) {
+    const existing = await db
+      .selectFrom('organization_members')
+      .select(['id', 'role_ids', 'metadata'])
+      .where('organization_id', '=', membership.organization_id)
+      .where('profile_id', '=', baseProfile.id)
+      .executeTakeFirst()
+
+    const mergedRoles = mergeRoleIds(
+      existing?.role_ids,
+      membership.role_ids,
+      [OWNER_ROLE.base_role_id]
+    )
+
+    if (existing) {
+      await db
+        .updateTable('organization_members')
+        .set({
+          role_ids: mergedRoles,
+          metadata: (existing.metadata as Record<string, unknown> | null) ?? {},
+          is_owner: true,
+        })
+        .where('id', '=', existing.id)
+        .execute()
+
+      await db
+        .deleteFrom('organization_members')
+        .where('id', '=', membership.id)
+        .execute()
+    } else {
+      await db
+        .updateTable('organization_members')
+        .set({
+          profile_id: baseProfile.id,
+          role_ids: mergedRoles,
+          metadata: (membership.metadata as Record<string, unknown> | null) ?? {},
+          is_owner: true,
+        })
+        .where('id', '=', membership.id)
+        .execute()
+    }
+  }
+
+  await db.deleteFrom('profiles').where('id', 'in', duplicateIds).execute()
 }
 
 const ensureAdminAuthUser = async (

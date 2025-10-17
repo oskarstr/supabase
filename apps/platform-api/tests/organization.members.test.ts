@@ -59,6 +59,19 @@ describe('organization member routes', () => {
     return row.id
   }
 
+  const adminRoleId = async () => {
+    const row = await platformDb
+      .selectFrom('organization_roles')
+      .select(['id'])
+      .where('organization_id', '=', defaultOrganizationId)
+      .where('name', '=', 'Administrator')
+      .executeTakeFirst()
+    if (!row?.id) {
+      throw new Error('Administrator role not found')
+    }
+    return row.id
+  }
+
   const invitationList = async () => {
     const response = await app.inject({
       method: 'GET',
@@ -181,6 +194,57 @@ describe('organization member routes', () => {
     expect(found?.role_ids).toEqual([roleId])
   })
 
+  it('appends new roles without overwriting existing assignments', async () => {
+    const targetUserId = randomUUID()
+    const targetEmail = 'multi-role@example.com'
+    const { ensureProfile } = await import('../src/store/profile.js')
+    const targetProfile = await ensureProfile(targetUserId, targetEmail)
+
+    const devRoleId = await developerRoleId()
+    const adminRoleIdValue = await adminRoleId()
+
+    const first = await app.inject({
+      method: 'PATCH',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/${targetUserId}`,
+      headers: ownerHeaders(),
+      payload: {
+        role_id: devRoleId,
+        role_scoped_projects: ['project-1'],
+      },
+    })
+
+    expect(first.statusCode).toBe(200)
+    expect(first.json()).toMatchObject({ role_ids: [devRoleId] })
+
+    const second = await app.inject({
+      method: 'PATCH',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/${targetUserId}`,
+      headers: ownerHeaders(),
+      payload: {
+        role_id: adminRoleIdValue,
+      },
+    })
+
+    expect(second.statusCode).toBe(200)
+    const secondPayload = second.json() as { role_ids: number[] }
+    expect(secondPayload.role_ids).toEqual([adminRoleIdValue, devRoleId])
+
+    const membership = await platformDb
+      .selectFrom('organization_members')
+      .select(['role_ids', 'metadata'])
+      .where('organization_id', '=', defaultOrganizationId)
+      .where('profile_id', '=', targetProfile.id)
+      .executeTakeFirst()
+
+    expect(membership?.role_ids).toEqual([adminRoleIdValue, devRoleId])
+    const metadata = (membership?.metadata as Record<string, unknown>) ?? {}
+    const scoped = (
+      metadata as { role_scoped_projects?: Record<string, string[]> }
+    ).role_scoped_projects
+    expect(scoped?.[String(devRoleId)]).toEqual(['project-1'])
+    expect(scoped?.[String(adminRoleIdValue)]).toBeUndefined()
+  })
+
   it('prevents non-admin members from mutating membership', async () => {
     const developerId = randomUUID()
     const { ensureProfile } = await import('../src/store/profile.js')
@@ -272,10 +336,17 @@ describe('organization member routes', () => {
     })
 
     expect(create.statusCode).toBe(201)
-    const created = create.json() as { invited_email: string; role_id: number; metadata?: { role_scoped_projects?: string[] } }
+    const created = create.json() as {
+      invited_email: string
+      role_id: number
+      metadata?: Record<string, unknown>
+    }
     expect(created.invited_email).toBe('invitee@example.com')
     expect(created.role_id).toBe(roleId)
-    expect(created.metadata?.role_scoped_projects).toEqual(['project-one', 'project-two'])
+    const invitationMetadata = (
+      created.metadata as { role_scoped_projects?: Record<string, string[]> }
+    )?.role_scoped_projects
+    expect(invitationMetadata?.[String(roleId)]).toEqual(['project-one', 'project-two'])
 
     const invitations = await invitationList()
     expect(invitations.invitations.some((invite) => invite.invited_email === 'invitee@example.com')).toBe(true)

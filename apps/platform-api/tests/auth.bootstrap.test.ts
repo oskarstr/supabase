@@ -162,4 +162,121 @@ describe('bootstrap admin reconciliation', () => {
     expect(profile?.gotrue_id).toBe(updatedUserId)
     expect(profile?.primary_email).toBe('new-admin@example.com')
   })
+
+  it('retries GoTrue reconciliation before succeeding', async () => {
+    await initMemDatabase()
+
+    const expectedUserId = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff'
+    const responses = [
+      new Response('temporarily unavailable', { status: 503 }),
+      new Response('still booting', { status: 502 }),
+      new Response(JSON.stringify({ user: { id: expectedUserId } }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ]
+
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url.endsWith('/admin/users')) {
+        return responses.shift() ?? new Response(null, { status: 500 })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
+    vi.stubGlobal('fetch', fetchSpy)
+
+    setEnv({
+      PLATFORM_ADMIN_EMAIL: 'admin@example.com',
+      PLATFORM_ADMIN_SEED_RETRY_ATTEMPTS: '4',
+      PLATFORM_ADMIN_SEED_RETRY_DELAY_MS: '5',
+      PLATFORM_ADMIN_SEED_MAX_DELAY_MS: '10',
+    })
+
+    const { seedDefaults } = await import('../src/db/seed.js')
+    await seedDefaults()
+
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+    const profile = await db
+      .selectFrom('profiles')
+      .select(['gotrue_id'])
+      .where('id', '=', 1)
+      .executeTakeFirst()
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    expect(profile?.gotrue_id).toBe(expectedUserId)
+  })
+
+  it('reassigns memberships back to the seeded admin profile', async () => {
+    await initMemDatabase()
+
+    const initialUserId = '99999999-aaaa-bbbb-cccc-dddddddddddd'
+    const reconciledUserId = 'eeeeeeee-ffff-0000-1111-222222222222'
+
+    let callCount = 0
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url.endsWith('/admin/users')) {
+        const ids = [initialUserId, reconciledUserId]
+        const id = ids[Math.min(callCount, ids.length - 1)]
+        callCount += 1
+        return new Response(JSON.stringify({ user: { id } }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { seedDefaults } = await import('../src/db/seed.js')
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+
+    setEnv({ PLATFORM_ADMIN_EMAIL: 'admin@example.com' })
+    await seedDefaults()
+
+    // Simulate a fresh login that created a secondary profile/membership
+    const { ensureProfile } = await import('../src/store/profile.js')
+    const secondaryUserId = reconciledUserId
+    const duplicateProfile = await ensureProfile(secondaryUserId, 'admin@example.com')
+
+    await db
+      .updateTable('organization_members')
+      .set({
+        profile_id: duplicateProfile.id,
+        role_ids: [1],
+        metadata: {},
+        is_owner: true,
+      })
+      .where('profile_id', '=', 1)
+      .execute()
+
+    setEnv({ PLATFORM_ADMIN_EMAIL: 'admin@example.com' })
+    await seedDefaults()
+
+    const profiles = await db
+      .selectFrom('profiles')
+      .select(['id', 'gotrue_id'])
+      .orderBy('id', 'asc')
+      .execute()
+
+    expect(profiles).toEqual([
+      expect.objectContaining({ id: 1, gotrue_id: reconciledUserId }),
+    ])
+
+    const membership = await db
+      .selectFrom('organization_members')
+      .select(['profile_id', 'role_ids', 'is_owner'])
+      .where('organization_id', '=', 1)
+      .executeTakeFirst()
+
+    expect(membership?.profile_id).toBe(1)
+    expect(membership?.role_ids).toEqual([1])
+    expect(membership?.is_owner).toBe(true)
+  })
 })

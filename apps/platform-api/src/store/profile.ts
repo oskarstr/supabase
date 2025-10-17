@@ -55,7 +55,8 @@ const isDuplicateProfileIdError = (error: unknown) =>
   error instanceof Error && /profiles_pkey/.test(error.message)
 
 const isDuplicateProfileUsernameError = (error: unknown) =>
-  error instanceof Error && /profiles_username_idx/.test(error.message)
+  error instanceof Error &&
+  (/profiles_username_idx/.test(error.message) || /username/.test(error.message))
 
 const usernameExists = async (username: string) => {
   const existing = await db

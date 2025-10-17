@@ -19,6 +19,54 @@ const db = getPlatformDb()
 
 const nowIso = () => new Date().toISOString()
 
+const mergeRoleIds = (...roleSets: Array<readonly unknown[] | null | undefined>): number[] => {
+  const seen = new Set<number>()
+  for (const roles of roleSets) {
+    if (!Array.isArray(roles)) continue
+    for (const role of roles) {
+      const value = Number(role)
+      if (Number.isFinite(value)) {
+        seen.add(value)
+      }
+    }
+  }
+  return Array.from(seen).sort((a, b) => a - b)
+}
+
+const sanitizeProjectList = (projects: unknown): string[] => {
+  if (!Array.isArray(projects)) return []
+  const set = new Set<string>()
+  for (const entry of projects) {
+    if (typeof entry !== 'string') continue
+    const trimmed = entry.trim()
+    if (trimmed.length > 0) {
+      set.add(trimmed)
+    }
+  }
+  return Array.from(set)
+}
+
+const toRoleScopedRecord = (value: unknown): Record<string, string[]> => {
+  if (!value) return {}
+  if (Array.isArray(value)) {
+    const sanitized = sanitizeProjectList(value)
+    return sanitized.length > 0 ? { legacy: sanitized } : {}
+  }
+
+  if (typeof value === 'object') {
+    const result: Record<string, string[]> = {}
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      const sanitized = sanitizeProjectList(entry)
+      if (sanitized.length > 0) {
+        result[key] = sanitized
+      }
+    }
+    return result
+  }
+
+  return {}
+}
+
 export const listOrganizationMembers = async (slug: string): Promise<OrganizationMember[]> => {
   const organization = await db
     .selectFrom('organizations')
@@ -270,12 +318,25 @@ const updateRoleScopedMetadata = (
 
   const cloned = { ...metadata }
   const key = 'role_scoped_projects'
-  const existing = (cloned[key] as Record<string, string[]>) ?? {}
+  const normalized = toRoleScopedRecord(cloned[key])
+
   if (Array.isArray(scopedProjects)) {
-    cloned[key] = { ...existing, [String(roleId)]: scopedProjects }
+    const sanitized = sanitizeProjectList(scopedProjects)
+    if (sanitized.length > 0) {
+      normalized[String(roleId)] = sanitized
+    } else {
+      delete normalized[String(roleId)]
+    }
   } else {
-    cloned[key] = existing
+    delete normalized[String(roleId)]
   }
+
+  if (Object.keys(normalized).length > 0) {
+    cloned[key] = normalized
+  } else {
+    delete cloned[key]
+  }
+
   return cloned
 }
 
@@ -293,7 +354,7 @@ const mapMemberRowToOrganizationMember = (
     is_sso_user: row.is_sso_user ?? false,
     metadata: (row.member_metadata as Record<string, unknown>) ?? {},
     mfa_enabled: row.member_mfa_enabled ?? false,
-    role_ids: row.member_role_ids ?? [],
+    role_ids: mergeRoleIds(row.member_role_ids ?? []),
   }
 }
 
@@ -302,11 +363,11 @@ const composeMemberMetadata = (
   roleId: number,
   scopedProjects?: string[] | null
 ) => {
-  const base = Array.isArray(current.role_scoped_projects)
-    ? { ...current, role_scoped_projects: {} as Record<string, string[]> }
-    : { ...current }
-
-  return updateRoleScopedMetadata(base, roleId, scopedProjects ?? undefined)
+  return updateRoleScopedMetadata(
+    { ...current },
+    roleId,
+    scopedProjects === null ? undefined : scopedProjects
+  )
 }
 
 const extractRoleScopedProjects = (
@@ -368,12 +429,13 @@ export const upsertOrganizationMemberRole = async (
     roleId,
     roleScopedProjects
   )
+  const nextRoleIds = mergeRoleIds(existing?.role_ids ?? [], [roleId])
 
   if (existing) {
     await db
       .updateTable('organization_members')
       .set({
-        role_ids: [roleId],
+        role_ids: nextRoleIds,
         metadata,
         updated_at: nowIso(),
       })
@@ -383,7 +445,7 @@ export const upsertOrganizationMemberRole = async (
     let values: Insertable<PlatformDatabase['organization_members']> = {
       organization_id: organizationId,
       profile_id: targetProfile.id,
-      role_ids: [roleId],
+      role_ids: nextRoleIds,
       metadata,
       mfa_enabled: false,
       is_owner: false,
@@ -467,11 +529,12 @@ export const createOrganizationInvitation = async (
   const baseMetadata =
     (existingInvitation?.metadata as Record<string, unknown> | null | undefined) ?? {}
 
-  const metadata: Record<string, unknown> = {
-    ...baseMetadata,
-    role_scoped_projects: options.roleScopedProjects ?? null,
-    invited_by_profile_id: options.invitedByProfileId ?? null,
-  }
+  let metadata = updateRoleScopedMetadata(
+    { ...baseMetadata },
+    roleId,
+    options.roleScopedProjects
+  )
+  metadata.invited_by_profile_id = options.invitedByProfileId ?? null
 
   const token = randomUUID()
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -641,13 +704,14 @@ export const acceptInvitationByToken = async (
   return db.transaction().execute(async (trx) => {
     const existingMember = await trx
       .selectFrom('organization_members')
-      .select(['id', 'metadata'])
+      .select(['id', 'metadata', 'role_ids'])
       .where('organization_id', '=', organization.id)
       .where('profile_id', '=', profile.id)
       .executeTakeFirst()
 
     const invitationMetadata = (invitation.metadata as Record<string, unknown>) ?? {}
-    const scopedProjects = extractRoleScopedProjects(invitationMetadata, invitation.role_id as number) ?? null
+    const scopedProjects =
+      extractRoleScopedProjects(invitationMetadata, invitation.role_id as number) ?? null
 
     if (existingMember) {
       const existingMetadata = (existingMember.metadata as Record<string, unknown>) ?? {}
@@ -656,11 +720,14 @@ export const acceptInvitationByToken = async (
         invitation.role_id as number,
         scopedProjects
       )
+      const mergedRoleIds = mergeRoleIds(existingMember.role_ids ?? [], [
+        invitation.role_id as number,
+      ])
 
       await trx
         .updateTable('organization_members')
         .set({
-          role_ids: [invitation.role_id as number],
+          role_ids: mergedRoleIds,
           metadata: mergedMetadata,
           updated_at: nowIso(),
         })
@@ -672,11 +739,12 @@ export const acceptInvitationByToken = async (
         invitation.role_id as number,
         scopedProjects
       )
+      const newRoleIds = mergeRoleIds([invitation.role_id as number])
 
       let values: Insertable<PlatformDatabase['organization_members']> = {
         organization_id: organization.id,
         profile_id: profile.id,
-        role_ids: [invitation.role_id as number],
+        role_ids: newRoleIds,
         metadata: newMetadata,
         mfa_enabled: false,
         is_owner: false,

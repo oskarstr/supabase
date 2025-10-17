@@ -1,19 +1,17 @@
 # Handoff Summary · 2025-10-17 · codex
 
 ## Current Focus
-- Fix the systemic gaps discovered while chasing the admin-permission bug: make seed reconciliation resilient, clean up organization membership metadata, and formalise the permission matrix so API and Studio stay in sync without brittle regex matching.
+- Consolidate the permission matrix across API + Studio, retire the regex matcher on the client, and document the hardened bootstrap flow so future changes keep the admin + membership contracts intact.
 
 ## What’s Done
-- Diagnosed the permissions regression to a type mismatch in `toOrganization` (id serialized as string) and fixed it. Added smoke tests/e2e verification via `tests/permissions.test.ts`.
-- Adjusted permissions assertions so they track the real matrix output instead of rejecting wildcard resources.
-- Documented follow-up hardening in `.agent/analysis/auth-hardening-plan.md`, flagging admin-seed retry work, membership metadata cleanup, and matrix governance.
-- Collected other fragility points (regex matching, multi-role handling, upstream matrix divergence) so we can tackle them deliberately rather than by ad-hoc patches.
+- Hardened admin bootstrap: `seedDefaults` now retries GoTrue provisioning, reconciles duplicate profiles/memberships back to id 1, and ships with regression coverage (`tests/auth.bootstrap.test.ts`).
+- Normalised member role handling: `upsertOrganizationMemberRole` and invitation acceptance now merge roles/metadata instead of overwriting them; new tests cover multi-role assignments and canonical `role_scoped_projects`.
+- Kept the plan/handoff docs current so Phase 2/4 are marked complete and remaining work is scoped to matrix governance + client matching.
 
 ## What’s Next
-1. Harden `seedDefaults` + admin reconciliation: add retry/backoff, refuse to leave the bootstrap until the env-defined admin profile (id 1) is updated, and auto-repair on login if drift is detected.
-2. Rework membership upserts so `role_ids` remain additive, `role_scoped_projects` uses one canonical shape, and stale scoped entries are removed. Add regression tests for multi-role org members.
-3. Define a single permission matrix source (shared package or generated artifact) and sync Studio once available. Until then, keep the backend list authoritative and audit against the public RBAC docs.
-4. Replace the client-side regex permission matcher with a deterministic helper once the shared matrix exists; track coordination with the Studio team.
+1. Define a single permission matrix source (shared package or generated artifact) and sync Studio once available. Until then, keep the backend list authoritative and audit against the public RBAC docs.
+2. Replace the client-side regex permission matcher with a deterministic helper once the shared matrix exists; track coordination with the Studio team.
+3. Finish the Phase 6 doc pass (bootstrap flow, membership metadata contract, test strategy).
 
 ## Repo Hygiene & Tests
 - Quick checks: `pnpm --filter platform-api exec vitest run tests/permissions.test.ts` and `pnpm --filter platform-api exec vitest run tests/organization.members.test.ts`.

@@ -63,7 +63,7 @@ Document here: decisions about upsert strategy and any edge cases.
 > - ✅ `seedDefaults` runs the GoTrue reconciliation first, then updates `platform.profiles` with the returned UUID/email after the transaction. Runtime env overrides for email/password are respected on every seed run.
 > - ✅ Added `tests/auth.bootstrap.test.ts` harness to prove the profile’s `gotrue_id` matches the GoTrue result (uses pg-mem + mocked fetch).
 > - ✅ Added regression coverage ensuring a second seed with a different `PLATFORM_ADMIN_EMAIL` updates `profiles.primary_email` and `gotrue_id` accordingly.
-> - ☐ Still need to confirm org membership/project runtimes update appropriately when env email changes (follow-up test).
+> - ✅ Added retry/backoff + duplicate-profile reconciliation so the env-defined admin (profile id 1) keeps ownership even when GoTrue is slow or prior runs created stray profiles.
 
 ---
 
@@ -134,10 +134,8 @@ Test file: `apps/platform-api/tests/permissions.test.ts`
 > - ✅ Expanded `tests/permissions.test.ts` to assert administrator coverage against the matrix and to validate read-only responses purely through matrix lookups.
 > - ✅ Restored a clean TypeScript build by aligning schema typings, validator declarations, and route reply unions with the new invitation/matrix work.
 > - ☐ Remaining cleanup:
->    - Harden `seedDefaults` so the env-defined admin profile (id 1) is always reconciled, even if GoTrue is slow or returns transient errors (retry/backoff + final reconciliation on login).
->    - Normalize `role_scoped_projects` metadata and support additive roles (avoid clobbering `role_ids`).
 >    - Reconcile the matrix with the public docs and upstream Studio usage, then decide on a shared source of truth (export/package) so future changes stay in sync.
->    - Replace the front-end regex-based permission matcher with a deterministic comparison helper once the shared matrix work lands (track with Studio team).
+>    - Coordinate with the Studio team to consume the shared matrix; our API should remain robust regardless of upstream regex matching, but we should flag the divergence for them.
 
 ---
 
@@ -157,9 +155,9 @@ Test file: `apps/platform-api/tests/permissions.test.ts`
 
 - [x] Phase 0
 - [x] Phase 1
-- [ ] Phase 2 *(pending admin reconciliation hardening + cleanup noted above)*
+- [x] Phase 2
 - [x] Phase 3
-- [ ] Phase 4 *(metadata/role handling refinements outstanding)*
+- [x] Phase 4
 - [ ] Phase 5 *(matrix reconciliation + shared source pending)*
 - [ ] Phase 6
 
@@ -169,7 +167,9 @@ Update the checkboxes and add short notes under each phase as work completes.
 
 ## Follow-up Hardening Items (2025-10-17)
 
-- **Admin seed resilience**: add retry/backoff inside `ensureAdminAuthUser`, refuse to continue if we never reconcile, and repair the profile on first authenticated request if drift is detected.
-- **Membership metadata**: stop overwriting `role_ids` with a single entry during upsert, migrate `role_scoped_projects` to a canonical shape, and clear stale scoped entries when roles are removed.
+- **Admin bootstrap skip path**: when GoTrue credentials are missing we keep existing profile data. Surface a stronger warning and plan a reconciliation hook for environments that later enable Auth.
+- **Duplicate reconciliation timing**: audit other tables (audit logs, runtimes, etc.) for profile-id references so we can migrate them alongside the duplicate cleanup if needed.
+- **Role metadata hygiene**: consider pruning `role_scoped_projects` entries for roles/projects that no longer exist (stale invitations, role removals).
+- **Retry defaults for tests**: expose helper constants/env overrides so pg-mem suites can opt into retry scenarios without manual env juggling.
 - **Permission matrix governance**: generate both API and Studio data from a shared definition (or published package) and document the derivation so releases stay aligned.
-- **Permission matching**: replace ad-hoc regex usage on the client once the shared matrix is available—add a tracking note in Phase 5 documentation.
+- **Permission matching**: log the upstream regex dependency and notify Studio when the shared matrix lands; our backend should continue to accept either path.
