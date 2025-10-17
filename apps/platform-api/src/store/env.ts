@@ -28,6 +28,8 @@ export const envString = (key: string, fallback?: string) => {
   return trimmed.length > 0 ? trimmed : fallback
 }
 
+export const runtimePublicHost = envString('PLATFORM_RUNTIME_PUBLIC_HOST')
+
 export const slugify = (value: string) =>
   value
     .toLowerCase()

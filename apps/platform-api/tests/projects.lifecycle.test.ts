@@ -212,6 +212,7 @@ describe('project lifecycle integration', () => {
       databasePassword: 'postgres',
       projectRoot: expectedRoot,
       excludedServices: ['logflare', 'vector'],
+      dbVersion: '15',
     })
     expect(typeof provisionPayload.projectId).toBe('number')
 
@@ -221,6 +222,56 @@ describe('project lifecycle integration', () => {
       excludedServices: ['logflare', 'vector'],
     })
     expect(mocks.destroyProjectStack).not.toHaveBeenCalled()
+  })
+
+  it('rewrites runtime hosts when PLATFORM_RUNTIME_PUBLIC_HOST is set', async () => {
+    const anonKey = 'anon-key'
+    const serviceKey = 'service-key'
+    const dbUrl = 'postgres://postgres:postgres@127.0.0.1:6543/postgres'
+    const supabaseUrl = 'http://127.0.0.1:54329'
+    const publicHost = 'host.runtime.test'
+
+    process.env.PLATFORM_RUNTIME_PUBLIC_HOST = publicHost
+
+    mocks.provisionProjectStack.mockImplementation(async ({ projectRoot }) => {
+      const supabaseDir = join(projectRoot, 'supabase')
+      mkdirSync(supabaseDir, { recursive: true })
+      writeFileSync(
+        join(supabaseDir, '.env'),
+        [
+          `SUPABASE_ANON_KEY=${anonKey}`,
+          `SUPABASE_SERVICE_KEY=${serviceKey}`,
+          `SUPABASE_DB_URL=${dbUrl}`,
+          `SUPABASE_URL=${supabaseUrl}`,
+          '',
+        ].join('\n')
+      )
+    })
+    mocks.waitForRuntimeHealth.mockResolvedValue(undefined)
+
+    const { createProject } = await import('../src/store/projects.js')
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+
+    await createProject({
+      cloud_provider: 'LOCAL',
+      db_pass: 'postgres',
+      name: 'runtime-public-host',
+      organization_slug: defaults.DEFAULT_ORG_SLUG,
+      postgres_engine: '15',
+      region_selection: { code: 'local-dev' },
+      local_runtime: { exclude_services: [] },
+    })
+
+    await waitForProjectStatus(db, 'runtime-public-host', 'ACTIVE_HEALTHY')
+
+    const projectRow = await fetchProjectRow(db, 'runtime-public-host')
+    expect(projectRow).toBeTruthy()
+    expect(projectRow).toMatchObject({
+      rest_url: `http://${publicHost}:54329/rest/v1/`,
+      connection_string: `postgres://postgres:postgres@${publicHost}:6543/postgres`,
+      db_host: publicHost,
+    })
   })
 
   it('records INIT_FAILED and cleans up when provisioning fails', async () => {

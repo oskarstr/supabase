@@ -5,11 +5,17 @@ export interface SupabaseConfigOptions {
   projectName: string
   ports: ProjectPortAllocation
   siteUrl: string
+  dbMajorVersion: number
 }
 
 const escapeTomlString = (value: string) => value.replace(/"/g, '\\"')
 
-export const renderSupabaseConfig = ({ projectId, ports, siteUrl }: SupabaseConfigOptions) => {
+export const renderSupabaseConfig = ({
+  projectId,
+  ports,
+  siteUrl,
+  dbMajorVersion,
+}: SupabaseConfigOptions) => {
   const sanitizedSiteUrl = siteUrl.endsWith('/') ? siteUrl.slice(0, -1) : siteUrl
   const shadowPort = ports.db + 50
   const poolerPort = ports.db + 60
@@ -27,7 +33,7 @@ max_rows = 1000
 [db]
 port = ${ports.db}
 shadow_port = ${shadowPort}
-major_version = 15
+major_version = ${dbMajorVersion}
 
 [db.pooler]
 enabled = true

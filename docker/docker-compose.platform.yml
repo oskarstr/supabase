@@ -12,6 +12,7 @@ services:
       PLATFORM_PROJECTS_ROOT: ${PWD}/platform-projects
       PLATFORM_ORCHESTRATOR_URL: http://runtime-agent:8085
       PLATFORM_ORCHESTRATOR_TOKEN: ${PLATFORM_ORCHESTRATOR_TOKEN:-supabase-runtime-agent}
+      PLATFORM_RUNTIME_PUBLIC_HOST: host.docker.internal
       SUPABASE_URL: http://kong:8000
       SUPABASE_GOTRUE_URL: http://kong:8000/auth/v1
     volumes:

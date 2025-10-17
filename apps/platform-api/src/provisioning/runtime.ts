@@ -13,6 +13,7 @@ export interface PrepareRuntimeOptions {
   projectName: string
   projectRoot: string
   databasePassword: string
+  dbVersion: string
 }
 
 export interface PreparedRuntime {
@@ -22,7 +23,14 @@ export interface PreparedRuntime {
   siteUrl: string
 }
 
-const SUPABASE_TEMPLATE_DIR = resolve(repoRoot, 'supabase')
+const SUPABASE_TEMPLATE_DIR = resolve(repoRoot, 'supabase', 'supabase')
+
+const parseMajorVersion = (value: string) => {
+  const match = value.match(/\d+/)
+  if (!match) return 15
+  const parsed = Number.parseInt(match[0] ?? '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15
+}
 
 const ensureParentDir = async (path: string) => {
   const parent = dirname(path)
@@ -89,6 +97,7 @@ export const prepareSupabaseRuntime = async (
       projectName: options.projectName,
       ports,
       siteUrl,
+      dbMajorVersion: parseMajorVersion(options.dbVersion),
     })
   )
 
