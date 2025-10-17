@@ -10,7 +10,7 @@
 - Published a shared `shared-data/permission-matrix` artifact and updated platform-api to hydrate its matrix from that single source, clearing the path for Studio consumption.
 
 ## What’s Next
-1. Document the shared matrix artifact for Studio maintainers and confirm the backend continues to tolerate the regex matcher during the transition.
+1. Socialise the new `.agent/docs/supabase/permission-matrix-artifact.md` note with Studio maintainers and plan the client-side adoption while the backend keeps the regex fallback in place.
 2. Finish the Phase 6 doc pass (bootstrap flow, membership metadata contract, test strategy) and clean up any TODOs.
 
 ## Repo Hygiene & Tests
@@ -29,6 +29,7 @@
 - Historical notes: `.agent/analysis/agent1.md` … `agent4.md`
 - Invitation flow tests: `apps/platform-api/tests/organization.members.test.ts`
 - Matrix data: `apps/platform-api/src/config/permission-matrix.ts`
+- Matrix artifact guide: `.agent/docs/supabase/permission-matrix-artifact.md`
 - Seed/bootstrap coverage: `apps/platform-api/tests/auth.bootstrap.test.ts`
 
 ## Follow-up Hardening Items (2025-10-17)

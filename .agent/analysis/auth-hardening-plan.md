@@ -129,8 +129,7 @@ Each test should prepare fixtures via the seed helper, use the auth middleware w
 > - ✅ Restored a clean TypeScript build by aligning schema typings, validator declarations, and route reply unions with the new invitation/matrix work.
 > - ✅ Alignment with the public docs is enforced by `apps/platform-api/tests/permissions.docs.test.ts`.
 > - ✅ Published `shared-data/permission-matrix` so Studio and other clients can import the canonical matrix dataset; platform-api now maps those entries back to `PermissionAction` values.
-> - ☐ Remaining cleanup:
->    - Document the artifact for Studio maintainers; we are not updating Studio ourselves, but the backend must continue to tolerate the existing regex matcher.
+> - ✅ Documented `shared-data/permission-matrix` usage for Studio maintainers in `.agent/docs/supabase/permission-matrix-artifact.md`; backend continues to tolerate the regex matcher during rollout.
 
 Tests:
 - `apps/platform-api/tests/permissions.test.ts` (owner wildcard, non-member denial, scoped developer/read-only, multi-org union, admin coverage).
