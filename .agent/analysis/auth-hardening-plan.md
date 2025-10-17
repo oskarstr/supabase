@@ -117,12 +117,20 @@ Each test should prepare fixtures via the seed helper, use the auth middleware w
 ## Phase 5 – Permissions & Matrix Governance *(in progress)*
 
 1. Keep `/platform/profile/permissions` aligned with the authenticated member’s roles.
-   - ✅ API derives permissions from `PERMISSION_MATRIX`; alignment with the public docs is enforced by `apps/platform-api/tests/permissions.docs.test.ts`.
-   - ✅ Permissions store relies on `@supabase/shared-types` `PermissionAction` constants and guards read-only roles from write-level actions.
-   - ✅ Restored a clean TypeScript build by aligning schema typings, validators, and route reply unions with the new invitation/matrix work.
 2. Provide a shared matrix artifact for Studio/reference clients.
-   - ☐ Publish a reusable matrix definition (package/JSON) so Studio—or any other consumer—can import it when they choose.
-   - ☐ Document the artifact for Studio maintainers; we are not updating Studio ourselves, but the backend must continue to tolerate the existing regex matcher.
+
+> Progress (2025-10-17):
+> - ✅ `/platform/profile/permissions` now resolves memberships per profile, mapping base role templates (owner/admin wildcard, developer/read-only scoped projects) and unioning results across organizations.
+> - ✅ Project scoped metadata (`role_scoped_projects`) drives the returned `project_refs`/`project_ids`, preventing non-members from inheriting wildcard access.
+> - ✅ Added `tests/permissions.test.ts` covering owner wildcard, non-member denial, scoped developer access, multi-organization union behaviour, and read-only safeguards.
+> - ✅ Permissions store now relies on `@supabase/shared-types` `PermissionAction` constants and explicitly guards read-only roles from write-level actions.
+> - ✅ Extracted the Supabase access-control matrix into `src/config/permission-matrix.ts` and generate permissions directly from that data.
+> - ✅ Expanded `tests/permissions.test.ts` to assert administrator coverage against the matrix and to validate read-only responses purely through matrix lookups.
+> - ✅ Restored a clean TypeScript build by aligning schema typings, validator declarations, and route reply unions with the new invitation/matrix work.
+> - ✅ Alignment with the public docs is enforced by `apps/platform-api/tests/permissions.docs.test.ts`.
+> - ☐ Remaining cleanup:
+>    - Publish a reusable matrix definition (package/JSON) so Studio—or any other consumer—can import it when they choose.
+>    - Document the artifact for Studio maintainers; we are not updating Studio ourselves, but the backend must continue to tolerate the existing regex matcher.
 
 Tests:
 - `apps/platform-api/tests/permissions.test.ts` (owner wildcard, non-member denial, scoped developer/read-only, multi-org union, admin coverage).
