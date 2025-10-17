@@ -1,3 +1,4 @@
+import type { Insertable, Selectable } from 'kysely'
 import { getPlatformDb } from '../db/client.js'
 import { toProfile } from '../db/mappers.js'
 import {
@@ -9,6 +10,7 @@ import {
 } from '../config/defaults.js'
 import { appendAuditLog } from './audit-logs.js'
 import type { Profile } from './types.js'
+import type { PlatformDatabase } from '../db/schema.js'
 
 const db = getPlatformDb()
 
@@ -42,6 +44,8 @@ const selectProfile = () =>
       'is_alpha_user',
       'is_sso_user',
       'disabled_features',
+      'inserted_at',
+      'updated_at',
     ])
 
 const findProfileRow = async (gotrueId: string) =>
@@ -50,9 +54,38 @@ const findProfileRow = async (gotrueId: string) =>
 const isDuplicateProfileIdError = (error: unknown) =>
   error instanceof Error && /profiles_pkey/.test(error.message)
 
+const isDuplicateProfileUsernameError = (error: unknown) =>
+  error instanceof Error && /profiles_username_idx/.test(error.message)
+
+const usernameExists = async (username: string) => {
+  const existing = await db
+    .selectFrom('profiles')
+    .select(['id'])
+    .where('username', '=', username)
+    .executeTakeFirst()
+  return Boolean(existing)
+}
+
+const generateAvailableUsername = async (base: string) => {
+  let candidate = base
+  let attempt = 0
+
+  while (await usernameExists(candidate)) {
+    attempt += 1
+    const suffix = Math.random().toString(36).slice(2, 2 + Math.min(4, 6))
+    candidate = `${base}-${suffix}`
+
+    if (attempt > 10) {
+      candidate = `${base}-${Math.random().toString(36).slice(2, 8)}`
+    }
+  }
+
+  return candidate
+}
+
 const insertProfileRow = async (
-  values: Record<string, unknown>
-) => {
+  values: Insertable<PlatformDatabase['profiles']>
+): Promise<Selectable<PlatformDatabase['profiles']>> => {
   try {
     return await db
       .insertInto('profiles')
@@ -60,19 +93,33 @@ const insertProfileRow = async (
       .returningAll()
       .executeTakeFirstOrThrow()
   } catch (error) {
-    if (!isDuplicateProfileIdError(error)) {
+    if (!isDuplicateProfileIdError(error) && !isDuplicateProfileUsernameError(error)) {
       throw error
     }
 
-    const maxRow = await db
-      .selectFrom('profiles')
-      .select((qb) => qb.fn.max('id').as('max_id'))
-      .executeTakeFirst()
-    const nextId = Number(maxRow?.max_id ?? 0) + 1
+    let retryValues = { ...values }
+
+    if (isDuplicateProfileIdError(error)) {
+      const maxRow = await db
+        .selectFrom('profiles')
+        .select((qb) => qb.fn.max('id').as('max_id'))
+        .executeTakeFirst()
+      const nextId = Number(maxRow?.max_id ?? 0) + 1
+      retryValues = { ...retryValues, id: nextId }
+    }
+
+    if (isDuplicateProfileUsernameError(error)) {
+      const baseUsername =
+        typeof retryValues.username === 'string'
+          ? retryValues.username
+          : deriveUsername(undefined, DEFAULT_USERNAME)
+      const uniqueUsername = await generateAvailableUsername(baseUsername)
+      retryValues = { ...retryValues, username: uniqueUsername }
+    }
 
     return await db
       .insertInto('profiles')
-      .values({ ...values, id: nextId })
+      .values(retryValues)
       .returningAll()
       .executeTakeFirstOrThrow()
   }
@@ -87,7 +134,11 @@ const deriveUsername = (email?: string | null, fallback?: string) => {
   return `user-${Math.random().toString(36).slice(2, 10)}`
 }
 
-const buildProfileDefaults = (email?: string | null) => ({
+const buildProfileInsert = (
+  gotrueId: string,
+  email?: string | null
+): Insertable<PlatformDatabase['profiles']> => ({
+  gotrue_id: gotrueId,
   auth0_id: null,
   username: deriveUsername(email, DEFAULT_USERNAME),
   first_name: DEFAULT_FIRST_NAME ?? '',
@@ -114,10 +165,7 @@ export const ensureProfile = async (
     return toProfile(existing)
   }
 
-  const inserted = await insertProfileRow({
-    gotrue_id: gotrueId,
-    ...buildProfileDefaults(email),
-  })
+  const inserted = await insertProfileRow(buildProfileInsert(gotrueId, email))
 
   return toProfile(inserted)
 }
@@ -130,10 +178,7 @@ export const createProfile = async (
   if (existing) {
     throw new ProfileAlreadyExistsError()
   }
-  const inserted = await insertProfileRow({
-    gotrue_id: gotrueId,
-    ...buildProfileDefaults(email),
-  })
+  const inserted = await insertProfileRow(buildProfileInsert(gotrueId, email))
 
   return toProfile(inserted)
 }

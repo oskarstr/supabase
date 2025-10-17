@@ -23,6 +23,8 @@ import type {
   AuditLogEntry,
 } from '../store/index.js'
 
+type ErrorResponse = { message: string }
+
 const profileRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', async (request, reply) => {
     const auth = request.auth
@@ -58,7 +60,7 @@ const profileRoutes: FastifyPluginAsync = async (app) => {
     return reply.send(logs)
   })
 
-  app.get<{ Reply: AccessToken[] }>('/access-tokens', async (request, reply) => {
+  app.get<{ Reply: AccessToken[] | ErrorResponse }>('/access-tokens', async (request, reply) => {
     const auth = request.auth
     if (!auth) {
       return reply.code(401).send({ message: 'Unauthorized' })
@@ -71,7 +73,7 @@ const profileRoutes: FastifyPluginAsync = async (app) => {
     return reply.send(tokens)
   })
 
-  app.post<{ Body: { name: string }; Reply: AccessTokenWithSecret }>(
+  app.post<{ Body: { name: string }; Reply: AccessTokenWithSecret | ErrorResponse }>(
     '/access-tokens',
     async (request, reply) => {
       const auth = request.auth
@@ -126,18 +128,21 @@ const profileRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send(checkPasswordStrength())
   })
 
-  app.get<{ Reply: AccessControlPermission[] }>('/permissions', async (request, reply) => {
-    const auth = request.auth
-    if (!auth) {
-      return reply.code(401).send({ message: 'Unauthorized' })
+  app.get<{ Reply: AccessControlPermission[] | ErrorResponse }>(
+    '/permissions',
+    async (request, reply) => {
+      const auth = request.auth
+      if (!auth) {
+        return reply.code(401).send({ message: 'Unauthorized' })
+      }
+      const profile = await getProfileByGotrueId(auth.userId)
+      if (!profile) {
+        return reply.send([])
+      }
+      const permissions = await listPermissionsForProfile(profile.id)
+      return reply.send(permissions)
     }
-    const profile = await getProfileByGotrueId(auth.userId)
-    if (!profile) {
-      return reply.send([])
-    }
-    const permissions = await listPermissionsForProfile(profile.id)
-    return reply.send(permissions)
-  })
+  )
 
   app.post('/', async (request, reply) => {
     const auth = request.auth

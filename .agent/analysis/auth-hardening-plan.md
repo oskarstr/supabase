@@ -1,6 +1,6 @@
 # Platform Auth & Membership Hardening Plan
 
-> Updated: 2025-10-17 · owner: codex
+> Updated: 2025-10-17 · owner: codex (last touched 2025-10-17)
 
 This plan replaces the ad-hoc grant scripts with a proper identity flow that matches Studio’s expectations. Each phase should land with focused commits, dedicated tests, and a short note in this file summarising what changed.
 
@@ -130,7 +130,14 @@ Test file: `apps/platform-api/tests/permissions.test.ts`
 > - ✅ Project scoped metadata (`role_scoped_projects`) drives the returned `project_refs`/`project_ids`, preventing non-members from inheriting wildcard access.
 > - ✅ Added `tests/permissions.test.ts` covering owner wildcard, non-member denial, scoped developer access, multi-organization union behaviour, and read-only safeguards.
 > - ✅ Permissions store now relies on `@supabase/shared-types` `PermissionAction` constants and explicitly guards read-only roles from write-level actions.
-> - ☐ Remaining cleanup: collapse the sprawling template into a maintainable data map, move shared role combinations into helpers, and audit the matrix against upstream Studio expectations.
+> - ✅ Extracted the Supabase access-control matrix into `src/config/permission-matrix.ts` and generate permissions directly from that data.
+> - ✅ Expanded `tests/permissions.test.ts` to assert administrator coverage against the matrix and to validate read-only responses purely through matrix lookups.
+> - ✅ Restored a clean TypeScript build by aligning schema typings, validator declarations, and route reply unions with the new invitation/matrix work.
+> - ☐ Remaining cleanup:
+>    - Harden `seedDefaults` so the env-defined admin profile (id 1) is always reconciled, even if GoTrue is slow or returns transient errors (retry/backoff + final reconciliation on login).
+>    - Normalize `role_scoped_projects` metadata and support additive roles (avoid clobbering `role_ids`).
+>    - Reconcile the matrix with the public docs and upstream Studio usage, then decide on a shared source of truth (export/package) so future changes stay in sync.
+>    - Replace the front-end regex-based permission matcher with a deterministic comparison helper once the shared matrix work lands (track with Studio team).
 
 ---
 
@@ -150,10 +157,19 @@ Test file: `apps/platform-api/tests/permissions.test.ts`
 
 - [x] Phase 0
 - [x] Phase 1
-- [ ] Phase 2
+- [ ] Phase 2 *(pending admin reconciliation hardening + cleanup noted above)*
 - [x] Phase 3
-- [ ] Phase 4
-- [ ] Phase 5
+- [ ] Phase 4 *(metadata/role handling refinements outstanding)*
+- [ ] Phase 5 *(matrix reconciliation + shared source pending)*
 - [ ] Phase 6
 
 Update the checkboxes and add short notes under each phase as work completes.
+
+---
+
+## Follow-up Hardening Items (2025-10-17)
+
+- **Admin seed resilience**: add retry/backoff inside `ensureAdminAuthUser`, refuse to continue if we never reconcile, and repair the profile on first authenticated request if drift is detected.
+- **Membership metadata**: stop overwriting `role_ids` with a single entry during upsert, migrate `role_scoped_projects` to a canonical shape, and clear stale scoped entries when roles are removed.
+- **Permission matrix governance**: generate both API and Studio data from a shared definition (or published package) and document the derivation so releases stay aligned.
+- **Permission matching**: replace ad-hoc regex usage on the client once the shared matrix is available—add a tracking note in Phase 5 documentation.

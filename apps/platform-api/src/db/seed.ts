@@ -454,7 +454,7 @@ const ensureAdminAuthUser = async (
       }),
     })
 
-    if (response.status === 409) {
+    if (response.status === 409 || response.status === 422) {
       return await updateAdminPassword(gotrueUrl, serviceKey, apiKey, email, password)
     }
 
@@ -505,8 +505,14 @@ const updateAdminPassword = async (
       return null
     }
 
-    const users = (await lookup.json().catch(() => [])) as Array<{ id: string }> | undefined
-    const userId = users?.[0]?.id
+    const lookupPayload = (await lookup.json().catch(() => undefined)) as
+      | { users?: Array<{ id: string }> }
+      | Array<{ id: string }>
+      | undefined
+
+    const userId = Array.isArray(lookupPayload)
+      ? lookupPayload[0]?.id
+      : lookupPayload?.users?.[0]?.id
     if (!userId) {
       return null
     }

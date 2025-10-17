@@ -73,6 +73,11 @@ export interface OrganizationInvitationsTable {
   invited_email: string
   role_id: number | null
   invited_at: Timestamp
+  metadata: Json
+  token: string
+  expires_at: Timestamp | null
+  accepted_at: Timestamp | null
+  invited_by_profile_id: number | null
 }
 
 export interface ProjectsTable {

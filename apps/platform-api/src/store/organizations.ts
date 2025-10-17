@@ -23,13 +23,13 @@ import type {
 
 const db = getPlatformDb()
 const memberSelection = [
-  'organization_members.id as member_id',
-  'organization_members.role_ids as member_role_ids',
-  'organization_members.metadata as member_metadata',
-  'organization_members.mfa_enabled as member_mfa_enabled',
-  'organization_members.is_owner as member_is_owner',
-  'organization_members.inserted_at as member_inserted_at',
-  'organization_members.updated_at as member_updated_at',
+  'om.id as member_id',
+  'om.role_ids as member_role_ids',
+  'om.metadata as member_metadata',
+  'om.mfa_enabled as member_mfa_enabled',
+  'om.is_owner as member_is_owner',
+  'om.inserted_at as member_inserted_at',
+  'om.updated_at as member_updated_at',
 ] as const
 
 const mapOrganization = (row: any, profileId: number): Organization =>

@@ -3,8 +3,10 @@ import { randomUUID } from 'node:crypto'
 import isEmail from 'validator/lib/isEmail.js'
 import normalizeEmail from 'validator/lib/normalizeEmail.js'
 
+import type { Insertable } from 'kysely'
 import { getPlatformDb } from '../db/client.js'
 import { DEFAULT_PRIMARY_EMAIL, DEFAULT_USERNAME } from '../config/defaults.js'
+import type { PlatformDatabase } from '../db/schema.js'
 import type {
   OrganizationInvitationsResponse,
   OrganizationMember,
@@ -175,6 +177,7 @@ const invitationSelectFields = [
   'token',
   'expires_at',
   'accepted_at',
+  'invited_by_profile_id',
 ] as const
 
 type InvitationOutput = {
@@ -186,6 +189,7 @@ type InvitationOutput = {
   token: string
   expires_at: string | null
   accepted_at: string | null
+  invited_by_profile_id: number | null
 }
 
 const mapInvitationRow = (row: {
@@ -197,6 +201,7 @@ const mapInvitationRow = (row: {
   token: string
   expires_at: Date | null
   accepted_at: Date | null
+  invited_by_profile_id: number | null
 }): InvitationOutput => ({
   id: row.id,
   invited_at: row.invited_at.toISOString(),
@@ -206,6 +211,7 @@ const mapInvitationRow = (row: {
   token: row.token,
   expires_at: row.expires_at ? row.expires_at.toISOString() : null,
   accepted_at: row.accepted_at ? row.accepted_at.toISOString() : null,
+  invited_by_profile_id: row.invited_by_profile_id,
 })
 
 const loadOrganizationId = async (slug: string) => {
@@ -374,7 +380,7 @@ export const upsertOrganizationMemberRole = async (
       .where('id', '=', existing.id)
       .execute()
   } else {
-    const values: Record<string, unknown> = {
+    let values: Insertable<PlatformDatabase['organization_members']> = {
       organization_id: organizationId,
       profile_id: targetProfile.id,
       role_ids: [roleId],
@@ -384,7 +390,7 @@ export const upsertOrganizationMemberRole = async (
     }
 
     if (isPgMem()) {
-      values.id = await nextMemberId()
+      values = { ...values, id: await nextMemberId() }
     }
 
     await db.insertInto('organization_members').values(values).execute()
@@ -458,8 +464,11 @@ export const createOrganizationInvitation = async (
     .where('invited_email', '=', normalizedEmail)
     .executeTakeFirst()
 
-  const metadata = {
-    ...(existingInvitation?.metadata as Record<string, unknown> | undefined),
+  const baseMetadata =
+    (existingInvitation?.metadata as Record<string, unknown> | null | undefined) ?? {}
+
+  const metadata: Record<string, unknown> = {
+    ...baseMetadata,
     role_scoped_projects: options.roleScopedProjects ?? null,
     invited_by_profile_id: options.invitedByProfileId ?? null,
   }
@@ -477,6 +486,7 @@ export const createOrganizationInvitation = async (
         token,
         expires_at: expiresAt.toISOString(),
         accepted_at: null,
+        invited_by_profile_id: options.invitedByProfileId ?? null,
       })
       .where('id', '=', existingInvitation.id)
       .returning(invitationSelectFields)
@@ -485,7 +495,7 @@ export const createOrganizationInvitation = async (
     return mapInvitationRow(updated)
   }
 
-  const values: Record<string, unknown> = {
+  let values: Insertable<PlatformDatabase['organization_invitations']> = {
     organization_id: organizationId,
     invited_email: normalizedEmail,
     role_id: roleId,
@@ -493,10 +503,12 @@ export const createOrganizationInvitation = async (
     metadata,
     token,
     expires_at: expiresAt.toISOString(),
+    accepted_at: null,
+    invited_by_profile_id: options.invitedByProfileId ?? null,
   }
 
   if (isPgMem()) {
-    values.id = await nextInvitationId()
+    values = { ...values, id: await nextInvitationId() }
   }
 
   const inserted = await db
@@ -661,7 +673,7 @@ export const acceptInvitationByToken = async (
         scopedProjects
       )
 
-      const values: Record<string, unknown> = {
+      let values: Insertable<PlatformDatabase['organization_members']> = {
         organization_id: organization.id,
         profile_id: profile.id,
         role_ids: [invitation.role_id as number],
@@ -675,7 +687,7 @@ export const acceptInvitationByToken = async (
           .selectFrom('organization_members')
           .select(({ fn }) => fn.max('id').as('max_id'))
           .executeTakeFirst()
-        values.id = Number(nextIdRow?.max_id ?? 0) + 1
+        values = { ...values, id: Number(nextIdRow?.max_id ?? 0) + 1 }
       }
 
       await trx.insertInto('organization_members').values(values).execute()

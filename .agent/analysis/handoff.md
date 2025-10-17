@@ -1,20 +1,22 @@
 # Handoff Summary · 2025-10-17 · codex
 
 ## Current Focus
-- `/platform/profile/permissions` now leans on shared `PermissionAction` constants with a read-only safety net. Next up is collapsing the massive template into maintainable data structures and cross-checking the matrix against Studio’s RBAC expectations.
+- Fix the systemic gaps discovered while chasing the admin-permission bug: make seed reconciliation resilient, clean up organization membership metadata, and formalise the permission matrix so API and Studio stay in sync without brittle regex matching.
 
 ## What’s Done
-- Replaced hand-written action strings with `PermissionAction` constants from `@supabase/shared-types` and added an explicit guard so read-only roles only receive read-level permissions.
-- Updated `apps/platform-api/tests/permissions.test.ts` to assert on canonical action names; the entire permission suite now passes without debug logging.
-- Captured the progress in `.agent/analysis/auth-hardening-plan.md` and refreshed dependencies (`@supabase/shared-types@0.1.80`) for the platform API package.
+- Diagnosed the permissions regression to a type mismatch in `toOrganization` (id serialized as string) and fixed it. Added smoke tests/e2e verification via `tests/permissions.test.ts`.
+- Adjusted permissions assertions so they track the real matrix output instead of rejecting wildcard resources.
+- Documented follow-up hardening in `.agent/analysis/auth-hardening-plan.md`, flagging admin-seed retry work, membership metadata cleanup, and matrix governance.
+- Collected other fragility points (regex matching, multi-role handling, upstream matrix divergence) so we can tackle them deliberately rather than by ad-hoc patches.
 
 ## What’s Next
-1. Factor the permission templates into a data-driven structure (e.g., resource/action matrices or shared helpers) to remove duplication and make future edits sustainable.
-2. Reconcile the generated permissions with Studio’s RBAC matrix: confirm storage, realtime, and SQL actions align per role, and add targeted tests for admin/project-level roles as gaps appear.
-3. Once the matrix stabilises, document the contract (Phase 6) and consider exposing shared constants so the API and Studio stop drifting.
+1. Harden `seedDefaults` + admin reconciliation: add retry/backoff, refuse to leave the bootstrap until the env-defined admin profile (id 1) is updated, and auto-repair on login if drift is detected.
+2. Rework membership upserts so `role_ids` remain additive, `role_scoped_projects` uses one canonical shape, and stale scoped entries are removed. Add regression tests for multi-role org members.
+3. Define a single permission matrix source (shared package or generated artifact) and sync Studio once available. Until then, keep the backend list authoritative and audit against the public RBAC docs.
+4. Replace the client-side regex permission matcher with a deterministic helper once the shared matrix exists; track coordination with the Studio team.
 
 ## Repo Hygiene & Tests
-- Use `pnpm --filter platform-api test -- tests/organization.members.test.ts` and `pnpm --filter platform-api test -- tests/profile.routes.test.ts` for targeted checks.
+- Quick checks: `pnpm --filter platform-api exec vitest run tests/permissions.test.ts` and `pnpm --filter platform-api exec vitest run tests/organization.members.test.ts`.
 - Keep commit messages in the format `Profile & Memberships API: …` (no `feat/chore` prefixes).
 - When adding dependencies, remember to update `pnpm-lock.yaml` with `pnpm install --filter platform-api --no-frozen-lockfile`.
 
@@ -28,5 +30,7 @@
 - Plan & progress: `.agent/analysis/auth-hardening-plan.md`
 - Historical notes: `.agent/analysis/agent1.md` … `agent4.md`
 - Invitation flow tests: `apps/platform-api/tests/organization.members.test.ts`
+- Matrix data: `apps/platform-api/src/config/permission-matrix.ts`
+- Seed/bootstrap coverage: `apps/platform-api/tests/auth.bootstrap.test.ts`
 
 Ping the user if you notice anything “hacky” or unfinished before moving on. They prefer blunt honesty over politeness.

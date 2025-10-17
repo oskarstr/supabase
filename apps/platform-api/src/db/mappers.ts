@@ -55,7 +55,7 @@ export const toOrganization = ({
 }: OrganizationWithMembership): Organization => ({
   billing_email: organization.billing_email,
   billing_partner: organization.billing_partner,
-  id: organization.id,
+  id: Number(organization.id),
   is_owner: membership?.is_owner ?? false,
   name: organization.name,
   opt_in_tags: organization.opt_in_tags ?? [],

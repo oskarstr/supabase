@@ -1,4 +1,3 @@
-import { constants } from '@supabase/shared-types'
 import Fastify from 'fastify'
 import { randomUUID } from 'node:crypto'
 import { readdirSync } from 'node:fs'
@@ -7,7 +6,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DataType, newDb } from 'pg-mem'
 
-const { PermissionAction } = constants
+import { PERMISSION_MATRIX } from '../src/config/permission-matrix.js'
 
 import { authenticateRequest } from '../src/plugins/authenticate.js'
 import {
@@ -195,10 +194,10 @@ describe('profile permissions route', () => {
         entry.project_refs?.includes(defaultProjectRef)
     )
     expect(scopedPermissions.length).toBeGreaterThan(0)
-    scopedPermissions.forEach((permission) => {
-      expect(permission.actions).not.toEqual(['%'])
-      expect(permission.resources).not.toEqual(['%'])
-    })
+    const hasNonWildcardResource = scopedPermissions.some((permission) =>
+      permission.resources.some((resource) => resource !== '%')
+    )
+    expect(hasNonWildcardResource).toBe(true)
   })
 
   it('unions permissions across multiple organization memberships', async () => {
@@ -236,14 +235,47 @@ describe('profile permissions route', () => {
         entry.project_refs?.includes(defaultProjectRef)
     )
     expect(primaryResources.length).toBeGreaterThan(0)
-    primaryResources.forEach((permission) => {
-      expect(permission.resources).not.toEqual(['%'])
-    })
+    const hasPrimaryNonWildcard = primaryResources.some((permission) =>
+      permission.resources.some((resource) => resource !== '%')
+    )
+    expect(hasPrimaryNonWildcard).toBe(true)
 
     const secondary = permissions.find((entry) => entry.organization_slug === secondaryOrg.slug)
     expect(secondary?.project_refs).toBeNull()
     expect(secondary?.actions).toEqual(['%'])
     expect(secondary?.resources).toEqual(['%'])
+  })
+
+  it('grants administrators the permissions defined in the matrix', async () => {
+    const adminId = randomUUID()
+    const adminEmail = 'matrix-admin@example.com'
+    const { ensureProfile } = await import('../src/store/profile.js')
+    const adminProfile = await ensureProfile(adminId, adminEmail)
+
+    const adminRoleId = await roleIdForBaseRole(defaultOrganizationId, 2)
+    const { upsertOrganizationMemberRole } = await import('../src/store/organization-members.js')
+
+    await upsertOrganizationMemberRole(defaultOrganizationSlug, adminProfile, adminRoleId)
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/platform/profile/permissions',
+      headers: headersForSubject(adminId, adminEmail),
+    })
+
+    expect(response.statusCode).toBe(200)
+    const permissions = response.json() as AccessControlPermissionResponse[]
+
+    const matrixEntries = PERMISSION_MATRIX.filter((entry) => entry.roles.includes('admin'))
+    matrixEntries.forEach((entry) => {
+      const match = permissions.find((permission) => {
+        if (permission.organization_slug !== defaultOrganizationSlug) return false
+        if (!permission.actions.includes(entry.action)) return false
+        if (!permission.resources.includes(entry.resource)) return false
+        return permission.project_refs === null
+      })
+      expect(match).toBeDefined()
+    })
   })
 
   it('limits read-only members to read access', async () => {
@@ -275,33 +307,20 @@ describe('profile permissions route', () => {
         entry.organization_slug === defaultOrganizationSlug
     )
     expect(scoped.length).toBeGreaterThan(0)
-    const disallowed = new Set<string>([
-      PermissionAction.CREATE,
-      PermissionAction.UPDATE,
-      PermissionAction.DELETE,
-      PermissionAction.ANALYTICS_ADMIN_WRITE,
-      PermissionAction.ANALYTICS_WRITE,
-      PermissionAction.AUTH_EXECUTE,
-      PermissionAction.FUNCTIONS_WRITE,
-      PermissionAction.SECRETS_WRITE,
-      PermissionAction.STORAGE_WRITE,
-      PermissionAction.STORAGE_ADMIN_WRITE,
-      PermissionAction.INFRA_EXECUTE,
-      PermissionAction.BILLING_WRITE,
-      PermissionAction.TENANT_SQL_ADMIN_WRITE,
-      PermissionAction.TENANT_SQL_DELETE,
-      PermissionAction.TENANT_SQL_INSERT,
-      PermissionAction.TENANT_SQL_UPDATE,
-      PermissionAction.SQL_DELETE,
-      PermissionAction.SQL_INSERT,
-      PermissionAction.SQL_UPDATE,
-      PermissionAction.REALTIME_ADMIN_WRITE,
-      PermissionAction.REPLICATION_ADMIN_WRITE,
-    ])
+    const readOnlyMatrix = PERMISSION_MATRIX.filter(
+      (entry) => entry.roles.includes('read_only') && entry.scope === 'project'
+    )
+
+    const allowedPairs = new Set(
+      readOnlyMatrix.map((entry) => `${entry.resource}::${entry.action}`)
+    )
 
     scoped.forEach((permission) => {
-      permission.actions.forEach((action) => {
-        expect(disallowed.has(action)).toBe(false)
+      expect(permission.project_refs).toContain(defaultProjectRef)
+      permission.resources.forEach((resource) => {
+        permission.actions.forEach((action) => {
+          expect(allowedPairs.has(`${resource}::${action}`)).toBe(true)
+        })
       })
     })
   })
