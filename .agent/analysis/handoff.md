@@ -10,8 +10,8 @@
 - Published a shared `shared-data/permission-matrix` artifact and updated platform-api to hydrate its matrix from that single source, clearing the path for Studio consumption.
 
 ## What’s Next
-1. Validate `scripts/platform-api/list-expected-routes.ts` against the current handlers and log discrepancies.
-2. Sweep for lingering TODOs/commented hacks introduced during auth hardening and resolve or track them.
+1. Implement the missing `/platform/auth/{ref}/…` endpoints (user CRUD, invites, send flows, spam validation) that Studio calls—each proxies to the matching GoTrue admin path with matrix-backed guards.
+2. Reconcile `scripts/platform-api/list-expected-routes.mjs` with the Fastify surface as those endpoints land; update tests/docs alongside.
 
 ## Repo Hygiene & Tests
 - Quick checks: `pnpm --filter platform-api exec vitest run tests/permissions.test.ts` and `pnpm --filter platform-api exec vitest run tests/organization.members.test.ts`.

@@ -149,7 +149,19 @@ Tests:
 
 > Progress (2025-10-17):
 > - ✅ Auth & membership overview captured in `docs/platform-auth.md` (request flow, route contracts, seeding, and test coverage).
-> - ☐ Sweep the codebase for lingering TODOs/hacks and align the route inventory script with actual handlers.
+> - ⚠️ Route extractor still reports 257 Studio calls, including endpoints we do not expose today (e.g., `/platform/auth/{ref}/users/{id}`, `/platform/projects/{ref}/analytics/log-drains/{token}`). Logged follow-up to reconcile the script output with actual Fastify handlers.
+> - ⚠️ Auth-related modules (`plugins/authenticate.ts`, `routes/organizations.ts`, `store/permissions.ts`) are clean, but wider platform TODOs remain (e.g., provisioning stubs). Continue tracking them outside this auth track.
+> - ⚠️ Identified nine missing `/platform/auth/{ref}/…` endpoints required by Studio. Each will proxy to GoTrue using `resolveAuthClientContext`:
+>    - `POST /users` → `POST admin/users`
+>    - `PATCH /users/{id}` → `PATCH admin/users/{id}`
+>    - `DELETE /users/{id}` → `DELETE admin/users/{id}` (propagate `soft_delete`)
+>    - `DELETE /users/{id}/factors` → `DELETE admin/users/{id}/factors`
+>    - `POST /invite` → `POST invite`
+>    - `POST /magiclink` → `POST magiclink`
+>    - `POST /otp` → `POST otp`
+>    - `POST /recover` → `POST recover`
+>    - `POST /validate/spam` → `POST validate/spam` (fall back to legacy path if required)
+>   Permission gates will map to matrix resources (`create_user`, `auth.users`, `auth.mfa_factors`, `invite_user`, `send_magic_link`, `send_otp`, `send_recovery`). Implementation plan: reuse the GoTrue request helper, add POST/DELETE support, and cover each route with Vitest fetch stubs + permission assertions.
 
 ---
 
