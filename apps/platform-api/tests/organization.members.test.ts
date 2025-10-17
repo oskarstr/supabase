@@ -434,7 +434,9 @@ describe('organization member routes', () => {
       .executeTakeFirst()
 
     expect(member?.role_ids).toEqual([roleId])
-    expect((member?.metadata as Record<string, unknown>)?.role_scoped_projects).toEqual(['alpha'])
+    expect((member?.metadata as Record<string, unknown>)?.role_scoped_projects).toEqual({
+      [String(roleId)]: ['alpha'],
+    })
 
     const invitationRow = await platformDb
       .selectFrom('organization_invitations')

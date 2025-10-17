@@ -32,6 +32,7 @@ import {
   acceptInvitationByToken,
   InvitationError,
 } from '../store/index.js'
+import { appendAuditLog } from '../store/audit-logs.js'
 import type {
   CloudProvider,
   CustomerProfileSummary,
@@ -101,9 +102,12 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
     ;(request as any).profile = profile
 
     const params = request.params as { slug?: string } | undefined
-    const routePath = typeof (request as any).routerPath === 'string'
-      ? (request as any).routerPath
-      : request.routeOptions?.url ?? ''
+    const requestAny = request as any
+    const routePath = typeof requestAny.routerPath === 'string'
+      ? requestAny.routerPath
+      : typeof requestAny.routeOptions?.url === 'string'
+        ? requestAny.routeOptions.url
+        : ''
     const skipMembershipCheck = routePath.includes('/members/invitations')
 
     if (params?.slug && !skipMembershipCheck) {
@@ -249,6 +253,16 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
 
       try {
         await acceptInvitationByToken(request.params.slug, request.params.token, profile)
+        await appendAuditLog({
+          created_at: new Date().toISOString(),
+          event_message: 'Accepted organization invitation',
+          ip_address: request.ip ?? null,
+          payload: {
+            organization_slug: request.params.slug,
+            invited_email: profile.primary_email,
+            invitation_token: request.params.token,
+          },
+        })
         return reply.code(201).send()
       } catch (error) {
         if (error instanceof InvitationError) {
@@ -589,7 +603,8 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
     const membership = await requireOrganizationMembership(profile, request.params.slug, reply, request)
     if (!membership) return
 
-    const org = await getOrganizationDetail(request.params.slug)
+    const organizations = await listOrganizations(profile.id)
+    const org = organizations.find((entry) => entry.slug === request.params.slug)
     if (!org) {
       return reply.code(404).send(organizationNotFoundResponse)
     }

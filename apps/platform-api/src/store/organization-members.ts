@@ -5,7 +5,6 @@ import normalizeEmail from 'validator/lib/normalizeEmail.js'
 
 import { getPlatformDb } from '../db/client.js'
 import { DEFAULT_PRIMARY_EMAIL, DEFAULT_USERNAME } from '../config/defaults.js'
-import { appendAuditLog } from './audit-logs.js'
 import type {
   OrganizationInvitationsResponse,
   OrganizationMember,
@@ -292,6 +291,36 @@ const mapMemberRowToOrganizationMember = (
   }
 }
 
+const composeMemberMetadata = (
+  current: Record<string, unknown>,
+  roleId: number,
+  scopedProjects?: string[] | null
+) =>
+  updateRoleScopedMetadata(
+    Array.isArray(current.role_scoped_projects)
+      ? { ...current, role_scoped_projects: {} as Record<string, string[]> }
+      : { ...current },
+    roleId,
+    scopedProjects ?? undefined
+  )
+
+const extractRoleScopedProjects = (
+  metadata: Record<string, unknown>,
+  roleId: number
+) => {
+  const value = metadata.role_scoped_projects
+  if (Array.isArray(value)) {
+    return value
+  }
+  if (value && typeof value === 'object') {
+    const scoped = (value as Record<string, unknown>)[String(roleId)]
+    if (Array.isArray(scoped)) {
+      return scoped as string[]
+    }
+  }
+  return undefined
+}
+
 const normalizeEmailAddress = (raw: string) => {
   const trimmed = raw.trim()
   const normalized = normalizeEmail(trimmed, {
@@ -567,7 +596,12 @@ export const acceptInvitationByToken = async (
   slug: string,
   token: string,
   profile: Profile
-): Promise<void> => {
+): Promise<{
+  organizationId: number
+  invitationId: number
+  roleId: number
+  profileId: number
+}> => {
   const organization = await db
     .selectFrom('organizations')
     .select(['id'])
@@ -592,37 +626,38 @@ export const acceptInvitationByToken = async (
     throw new InvitationError('Invitation email does not match the authenticated user')
   }
 
-  await db.transaction().execute(async (trx) => {
+  return db.transaction().execute(async (trx) => {
     const existingMember = await trx
       .selectFrom('organization_members')
-      .select(['id'])
+      .select(['id', 'metadata'])
       .where('organization_id', '=', organization.id)
       .where('profile_id', '=', profile.id)
       .executeTakeFirst()
 
-    const roleScopedProjects = ((invitation.metadata as Record<string, unknown>) ?? {})
-      .role_scoped_projects as string[] | null
+    const invitationMetadata = (invitation.metadata as Record<string, unknown>) ?? {}
+    const scopedProjects = extractRoleScopedProjects(invitationMetadata, invitation.role_id as number)
 
     if (existingMember) {
+      const existingMetadata = (existingMember.metadata as Record<string, unknown>) ?? {}
+      const mergedMetadata = composeMemberMetadata({ ...existingMetadata }, invitation.role_id as number, scopedProjects)
+
       await trx
         .updateTable('organization_members')
         .set({
           role_ids: [invitation.role_id as number],
-          metadata: updateRoleScopedMetadata(
-            ((invitation.metadata as Record<string, unknown>) ?? {}) as Record<string, unknown>,
-            invitation.role_id as number,
-            roleScopedProjects ?? undefined
-          ),
+          metadata: mergedMetadata,
           updated_at: nowIso(),
         })
         .where('id', '=', existingMember.id)
         .execute()
     } else {
+      const newMetadata = composeMemberMetadata({ ...invitationMetadata }, invitation.role_id as number, scopedProjects)
+
       const values: Record<string, unknown> = {
         organization_id: organization.id,
         profile_id: profile.id,
         role_ids: [invitation.role_id as number],
-        metadata: (invitation.metadata as Record<string, unknown>) ?? {},
+        metadata: newMetadata,
         mfa_enabled: false,
         is_owner: false,
       }
@@ -645,15 +680,12 @@ export const acceptInvitationByToken = async (
       })
       .where('id', '=', invitation.id)
       .execute()
-  })
-
-  await appendAuditLog({
-    created_at: nowIso(),
-    event_message: 'Accepted organization invitation',
-    ip_address: null,
-    payload: {
-      organization_slug: slug,
-      invited_email: profile.primary_email,
-    },
+  
+    return {
+      organizationId: organization.id,
+      invitationId: invitation.id,
+      roleId: invitation.role_id as number,
+      profileId: profile.id,
+    }
   })
 }
