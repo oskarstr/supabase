@@ -1,10 +1,6 @@
 import Fastify from 'fastify'
 import { randomUUID } from 'node:crypto'
-import { readdirSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DataType, newDb } from 'pg-mem'
 
 import { authenticateRequest } from '../src/plugins/authenticate.js'
 import {
@@ -14,15 +10,9 @@ import {
   TEST_USER_ID,
   createTestJwt,
 } from './utils/auth.js'
-
-const sanitizeMigrationSql = (sql: string) =>
-  sql
-    .replace(/CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\s*/g, '')
-    .replace(/CREATE EXTENSION IF NOT EXISTS "pgcrypto";\s*/g, '')
-    .replace(/ADD VALUE IF NOT EXISTS/g, 'ADD VALUE')
-    .replace(/COMMENT ON SCHEMA platform IS 'Supabase platform control-plane schema.';\s*/g, '')
-
-const MIGRATIONS_DIR = resolve(process.cwd(), 'migrations')
+import { initTestDatabase } from './utils/db.js'
+import { captureEnv, patchEnv, restoreEnv } from './utils/env.js'
+import { roleScopedProjectsMetadata } from './utils/metadata.js'
 
 const createApp = async () => {
   const { default: platformRoutes } = await import('../src/routes/platform.js')
@@ -88,31 +78,18 @@ describe('organization member routes', () => {
     authorization: `Bearer ${createTestJwt({ sub, email })}`,
   })
 
+  const originalEnv = captureEnv()
+
   beforeEach(async () => {
     vi.resetModules()
-    process.env.JWT_SECRET = TEST_JWT_SECRET
-    process.env.PLATFORM_DB_URL = 'pg-mem'
-    process.env.SUPABASE_DB_URL = 'pg-mem'
-    process.env.PLATFORM_API_REPO_ROOT = process.cwd()
-
-    const memDb = newDb()
-    memDb.public.registerFunction({
-      name: 'gen_random_uuid',
-      returns: DataType.uuid,
-      implementation: () => randomUUID(),
+    patchEnv({
+      JWT_SECRET: TEST_JWT_SECRET,
+      PLATFORM_DB_URL: 'pg-mem',
+      SUPABASE_DB_URL: 'pg-mem',
+      PLATFORM_API_REPO_ROOT: process.cwd(),
     })
 
-    const migrationFiles = readdirSync(MIGRATIONS_DIR)
-      .filter((file) => file.endsWith('.sql'))
-      .sort()
-
-    for (const file of migrationFiles) {
-      const sql = await readFile(resolve(MIGRATIONS_DIR, file), 'utf-8')
-      memDb.public.none(sanitizeMigrationSql(sql))
-    }
-
-    const { Pool: MemPool } = memDb.adapters.createPg()
-    globalThis.__PLATFORM_TEST_POOL__ = new MemPool()
+    await initTestDatabase()
 
     const defaults = await import('../src/config/defaults.js')
     defaultOrganizationSlug = defaults.DEFAULT_ORG_SLUG
@@ -159,6 +136,7 @@ describe('organization member routes', () => {
     const { destroyDb } = await import('../src/db/client.js')
     await destroyDb()
     delete (globalThis as any).__PLATFORM_TEST_POOL__
+    restoreEnv(originalEnv)
   })
 
   it('allows an owner to assign a role to an existing profile', async () => {
@@ -505,9 +483,10 @@ describe('organization member routes', () => {
       .executeTakeFirst()
 
     expect(member?.role_ids).toEqual([roleId])
-    expect((member?.metadata as Record<string, unknown>)?.role_scoped_projects).toEqual({
-      [String(roleId)]: ['alpha'],
-    })
+    const metadata = (member?.metadata as Record<string, unknown>) ?? {}
+    expect(metadata.role_scoped_projects).toEqual(
+      roleScopedProjectsMetadata([{ roleId, projects: ['alpha'] }]).role_scoped_projects
+    )
 
     const invitationRow = await platformDb
       .selectFrom('organization_invitations')

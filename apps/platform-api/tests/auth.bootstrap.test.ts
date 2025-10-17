@@ -1,25 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { newDb, DataType } from 'pg-mem'
-import { join } from 'node:path'
-import { readFile } from 'node:fs/promises'
-import { readdirSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { fileURLToPath } from 'node:url'
 
 import { baseProfile, DEFAULT_ORG_ID } from '../src/config/defaults.js'
-
-const MIGRATIONS_DIR = new URL('../migrations', import.meta.url)
-const MIGRATIONS_PATH = fileURLToPath(MIGRATIONS_DIR)
-
-const sanitizeMigrationSql = (sql: string) =>
-  sql
-    .replace(/CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\s*/g, '')
-    .replace(/CREATE EXTENSION IF NOT EXISTS "pgcrypto";\s*/g, '')
-    .replace(/ADD VALUE IF NOT EXISTS/g, 'ADD VALUE')
-    .replace(/COMMENT ON SCHEMA platform IS 'Supabase platform control-plane schema.';\s*/g, '')
+import { initTestDatabase } from './utils/db.js'
+import { captureEnv, patchEnv, restoreEnv } from './utils/env.js'
+import { createFetchStub } from './utils/gotrue.js'
+import { roleScopedProjectsMetadata } from './utils/metadata.js'
 
 describe('bootstrap admin reconciliation', () => {
-  const originalEnv = { ...process.env }
+  const originalEnv = captureEnv()
 
   beforeEach(() => {
     vi.resetModules()
@@ -32,33 +21,12 @@ describe('bootstrap admin reconciliation', () => {
     if ((globalThis as any).__PLATFORM_TEST_FETCH__) {
       delete (globalThis as any).__PLATFORM_TEST_FETCH__
     }
-    for (const key of Object.keys(process.env)) {
-      if (!(key in originalEnv)) {
-        delete process.env[key]
-      }
-    }
-    Object.assign(process.env, originalEnv)
+    restoreEnv(originalEnv)
     vi.restoreAllMocks()
   })
 
   const initMemDatabase = async () => {
-    const memDb = newDb()
-    memDb.public.registerFunction({
-      name: 'gen_random_uuid',
-      returns: DataType.uuid,
-      implementation: () => randomUUID(),
-    })
-    const migrationFiles = readdirSync(MIGRATIONS_PATH)
-      .filter((file) => file.endsWith('.sql'))
-      .sort()
-
-    for (const file of migrationFiles) {
-      const sql = await readFile(join(MIGRATIONS_PATH, file), 'utf-8')
-      memDb.public.none(sanitizeMigrationSql(sql))
-    }
-
-    const { Pool: MemPool } = memDb.adapters.createPg()
-    ;(globalThis as any).__PLATFORM_TEST_POOL__ = new MemPool()
+    await initTestDatabase()
   }
 
   const baseEnv = {
@@ -72,29 +40,23 @@ describe('bootstrap admin reconciliation', () => {
   }
 
   const setEnv = (overrides: Record<string, string>) => {
-    Object.assign(process.env, baseEnv, overrides)
+    patchEnv(baseEnv, overrides)
   }
 
   it('aligns platform profile gotrue_id with the GoTrue admin user', async () => {
     const expectedUserId = '11111111-2222-3333-4444-555555555555'
     await initMemDatabase()
 
-    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
       const url = input.toString()
       if (url.endsWith('/admin/users')) {
-        return new Response(
-          JSON.stringify({ user: { id: expectedUserId } }),
-          {
-            status: 201,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        )
+        return new Response(JSON.stringify({ user: { id: expectedUserId } }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
       }
       return new Response(null, { status: 404 })
     })
-
-    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
-    vi.stubGlobal('fetch', fetchSpy)
 
     setEnv({ PLATFORM_ADMIN_EMAIL: 'admin@example.com' })
 
@@ -119,7 +81,7 @@ describe('bootstrap admin reconciliation', () => {
     await initMemDatabase()
 
     let callIndex = 0
-    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
       const url = input.toString()
       if (url.endsWith('/admin/users')) {
         const ids = [initialUserId, updatedUserId]
@@ -132,9 +94,6 @@ describe('bootstrap admin reconciliation', () => {
       }
       return new Response(null, { status: 404 })
     })
-
-    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
-    vi.stubGlobal('fetch', fetchSpy)
 
     const { seedDefaults } = await import('../src/db/seed.js')
     const { getPlatformDb } = await import('../src/db/client.js')
@@ -178,16 +137,13 @@ describe('bootstrap admin reconciliation', () => {
       }),
     ]
 
-    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
       const url = input.toString()
       if (url.endsWith('/admin/users')) {
         return responses.shift() ?? new Response(null, { status: 500 })
       }
       return new Response(null, { status: 404 })
     })
-
-    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
-    vi.stubGlobal('fetch', fetchSpy)
 
     setEnv({
       PLATFORM_ADMIN_EMAIL: 'admin@example.com',
@@ -218,7 +174,7 @@ describe('bootstrap admin reconciliation', () => {
     const reconciledUserId = 'eeeeeeee-ffff-0000-1111-222222222222'
 
     let callCount = 0
-    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
       const url = input.toString()
       if (url.endsWith('/admin/users')) {
         const ids = [initialUserId, reconciledUserId]
@@ -231,9 +187,6 @@ describe('bootstrap admin reconciliation', () => {
       }
       return new Response(null, { status: 404 })
     })
-
-    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
-    vi.stubGlobal('fetch', fetchSpy)
 
     const { seedDefaults } = await import('../src/db/seed.js')
     const { getPlatformDb } = await import('../src/db/client.js')
@@ -285,16 +238,13 @@ describe('bootstrap admin reconciliation', () => {
   it('fails when GoTrue never returns the admin user', async () => {
     await initMemDatabase()
 
-    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
       const url = input.toString()
       if (url.endsWith('/admin/users')) {
         return new Response('temporarily unavailable', { status: 503 })
       }
       return new Response(null, { status: 404 })
     })
-
-    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
-    vi.stubGlobal('fetch', fetchSpy)
 
     setEnv({
       PLATFORM_ADMIN_EMAIL: 'admin@example.com',
@@ -316,7 +266,7 @@ describe('bootstrap admin reconciliation', () => {
     await initMemDatabase()
 
     const adminUserId = 'cccccccc-dddd-eeee-ffff-000000000000'
-    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
       const url = input.toString()
       if (url.endsWith('/admin/users')) {
         return new Response(JSON.stringify({ user: { id: adminUserId } }), {
@@ -326,9 +276,6 @@ describe('bootstrap admin reconciliation', () => {
       }
       return new Response(null, { status: 404 })
     })
-
-    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
-    vi.stubGlobal('fetch', fetchSpy)
 
     const { seedDefaults } = await import('../src/db/seed.js')
     const { getPlatformDb } = await import('../src/db/client.js')
@@ -351,11 +298,9 @@ describe('bootstrap admin reconciliation', () => {
       .updateTable('organization_members')
       .set({
         role_ids: [ownerRoleId, developerRoleId],
-        metadata: {
-          role_scoped_projects: {
-            [String(developerRoleId)]: ['existing-project'],
-          },
-        },
+        metadata: roleScopedProjectsMetadata([
+          { roleId: developerRoleId, projects: ['existing-project'] },
+        ]),
       })
       .where('organization_id', '=', DEFAULT_ORG_ID)
       .where('profile_id', '=', baseProfile.id)
@@ -388,11 +333,9 @@ describe('bootstrap admin reconciliation', () => {
         organization_id: DEFAULT_ORG_ID,
         profile_id: duplicateProfileId,
         role_ids: [developerRoleId],
-        metadata: {
-          role_scoped_projects: {
-            [String(developerRoleId)]: ['dup-project'],
-          },
-        },
+        metadata: roleScopedProjectsMetadata([
+          { roleId: developerRoleId, projects: ['dup-project'] },
+        ]),
         mfa_enabled: false,
         is_owner: false,
       })
@@ -447,7 +390,7 @@ describe('bootstrap admin reconciliation', () => {
     await initMemDatabase()
 
     const adminUserId = 'dddddddd-eeee-ffff-1111-222222222222'
-    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
       const url = input.toString()
       if (url.endsWith('/admin/users')) {
         return new Response(JSON.stringify({ user: { id: adminUserId } }), {
@@ -458,9 +401,6 @@ describe('bootstrap admin reconciliation', () => {
       return new Response(null, { status: 404 })
     })
 
-    ;(globalThis as any).__PLATFORM_TEST_FETCH__ = fetchSpy
-    vi.stubGlobal('fetch', fetchSpy)
-
     const { seedDefaults } = await import('../src/db/seed.js')
     const { getPlatformDb } = await import('../src/db/client.js')
     const db = getPlatformDb()
@@ -470,9 +410,7 @@ describe('bootstrap admin reconciliation', () => {
 
     const complexMetadata = {
       nested: { flag: true },
-      role_scoped_projects: {
-        '1': ['project-x'],
-      },
+      ...roleScopedProjectsMetadata([{ roleId: 1, projects: ['project-x'] }]),
     }
 
     await db
