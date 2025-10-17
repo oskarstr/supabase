@@ -12,6 +12,7 @@
   "dependencies": {
     "@fastify/cors": "^11.1.0",
     "@supabase/shared-types": "0.1.80",
+    "shared-data": "workspace:*",
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.5",
     "fastify": "^5.1.0",

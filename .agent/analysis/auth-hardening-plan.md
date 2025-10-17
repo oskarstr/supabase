@@ -128,8 +128,8 @@ Each test should prepare fixtures via the seed helper, use the auth middleware w
 > - ✅ Expanded `tests/permissions.test.ts` to assert administrator coverage against the matrix and to validate read-only responses purely through matrix lookups.
 > - ✅ Restored a clean TypeScript build by aligning schema typings, validator declarations, and route reply unions with the new invitation/matrix work.
 > - ✅ Alignment with the public docs is enforced by `apps/platform-api/tests/permissions.docs.test.ts`.
+> - ✅ Published `shared-data/permission-matrix` so Studio and other clients can import the canonical matrix dataset; platform-api now maps those entries back to `PermissionAction` values.
 > - ☐ Remaining cleanup:
->    - Publish a reusable matrix definition (package/JSON) so Studio—or any other consumer—can import it when they choose.
 >    - Document the artifact for Studio maintainers; we are not updating Studio ourselves, but the backend must continue to tolerate the existing regex matcher.
 
 Tests:

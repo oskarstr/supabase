@@ -7,9 +7,10 @@
 - Hardened admin bootstrap: `seedDefaults` now retries GoTrue provisioning, reconciles duplicate profiles/memberships back to id 1, and ships with regression coverage (`tests/auth.bootstrap.test.ts`).
 - Normalised member role handling: `upsertOrganizationMemberRole` and invitation acceptance now merge roles/metadata instead of overwriting them; new tests cover multi-role assignments and canonical `role_scoped_projects`.
 - Kept the plan/handoff docs current so Phase 2/4 are marked complete and remaining work is scoped to matrix governance + client matching.
+- Published a shared `shared-data/permission-matrix` artifact and updated platform-api to hydrate its matrix from that single source, clearing the path for Studio consumption.
 
 ## What’s Next
-1. Publish a reusable permission matrix artifact (package/JSON) so Studio and other clients can import it. We are not planning to edit Studio ourselves, but documenting the artifact keeps future Studio work straightforward while the backend continues to tolerate the existing regex matcher.
+1. Document the shared matrix artifact for Studio maintainers and confirm the backend continues to tolerate the regex matcher during the transition.
 2. Finish the Phase 6 doc pass (bootstrap flow, membership metadata contract, test strategy) and clean up any TODOs.
 
 ## Repo Hygiene & Tests

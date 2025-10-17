@@ -745,6 +745,9 @@ importers:
       pg:
         specifier: ^8.13.1
         version: 8.16.3
+      shared-data:
+        specifier: workspace:*
+        version: link:../../packages/shared-data
       validator:
         specifier: ^13.12.0
         version: 13.15.15
