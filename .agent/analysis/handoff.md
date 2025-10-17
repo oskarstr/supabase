@@ -1,37 +1,33 @@
 # Handoff Summary · 2025-10-17 · codex
 
 ## Current Focus
-We’re in **Phase 4 – Profile & Membership APIs** of the auth-hardening plan. Phase 0–3 and part of Phase 4 are complete (see `.agent/analysis/auth-hardening-plan.md` for the detailed checklist and progress notes). The main objective is to replace the old, global-profile shortcuts with per-user profile, permissions, and organization membership handling that matches Studio’s expectations and the upstream Supabase platform contracts (see the agent findings in `.agent/analysis/agent1.md` … `.agent/analysis/agent4.md`).
+Phase 4 of the auth-hardening plan is wrapped. Phase 5 – **Permissions & UI Contract** – is up next. The goal is to replace the wildcard permission response with per-member rules derived from organization roles and scoped projects so Studio’s gating logic stops showing the “additional permissions” banner.
 
-## Why We’re Doing This
-Earlier hacks (global `baseProfile`, wildcard permissions, grant scripts) meant every request looked like the bootstrap admin. Studio’s “additional permissions required” banner and API security issues were symptoms of that mismatch. The cloud agents mapped the full auth flow and confirmed we need to mirror the upstream design: authenticate every request, resolve the caller’s GoTrue UUID, materialize their profile and memberships, and scope organization/project access accordingly.
+## What’s Done
+- Profiles now reconcile with GoTrue and are exercised by `tests/profile.routes.test.ts`.
+- Membership mutations and invitation flows are live (including token lookup, acceptance, scoped project metadata, and audit logging).
+- Phase notes in `.agent/analysis/auth-hardening-plan.md` are current; follow-ups from earlier phases are closed out.
 
-## Work Completed This Session
-- **Grant scripts removed** (Phase 1) – helper deleted, stack script simplified, migration locked down; `tests/migrations.platform-grants.test.ts` added.
-- **Bootstrap reconciliation** (Phase 2) – `seedDefaults` now captures the real GoTrue UUID/email, updates `profiles` on each seed, and the pg-mem tests (`tests/auth.bootstrap.test.ts`) cover both the initial seed and env-driven admin rotations.
-- **Request-time authentication** (Phase 3) – added `plugins/authenticate.ts` (HS256 via `JWT_SECRET`/`SUPABASE_JWT_SECRET`), wrapped `/api/v1` and `/api/platform`, updated route tests to supply signed JWTs (`tests/utils/auth.ts`), and added `tests/auth.middleware.test.ts`.
-- **Phase 4 in progress** – profile routes/stores now operate on the authenticated user: new helpers in `store/profile.ts`, `/platform/profile` GET/POST/PATCH updated, permissions resolved via `listPermissionsForProfile`. A fresh suite (`tests/profile.routes.test.ts`) covers the new flow but is currently failing (see below).
+## What’s Next
+1. Redesign `/platform/profile/permissions` to compute permissions from the authenticated member’s role IDs and any scoped-project metadata.
+2. Confirm the response shape matches Studio’s expectations (owner wildcard, non-member zero access, union across memberships).
+3. Add integration tests (`tests/permissions.test.ts` stub needs to be created) that cover the scenarios above.
+4. Once Phase 5 lands, start Phase 6 (documentation/cleanup).
 
-## Current Blockers
-Running
-```
-pnpm --filter platform-api test -- tests/profile.routes.test.ts
-```
-returns 500s because the request + database fixtures aren’t yet aligned with the new helpers:
-- `ensureProfile()` expects valid UUIDs (`uuid` column), so the test should use a proper UUID instead of `test-user`.
-- The Fastify test harness needs a seeded organization membership for the test user; otherwise the new guards short-circuit.
-- Some organization store functions still hit old code paths that ignore the caller, and we’ve only partially refactored the main routes. Expect additional 500s until those are finished.
+## Repo Hygiene & Tests
+- Use `pnpm --filter platform-api test -- tests/organization.members.test.ts` and `pnpm --filter platform-api test -- tests/profile.routes.test.ts` for targeted checks.
+- Keep commit messages in the format `Profile & Memberships API: …` (no `feat/chore` prefixes).
+- When adding dependencies, remember to update `pnpm-lock.yaml` with `pnpm install --filter platform-api --no-frozen-lockfile`.
 
-## Next Steps
-1. Finish Phase 4:
-   - Refactor the remaining organization store helpers (`listOrganizationProjects`, `getOrganizationDetail`, etc.) to accept the authenticated profile ID or membership and remove fallback stubs.
-   - Update the organization routes to use the new helpers consistently.
-   - Extend/update tests (profile + organization) to seed test profiles/memberships using the new helpers.
-2. Once profile/org flows pass, continue with Phase 5 (permissions UX) and Phase 6 (docs/cleanup) per the plan.
+## User Quirks & Expectations
+- Commit messages: no conventional prefixes; prefer `Area: summary`.
+- Code should be “artful”: clean, well-factored, no shortcuts even in tests. If a validation is “good enough,” it probably isn’t—pull in the proper helper/library.
+- Tests should challenge the code. Don’t tweak assertions to make them pass; fix the implementation instead.
+- Keep `.agent/analysis/auth-hardening-plan.md` updated as you land work.
 
-## Reminder
-Everything else you need—full plan, per-phase notes, and the cloud-agent analyses—is in the `.agent/analysis` directory:
-- `.agent/analysis/auth-hardening-plan.md`
-- `.agent/analysis/agent1.md` … `.agent/analysis/agent4.md`
+## Useful References
+- Plan & progress: `.agent/analysis/auth-hardening-plan.md`
+- Historical notes: `.agent/analysis/agent1.md` … `agent4.md`
+- Invitation flow tests: `apps/platform-api/tests/organization.members.test.ts`
 
-I’m out of cycle (“ran out of juice”), so please pick it up from Phase 4 with the failing profile tests as your starting point.
+Ping the user if you notice anything “hacky” or unfinished before moving on. They prefer blunt honesty over politeness.  !*** End Patch

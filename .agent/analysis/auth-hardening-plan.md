@@ -108,7 +108,7 @@ Tests:
 > - ✅ Introduced `tests/organization.members.test.ts` to cover role assignment, permission denials, and owner deletion protections.
 > - ✅ Wired up invitation create/delete flows with metadata storage, plus regression coverage ensuring only owners/admins can mutate invitations.
 > - ✅ Added invitation token lookup/acceptance routes that enforce email matching, expiry, and scoped project metadata during membership creation.
-> - ☐ Follow-up: align invitation acceptance audit payloads with upstream format (include requester IP and project context).
+> - ✅ Aligned invitation acceptance audit payloads with upstream expectations (IP, organization identifiers, scoped project metadata).
 
 Each test should prepare fixtures via the seed helper, use the auth middleware with mocked JWTs, and assert DB state after the route executes.
 
