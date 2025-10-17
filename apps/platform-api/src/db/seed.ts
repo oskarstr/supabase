@@ -265,6 +265,7 @@ export const seedDefaults = async () => {
         .values({
           project_id: projectId,
           root_dir: rootDir,
+          port_slot: 0,
         })
         .execute()
     }
@@ -335,6 +336,7 @@ export const seedDefaults = async () => {
           .values({
             project_id: platformProjectId,
             root_dir: platformRoot,
+            port_slot: 1,
           })
           .execute()
       }

@@ -109,6 +109,10 @@ func (e *localExecutor) runWithLogs(fn func() error) (operationResult, error) {
 
 	os.Stdout = stdoutWriter
 	os.Stderr = stderrWriter
+	defer func() {
+		os.Stdout = originalStdout
+		os.Stderr = originalStderr
+	}()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	var wg sync.WaitGroup
@@ -122,7 +126,16 @@ func (e *localExecutor) runWithLogs(fn func() error) (operationResult, error) {
 		_, _ = io.Copy(&stderrBuf, stderrReader)
 	}()
 
-	runErr := fn()
+	var runErr error
+	var panicValue any
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicValue = r
+			}
+		}()
+		runErr = fn()
+	}()
 
 	stdoutWriter.Close()
 	stderrWriter.Close()
@@ -130,12 +143,12 @@ func (e *localExecutor) runWithLogs(fn func() error) (operationResult, error) {
 	stdoutReader.Close()
 	stderrReader.Close()
 
-	os.Stdout = originalStdout
-	os.Stderr = originalStderr
-
 	result.Stdout = stdoutBuf.String()
 	result.Stderr = stderrBuf.String()
 	result.DurationMs = time.Since(startTime).Milliseconds()
+	if panicValue != nil {
+		panic(panicValue)
+	}
 	return result, runErr
 }
 
