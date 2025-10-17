@@ -1,5 +1,8 @@
 import { createHmac } from 'node:crypto'
 
+export const TEST_USER_ID = '00000000-0000-0000-0000-000000000001'
+export const TEST_USER_EMAIL = 'test-user@example.com'
+
 export const TEST_JWT_SECRET = 'test-secret'
 
 const encode = (value: Record<string, unknown>) =>
@@ -9,7 +12,7 @@ export const createTestJwt = (payload: Record<string, unknown> = {}) => {
   const header = { alg: 'HS256', typ: 'JWT' }
   const now = Math.floor(Date.now() / 1000)
   const body = {
-    sub: 'test-user',
+    sub: TEST_USER_ID,
     role: 'authenticated',
     exp: now + 60 * 60,
     ...payload,

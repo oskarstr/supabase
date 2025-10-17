@@ -47,6 +47,37 @@ const selectProfile = () =>
 const findProfileRow = async (gotrueId: string) =>
   selectProfile().where('gotrue_id', '=', gotrueId).executeTakeFirst()
 
+const isDuplicateProfileIdError = (error: unknown) =>
+  error instanceof Error && /profiles_pkey/.test(error.message)
+
+const insertProfileRow = async (
+  values: Record<string, unknown>
+) => {
+  try {
+    return await db
+      .insertInto('profiles')
+      .values(values)
+      .returningAll()
+      .executeTakeFirstOrThrow()
+  } catch (error) {
+    if (!isDuplicateProfileIdError(error)) {
+      throw error
+    }
+
+    const maxRow = await db
+      .selectFrom('profiles')
+      .select((qb) => qb.fn.max('id').as('max_id'))
+      .executeTakeFirst()
+    const nextId = Number(maxRow?.max_id ?? 0) + 1
+
+    return await db
+      .insertInto('profiles')
+      .values({ ...values, id: nextId })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+  }
+}
+
 const deriveUsername = (email?: string | null, fallback?: string) => {
   if (email && email.includes('@')) {
     const candidate = email.split('@')[0]?.trim()
@@ -83,14 +114,10 @@ export const ensureProfile = async (
     return toProfile(existing)
   }
 
-  const inserted = await db
-    .insertInto('profiles')
-    .values({
-      gotrue_id: gotrueId,
-      ...buildProfileDefaults(email),
-    })
-    .returningAll()
-    .executeTakeFirstOrThrow()
+  const inserted = await insertProfileRow({
+    gotrue_id: gotrueId,
+    ...buildProfileDefaults(email),
+  })
 
   return toProfile(inserted)
 }
@@ -103,14 +130,10 @@ export const createProfile = async (
   if (existing) {
     throw new ProfileAlreadyExistsError()
   }
-  const inserted = await db
-    .insertInto('profiles')
-    .values({
-      gotrue_id: gotrueId,
-      ...buildProfileDefaults(email),
-    })
-    .returningAll()
-    .executeTakeFirstOrThrow()
+  const inserted = await insertProfileRow({
+    gotrue_id: gotrueId,
+    ...buildProfileDefaults(email),
+  })
 
   return toProfile(inserted)
 }

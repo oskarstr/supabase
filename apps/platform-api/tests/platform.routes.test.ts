@@ -8,7 +8,7 @@ import { DataType, newDb } from 'pg-mem'
 import { randomUUID } from 'node:crypto'
 
 import { authenticateRequest } from '../src/plugins/authenticate.js'
-import { authHeaders, TEST_JWT_SECRET } from './utils/auth.js'
+import { authHeaders, TEST_JWT_SECRET, TEST_USER_EMAIL, TEST_USER_ID } from './utils/auth.js'
 
 async function buildApp() {
   const platformRoutes = (await import('../src/routes/platform.js')).default
@@ -52,9 +52,6 @@ const sanitizeMigrationSql = (sql: string) =>
     .replace(/COMMENT ON SCHEMA platform IS 'Supabase platform control-plane schema.';\s*/g, '')
 
 const MIGRATIONS_DIR = resolve(process.cwd(), 'migrations')
-const TEST_USER_ID = 'test-user'
-const TEST_USER_EMAIL = 'test-user@example.com'
-
 describe('platform routes', () => {
   let app: FastifyInstance
   let defaultProjectRef = ''

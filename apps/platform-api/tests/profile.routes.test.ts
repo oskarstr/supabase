@@ -6,9 +6,8 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-import platformRoutes from '../src/routes/platform.js'
 import { authenticateRequest } from '../src/plugins/authenticate.js'
-import { createTestJwt, TEST_JWT_SECRET } from './utils/auth.js'
+import { authHeaders, TEST_JWT_SECRET, TEST_USER_ID } from './utils/auth.js'
 
 const sanitizeMigrationSql = (sql: string) =>
   sql
@@ -20,6 +19,7 @@ const sanitizeMigrationSql = (sql: string) =>
 const MIGRATIONS_DIR = resolve(process.cwd(), 'migrations')
 
 const createApp = async () => {
+  const { default: platformRoutes } = await import('../src/routes/platform.js')
   const app = Fastify({ logger: false })
   await app.register(async (instance) => {
     instance.addHook('preHandler', authenticateRequest)
@@ -71,10 +71,6 @@ describe('profile routes', () => {
     delete (globalThis as any).__PLATFORM_TEST_POOL__
   })
 
-  const authHeaders = (payload: Record<string, unknown> = {}) => ({
-    authorization: `Bearer ${createTestJwt({ sub: 'test-user', ...payload })}`,
-  })
-
   it('returns 404 when profile is not found', async () => {
     const response = await app.inject({
       method: 'GET',
@@ -103,7 +99,7 @@ describe('profile routes', () => {
       headers: authHeaders(),
     })
     expect(get.statusCode).toBe(200)
-    expect(get.json().gotrue_id).toBe('test-user')
+    expect(get.json().gotrue_id).toBe(TEST_USER_ID)
   })
 
   it('updates the profile', async () => {

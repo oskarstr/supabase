@@ -3,11 +3,15 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
 import {
   CLOUD_PROVIDERS,
   createOrganization,
+  deleteOrganizationMember,
+  ensureProfile,
   getOrganizationCustomer,
   getOrganizationDetail,
-  getOrganizationUsage,
   getOrganizationMembership,
+  getOrganizationUsage,
+  getProfileByGotrueId,
   getSubscriptionForOrg,
+  getUpcomingInvoice,
   listAvailablePlans,
   listAvailableVersionsForOrganization,
   listMembersReachedFreeProjectLimit,
@@ -21,8 +25,7 @@ import {
   listOrganizationProjects,
   listOrganizationTaxIds,
   listOrganizations,
-  getUpcomingInvoice,
-  ensureProfile,
+  upsertOrganizationMemberRole,
 } from '../store/index.js'
 import type {
   CloudProvider,
@@ -44,6 +47,12 @@ import type { Profile } from '../store/types.js'
 
 const unauthorizedResponse = { message: 'Unauthorized' }
 const organizationNotFoundResponse = { message: 'Organization not found' }
+
+const canManageMembers = (membership: { is_owner?: boolean; role_ids?: number[] | null }) => {
+  if (membership?.is_owner) return true
+  if (!Array.isArray(membership?.role_ids)) return false
+  return membership.role_ids.includes(1) || membership.role_ids.includes(2)
+}
 
 const requireProfile = async (request: FastifyRequest, reply: FastifyReply): Promise<Profile | null> => {
   const cached = (request as any).profile as Profile | undefined
@@ -158,6 +167,84 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
 
       const members = await listOrganizationMembers(request.params.slug)
       return reply.send(members)
+    }
+  )
+
+  app.patch<{
+    Params: { slug: string; gotrue_id: string }
+    Body: { role_id?: number; role_scoped_projects?: unknown }
+  }>('/:slug/members/:gotrue_id', async (request, reply) => {
+    const profile = await requireProfile(request, reply)
+    if (!profile) return
+
+    const membership = await requireOrganizationMembership(profile, request.params.slug, reply, request)
+    if (!membership) return
+
+    if (!canManageMembers(membership)) {
+      return reply.code(403).send({ message: 'Forbidden' })
+    }
+
+    const roleId = request.body?.role_id
+    if (!Number.isFinite(roleId)) {
+      return reply.code(400).send({ message: 'role_id must be a number' })
+    }
+
+    const targetProfile = await getProfileByGotrueId(request.params.gotrue_id)
+    if (!targetProfile) {
+      return reply.code(404).send({ message: "Member's profile not found" })
+    }
+
+    const scopedProjects = Array.isArray(request.body?.role_scoped_projects)
+      ? (request.body.role_scoped_projects as string[])
+      : undefined
+
+    try {
+      const updated = await upsertOrganizationMemberRole(
+        request.params.slug,
+        targetProfile,
+        Number(roleId),
+        scopedProjects
+      )
+
+      if (!updated) {
+        return reply.code(404).send(organizationNotFoundResponse)
+      }
+
+      return reply.send(updated)
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to assign organization member role')
+      return reply.code(400).send({ message: (error as Error).message })
+    }
+  })
+
+  app.delete<{ Params: { slug: string; gotrue_id: string } }>(
+    '/:slug/members/:gotrue_id',
+    async (request, reply) => {
+      const profile = await requireProfile(request, reply)
+      if (!profile) return
+
+      const membership = await requireOrganizationMembership(profile, request.params.slug, reply, request)
+      if (!membership) return
+
+      if (!canManageMembers(membership)) {
+        return reply.code(403).send({ message: 'Forbidden' })
+      }
+
+      const targetProfile = await getProfileByGotrueId(request.params.gotrue_id)
+      if (!targetProfile) {
+        return reply.code(404).send({ message: "Member's profile not found" })
+      }
+
+      try {
+        const removed = await deleteOrganizationMember(request.params.slug, targetProfile)
+        if (!removed) {
+          return reply.code(404).send({ message: 'Member not found' })
+        }
+        return reply.code(204).send()
+      } catch (error) {
+        request.log.error({ err: error }, 'Failed to remove organization member')
+        return reply.code(400).send({ message: (error as Error).message })
+      }
     }
   )
 

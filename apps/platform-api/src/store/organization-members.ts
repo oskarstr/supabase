@@ -5,6 +5,7 @@ import type {
   OrganizationMember,
   OrganizationRolesResponse,
   OrgDailyUsageResponse,
+  Profile,
 } from './types.js'
 
 const db = getPlatformDb()
@@ -140,4 +141,175 @@ export const listOrganizationDailyUsage = async (
       },
     ],
   }
+}
+
+const isPgMem = () => process.env.PLATFORM_DB_URL === 'pg-mem'
+
+const nextMemberId = async () => {
+  const maxRow = await db
+    .selectFrom('organization_members')
+    .select(({ fn }) => fn.max('id').as('max_id'))
+    .executeTakeFirst()
+  return Number(maxRow?.max_id ?? 0) + 1
+}
+
+const loadOrganizationId = async (slug: string) => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['id'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+  return organization?.id ?? null
+}
+
+const loadMemberRow = async (organizationId: number, profileId: number) =>
+  db
+    .selectFrom('organization_members')
+    .selectAll()
+    .where('organization_id', '=', organizationId)
+    .where('profile_id', '=', profileId)
+    .executeTakeFirst()
+
+const loadMemberByGotrueId = async (organizationId: number, gotrueId: string) =>
+  db
+    .selectFrom('organization_members')
+    .innerJoin('profiles', 'profiles.id', 'organization_members.profile_id')
+    .select([
+      'organization_members.id as member_id',
+      'organization_members.role_ids as member_role_ids',
+      'organization_members.metadata as member_metadata',
+      'organization_members.mfa_enabled as member_mfa_enabled',
+      'organization_members.is_owner as member_is_owner',
+      'organization_members.inserted_at as member_inserted_at',
+      'organization_members.updated_at as member_updated_at',
+      'profiles.id as profile_id',
+      'profiles.gotrue_id as gotrue_id',
+      'profiles.username as username',
+      'profiles.primary_email as primary_email',
+      'profiles.is_sso_user as is_sso_user',
+    ])
+    .where('organization_members.organization_id', '=', organizationId)
+    .where('profiles.gotrue_id', '=', gotrueId)
+    .executeTakeFirst()
+
+const loadOrgRole = async (organizationId: number, roleId: number) =>
+  db
+    .selectFrom('organization_roles')
+    .select(['id'])
+    .where('organization_id', '=', organizationId)
+    .where('id', '=', roleId)
+    .executeTakeFirst()
+
+const updateRoleScopedMetadata = (
+  metadata: Record<string, unknown>,
+  roleId: number,
+  scopedProjects?: string[]
+) => {
+  if (scopedProjects === undefined) return metadata
+
+  const cloned = { ...metadata }
+  const key = 'role_scoped_projects'
+  const existing = (cloned[key] as Record<string, string[]>) ?? {}
+  if (Array.isArray(scopedProjects)) {
+    cloned[key] = { ...existing, [String(roleId)]: scopedProjects }
+  } else {
+    cloned[key] = existing
+  }
+  return cloned
+}
+
+const mapMemberRowToOrganizationMember = (
+  row:
+    | Awaited<ReturnType<typeof loadMemberByGotrueId>>
+    | undefined
+): OrganizationMember | null => {
+  if (!row) return null
+
+  return {
+    gotrue_id: row.gotrue_id,
+    primary_email: row.primary_email ?? DEFAULT_PRIMARY_EMAIL,
+    username: row.username ?? DEFAULT_USERNAME,
+    is_sso_user: row.is_sso_user ?? false,
+    metadata: (row.member_metadata as Record<string, unknown>) ?? {},
+    mfa_enabled: row.member_mfa_enabled ?? false,
+    role_ids: row.member_role_ids ?? [],
+  }
+}
+
+export const upsertOrganizationMemberRole = async (
+  slug: string,
+  targetProfile: Profile,
+  roleId: number,
+  roleScopedProjects?: string[]
+): Promise<OrganizationMember | null> => {
+  const organizationId = await loadOrganizationId(slug)
+  if (!organizationId) {
+    return null
+  }
+
+  const role = await loadOrgRole(organizationId, roleId)
+  if (!role) {
+    throw new Error('Role does not exist for this organization')
+  }
+
+  const existing = await loadMemberRow(organizationId, targetProfile.id)
+  const metadata = updateRoleScopedMetadata(
+    ((existing?.metadata as Record<string, unknown>) ?? {}) as Record<string, unknown>,
+    roleId,
+    roleScopedProjects
+  )
+
+  if (existing) {
+    await db
+      .updateTable('organization_members')
+      .set({
+        role_ids: [roleId],
+        metadata,
+        updated_at: nowIso(),
+      })
+      .where('id', '=', existing.id)
+      .execute()
+  } else {
+    const values: Record<string, unknown> = {
+      organization_id: organizationId,
+      profile_id: targetProfile.id,
+      role_ids: [roleId],
+      metadata,
+      mfa_enabled: false,
+      is_owner: false,
+    }
+
+    if (isPgMem()) {
+      values.id = await nextMemberId()
+    }
+
+    await db.insertInto('organization_members').values(values).execute()
+  }
+
+  const row = await loadMemberByGotrueId(organizationId, targetProfile.gotrue_id)
+  return mapMemberRowToOrganizationMember(row)
+}
+
+export const deleteOrganizationMember = async (
+  slug: string,
+  targetProfile: Profile
+): Promise<boolean> => {
+  const organizationId = await loadOrganizationId(slug)
+  if (!organizationId) {
+    return false
+  }
+
+  const existing = await loadMemberRow(organizationId, targetProfile.id)
+  if (!existing) {
+    return false
+  }
+  if (existing.is_owner) {
+    throw new Error('Cannot remove organization owner')
+  }
+
+  await db
+    .deleteFrom('organization_members')
+    .where('id', '=', existing.id)
+    .execute()
+  return true
 }

@@ -140,6 +140,8 @@ export {
   listOrganizationRoles,
   listOrganizationInvitations,
   listOrganizationDailyUsage,
+  upsertOrganizationMemberRole,
+  deleteOrganizationMember,
 } from './organization-members.js'
 
 export {
