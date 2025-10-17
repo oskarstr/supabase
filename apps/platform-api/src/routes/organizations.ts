@@ -28,6 +28,8 @@ import {
   listOrganizationTaxIds,
   listOrganizations,
   upsertOrganizationMemberRole,
+  getInvitationByToken,
+  acceptInvitationByToken,
   InvitationError,
 } from '../store/index.js'
 import type {
@@ -99,7 +101,12 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
     ;(request as any).profile = profile
 
     const params = request.params as { slug?: string } | undefined
-    if (params?.slug) {
+    const routePath = typeof (request as any).routerPath === 'string'
+      ? (request as any).routerPath
+      : request.routeOptions?.url ?? ''
+    const skipMembershipCheck = routePath.includes('/members/invitations')
+
+    if (params?.slug && !skipMembershipCheck) {
       const membership = await getOrganizationMembership(profile.id, params.slug)
       if (!membership) {
         await reply.code(404).send(organizationNotFoundResponse)
@@ -210,6 +217,48 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(500).send({ message: 'Failed to create organization invitation' })
     }
   })
+
+  app.get<{ Params: { slug: string; token: string } }>(
+    '/:slug/members/invitations/:token',
+    async (request, reply) => {
+      const profile = await requireProfile(request, reply)
+      if (!profile) return
+
+      try {
+        const result = await getInvitationByToken(
+          request.params.slug,
+          request.params.token,
+          profile
+        )
+        return reply.send(result)
+      } catch (error) {
+        if (error instanceof InvitationError) {
+          return reply.code(404).send({ message: error.message })
+        }
+        request.log.error({ err: error }, 'Failed to fetch invitation by token')
+        return reply.code(500).send({ message: 'Failed to retrieve organization invitation' })
+      }
+    }
+  )
+
+  app.post<{ Params: { slug: string; token: string } }>(
+    '/:slug/members/invitations/:token',
+    async (request, reply) => {
+      const profile = await requireProfile(request, reply)
+      if (!profile) return
+
+      try {
+        await acceptInvitationByToken(request.params.slug, request.params.token, profile)
+        return reply.code(201).send()
+      } catch (error) {
+        if (error instanceof InvitationError) {
+          return reply.code(400).send({ message: error.message })
+        }
+        request.log.error({ err: error }, 'Failed to accept organization invitation')
+        return reply.code(500).send({ message: 'Failed to accept organization invitation' })
+      }
+    }
+  )
 
   app.delete<{ Params: { slug: string; id: string } }>(
     '/:slug/members/invitations/:id',

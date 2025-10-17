@@ -71,8 +71,8 @@ describe('organization member routes', () => {
 
   const ownerHeaders = () => withAuth()
 
-  const headersForSubject = (sub: string) => ({
-    authorization: `Bearer ${createTestJwt({ sub })}`,
+  const headersForSubject = (sub: string, email?: string) => ({
+    authorization: `Bearer ${createTestJwt({ sub, email })}`,
   })
 
   beforeEach(async () => {
@@ -334,5 +334,157 @@ describe('organization member routes', () => {
 
     const invitations = await invitationList()
     expect(invitations.invitations.some((invite) => invite.invited_email === 'delete-me@example.com')).toBe(false)
+  })
+
+  it('returns invitation metadata by token for the invited user', async () => {
+    const roleId = await developerRoleId()
+    const inviteEmail = 'lookup@example.com'
+    const targetUserId = randomUUID()
+
+    const create = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+      payload: {
+        email: inviteEmail,
+        role_id: roleId,
+      },
+    })
+    expect(create.statusCode).toBe(201)
+    const invitation = create.json() as { token: string }
+
+    const { ensureProfile } = await import('../src/store/profile.js')
+    await ensureProfile(targetUserId, inviteEmail)
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations/${invitation.token}`,
+      headers: headersForSubject(targetUserId, inviteEmail),
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      token_does_not_exist: false,
+      expired_token: false,
+      email_match: true,
+      authorized_user: true,
+    })
+  })
+
+  it('rejects invitation acceptance when email mismatches', async () => {
+    const roleId = await developerRoleId()
+    const create = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+      payload: {
+        email: 'mismatch@example.com',
+        role_id: roleId,
+      },
+    })
+    expect(create.statusCode).toBe(201)
+    const invitation = create.json() as { token: string }
+
+    const mismatchUserId = randomUUID()
+    const { ensureProfile } = await import('../src/store/profile.js')
+    await ensureProfile(mismatchUserId, 'other@example.com')
+
+    const accept = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations/${invitation.token}`,
+      headers: headersForSubject(mismatchUserId, 'other@example.com'),
+    })
+
+    expect(accept.statusCode).toBe(400)
+  })
+
+  it('accepts invitation and creates membership for invited user', async () => {
+    const roleId = await developerRoleId()
+    const inviteEmail = 'accept@example.com'
+    const targetUserId = randomUUID()
+
+    const create = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+      payload: {
+        email: inviteEmail,
+        role_id: roleId,
+        role_scoped_projects: ['alpha'],
+      },
+    })
+    expect(create.statusCode).toBe(201)
+    const invitation = create.json() as { token: string }
+
+    const { ensureProfile } = await import('../src/store/profile.js')
+    const profile = await ensureProfile(targetUserId, inviteEmail)
+
+    const accept = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations/${invitation.token}`,
+      headers: headersForSubject(targetUserId, inviteEmail),
+    })
+    expect(accept.statusCode).toBe(201)
+
+    const member = await platformDb
+      .selectFrom('organization_members')
+      .select(['metadata', 'role_ids'])
+      .where('organization_id', '=', defaultOrganizationId)
+      .where('profile_id', '=', profile.id)
+      .executeTakeFirst()
+
+    expect(member?.role_ids).toEqual([roleId])
+    expect((member?.metadata as Record<string, unknown>)?.role_scoped_projects).toEqual(['alpha'])
+
+    const invitationRow = await platformDb
+      .selectFrom('organization_invitations')
+      .select(['accepted_at'])
+      .where('organization_id', '=', defaultOrganizationId)
+      .where('token', '=', invitation.token)
+      .executeTakeFirst()
+    expect(invitationRow?.accepted_at).not.toBeNull()
+
+    const lookup = await app.inject({
+      method: 'GET',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations/${invitation.token}`,
+      headers: headersForSubject(targetUserId, inviteEmail),
+    })
+    expect(lookup.statusCode).toBe(200)
+    expect(lookup.json()).toMatchObject({ token_does_not_exist: true })
+  })
+
+  it('prevents accepting expired invitations', async () => {
+    const roleId = await developerRoleId()
+    const inviteEmail = 'expired@example.com'
+    const targetUserId = randomUUID()
+
+    const create = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+      payload: {
+        email: inviteEmail,
+        role_id: roleId,
+      },
+    })
+    expect(create.statusCode).toBe(201)
+    const invitation = create.json() as { token: string }
+
+    await platformDb
+      .updateTable('organization_invitations')
+      .set({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+      .where('organization_id', '=', defaultOrganizationId)
+      .where('token', '=', invitation.token)
+      .execute()
+
+    const { ensureProfile } = await import('../src/store/profile.js')
+    await ensureProfile(targetUserId, inviteEmail)
+
+    const accept = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations/${invitation.token}`,
+      headers: headersForSubject(targetUserId, inviteEmail),
+    })
+    expect(accept.statusCode).toBe(400)
   })
 })

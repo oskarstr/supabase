@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto'
+
 import isEmail from 'validator/lib/isEmail.js'
 import normalizeEmail from 'validator/lib/normalizeEmail.js'
 
 import { getPlatformDb } from '../db/client.js'
 import { DEFAULT_PRIMARY_EMAIL, DEFAULT_USERNAME } from '../config/defaults.js'
+import { appendAuditLog } from './audit-logs.js'
 import type {
   OrganizationInvitationsResponse,
   OrganizationMember,
@@ -156,6 +159,56 @@ const nextMemberId = async () => {
   return Number(maxRow?.max_id ?? 0) + 1
 }
 
+const nextInvitationId = async () => {
+  const maxRow = await db
+    .selectFrom('organization_invitations')
+    .select(({ fn }) => fn.max('id').as('max_id'))
+    .executeTakeFirst()
+  return Number(maxRow?.max_id ?? 0) + 1
+}
+
+const invitationSelectFields = [
+  'id',
+  'invited_email',
+  'role_id',
+  'invited_at',
+  'metadata',
+  'token',
+  'expires_at',
+  'accepted_at',
+] as const
+
+type InvitationOutput = {
+  id: number
+  invited_at: string
+  invited_email: string
+  role_id: number
+  metadata: Record<string, unknown>
+  token: string
+  expires_at: string | null
+  accepted_at: string | null
+}
+
+const mapInvitationRow = (row: {
+  id: number
+  invited_email: string
+  role_id: number | null
+  invited_at: Date
+  metadata?: unknown
+  token: string
+  expires_at: Date | null
+  accepted_at: Date | null
+}): InvitationOutput => ({
+  id: row.id,
+  invited_at: row.invited_at.toISOString(),
+  invited_email: row.invited_email,
+  role_id: Number(row.role_id ?? 0),
+  metadata: (row.metadata as Record<string, unknown>) ?? {},
+  token: row.token,
+  expires_at: row.expires_at ? row.expires_at.toISOString() : null,
+  accepted_at: row.accepted_at ? row.accepted_at.toISOString() : null,
+})
+
 const loadOrganizationId = async (slug: string) => {
   const organization = await db
     .selectFrom('organizations')
@@ -250,32 +303,6 @@ const normalizeEmailAddress = (raw: string) => {
     all_lowercase: true,
   })
   return (normalized ?? trimmed).toLowerCase()
-}
-
-const nextInvitationId = async () => {
-  const maxRow = await db
-    .selectFrom('organization_invitations')
-    .select(({ fn }) => fn.max('id').as('max_id'))
-    .executeTakeFirst()
-  return Number(maxRow?.max_id ?? 0) + 1
-}
-
-const mapInvitationRow = (row: {
-  id: number
-  invited_email: string
-  role_id: number | null
-  invited_at: Date
-  metadata?: unknown
-}): InvitationOutput => ({
-  id: row.id,
-  invited_at: row.invited_at.toISOString(),
-  invited_email: row.invited_email,
-  role_id: Number(row.role_id ?? 0),
-  metadata: (row.metadata as Record<string, unknown>) ?? {},
-})
-
-type InvitationOutput = OrganizationInvitationsResponse['invitations'][number] & {
-  metadata: Record<string, unknown>
 }
 
 export class InvitationError extends Error {
@@ -398,7 +425,7 @@ export const createOrganizationInvitation = async (
 
   const existingInvitation = await db
     .selectFrom('organization_invitations')
-    .selectAll()
+    .select(invitationSelectFields)
     .where('organization_id', '=', organizationId)
     .where('invited_email', '=', normalizedEmail)
     .executeTakeFirst()
@@ -409,6 +436,9 @@ export const createOrganizationInvitation = async (
     invited_by_profile_id: options.invitedByProfileId ?? null,
   }
 
+  const token = randomUUID()
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
   if (existingInvitation) {
     const updated = await db
       .updateTable('organization_invitations')
@@ -416,15 +446,12 @@ export const createOrganizationInvitation = async (
         role_id: roleId,
         invited_at: new Date().toISOString(),
         metadata,
+        token,
+        expires_at: expiresAt.toISOString(),
+        accepted_at: null,
       })
       .where('id', '=', existingInvitation.id)
-      .returning([
-        'id',
-        'invited_email',
-        'role_id',
-        'invited_at',
-        'metadata',
-      ])
+      .returning(invitationSelectFields)
       .executeTakeFirstOrThrow()
 
     return mapInvitationRow(updated)
@@ -436,6 +463,8 @@ export const createOrganizationInvitation = async (
     role_id: roleId,
     invited_at: new Date().toISOString(),
     metadata,
+    token,
+    expires_at: expiresAt.toISOString(),
   }
 
   if (isPgMem()) {
@@ -445,7 +474,7 @@ export const createOrganizationInvitation = async (
   const inserted = await db
     .insertInto('organization_invitations')
     .values(values)
-    .returning(['id', 'invited_email', 'role_id', 'invited_at', 'metadata'])
+    .returning(invitationSelectFields)
     .executeTakeFirstOrThrow()
 
   return mapInvitationRow(inserted)
@@ -467,4 +496,164 @@ export const deleteOrganizationInvitationById = async (
     .executeTakeFirst()
 
   return Boolean(deleted?.numDeletedRows)
+}
+
+const loadInvitationByToken = async (organizationId: number, token: string) =>
+  db
+    .selectFrom('organization_invitations')
+    .select(invitationSelectFields)
+    .where('organization_id', '=', organizationId)
+    .where('token', '=', token)
+    .executeTakeFirst()
+
+export type InvitationTokenLookup = {
+  authorized_user: boolean
+  email_match: boolean
+  expired_token: boolean
+  invite_id?: number
+  organization_name: string
+  sso_mismatch: boolean
+  token_does_not_exist: boolean
+}
+
+const defaultInvitationLookup = (organizationName: string): InvitationTokenLookup => ({
+  authorized_user: false,
+  email_match: false,
+  expired_token: false,
+  invite_id: undefined,
+  organization_name: organizationName,
+  sso_mismatch: false,
+  token_does_not_exist: true,
+})
+
+export const getInvitationByToken = async (
+  slug: string,
+  token: string,
+  profile: Profile
+): Promise<InvitationTokenLookup> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['id', 'name'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+
+  if (!organization) {
+    throw new InvitationError('Organization not found')
+  }
+
+  const invitation = await loadInvitationByToken(organization.id, token)
+  if (!invitation || invitation.accepted_at) {
+    return defaultInvitationLookup(organization.name)
+  }
+
+  const expired = Boolean(
+    invitation.expires_at && invitation.expires_at.getTime() <= Date.now()
+  )
+  const emailMatch =
+    profile.primary_email?.toLowerCase() === invitation.invited_email.toLowerCase()
+
+  return {
+    authorized_user: emailMatch && !expired,
+    email_match: emailMatch,
+    expired_token: expired,
+    invite_id: invitation.id,
+    organization_name: organization.name,
+    sso_mismatch: false,
+    token_does_not_exist: false,
+  }
+}
+
+export const acceptInvitationByToken = async (
+  slug: string,
+  token: string,
+  profile: Profile
+): Promise<void> => {
+  const organization = await db
+    .selectFrom('organizations')
+    .select(['id'])
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+
+  if (!organization) {
+    throw new InvitationError('Organization not found')
+  }
+
+  const invitation = await loadInvitationByToken(organization.id, token)
+  if (!invitation || invitation.accepted_at) {
+    throw new InvitationError('Invitation is no longer valid')
+  }
+
+  if (invitation.expires_at && invitation.expires_at.getTime() <= Date.now()) {
+    throw new InvitationError('Invitation has expired')
+  }
+
+  const normalizedProfileEmail = profile.primary_email?.toLowerCase() ?? ''
+  if (normalizedProfileEmail !== invitation.invited_email.toLowerCase()) {
+    throw new InvitationError('Invitation email does not match the authenticated user')
+  }
+
+  await db.transaction().execute(async (trx) => {
+    const existingMember = await trx
+      .selectFrom('organization_members')
+      .select(['id'])
+      .where('organization_id', '=', organization.id)
+      .where('profile_id', '=', profile.id)
+      .executeTakeFirst()
+
+    const roleScopedProjects = ((invitation.metadata as Record<string, unknown>) ?? {})
+      .role_scoped_projects as string[] | null
+
+    if (existingMember) {
+      await trx
+        .updateTable('organization_members')
+        .set({
+          role_ids: [invitation.role_id as number],
+          metadata: updateRoleScopedMetadata(
+            ((invitation.metadata as Record<string, unknown>) ?? {}) as Record<string, unknown>,
+            invitation.role_id as number,
+            roleScopedProjects ?? undefined
+          ),
+          updated_at: nowIso(),
+        })
+        .where('id', '=', existingMember.id)
+        .execute()
+    } else {
+      const values: Record<string, unknown> = {
+        organization_id: organization.id,
+        profile_id: profile.id,
+        role_ids: [invitation.role_id as number],
+        metadata: (invitation.metadata as Record<string, unknown>) ?? {},
+        mfa_enabled: false,
+        is_owner: false,
+      }
+
+      if (isPgMem()) {
+        const nextIdRow = await trx
+          .selectFrom('organization_members')
+          .select(({ fn }) => fn.max('id').as('max_id'))
+          .executeTakeFirst()
+        values.id = Number(nextIdRow?.max_id ?? 0) + 1
+      }
+
+      await trx.insertInto('organization_members').values(values).execute()
+    }
+
+    await trx
+      .updateTable('organization_invitations')
+      .set({
+        accepted_at: nowIso(),
+      })
+      .where('id', '=', invitation.id)
+      .execute()
+  })
+
+  await appendAuditLog({
+    created_at: nowIso(),
+    event_message: 'Accepted organization invitation',
+    ip_address: null,
+    payload: {
+      organization_slug: slug,
+      invited_email: profile.primary_email,
+    },
+  })
 }

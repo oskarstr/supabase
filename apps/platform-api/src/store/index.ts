@@ -144,6 +144,8 @@ export {
   deleteOrganizationMember,
   createOrganizationInvitation,
   deleteOrganizationInvitationById,
+  getInvitationByToken,
+  acceptInvitationByToken,
   InvitationError,
 } from './organization-members.js'
 

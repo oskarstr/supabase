@@ -274,12 +274,18 @@ export const createOrganization = async (
     .executeTakeFirst()
 
   if (developerRole?.id) {
+    const token = randomUUID()
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
     await db
       .insertInto('organization_invitations')
       .values({
         organization_id: insertedOrg.id,
         invited_email: 'new-contributor@example.com',
         role_id: developerRole.id,
+        metadata: {},
+        token,
+        expires_at: expiresAt,
       })
       .execute()
   }

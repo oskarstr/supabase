@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 
 import {
@@ -210,6 +211,9 @@ export const seedDefaults = async () => {
           .where('invited_email', '=', invite.invited_email)
           .executeTakeFirst()
 
+        const token = randomUUID()
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
         if (!existingInvite) {
           await trx
             .insertInto('organization_invitations')
@@ -218,7 +222,19 @@ export const seedDefaults = async () => {
               invited_email: invite.invited_email,
               role_id: role.id,
               metadata: {},
+              token,
+              expires_at: expiresAt,
             })
+            .execute()
+        } else {
+          await trx
+            .updateTable('organization_invitations')
+            .set({
+              token,
+              expires_at: expiresAt,
+              metadata: {},
+            })
+            .where('id', '=', existingInvite.id)
             .execute()
         }
       }
