@@ -1,15 +1,36 @@
 -- Platform-specific grants executed immediately after the upstream revoke migration.
 -- Ensures postgres and supabase_admin retain access to the control-plane schema.
--- Safe to re-run (GRANT statements are idempotent).
+-- Safe to re-run (GRANT statements are idempotent). Skips gracefully if the schema is not present yet.
 
-GRANT USAGE ON SCHEMA platform TO postgres;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA platform TO postgres;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA platform TO postgres;
-ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON TABLES TO postgres;
-ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON SEQUENCES TO postgres;
+DO $$
+DECLARE
+  grantee text;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'platform') THEN
+    RAISE NOTICE 'platform schema missing; skipping grant restoration';
+    RETURN;
+  END IF;
 
-GRANT USAGE ON SCHEMA platform TO supabase_admin;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA platform TO supabase_admin;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA platform TO supabase_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON TABLES TO supabase_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON SEQUENCES TO supabase_admin;
+  EXECUTE 'GRANT USAGE ON SCHEMA platform TO postgres';
+  EXECUTE 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA platform TO postgres';
+  EXECUTE 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA platform TO postgres';
+  EXECUTE '' ||
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON TABLES TO postgres';
+  EXECUTE '' ||
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON SEQUENCES TO postgres';
+
+  FOREACH grantee IN ARRAY ARRAY['supabase_admin', 'service_role'] LOOP
+    EXECUTE format('GRANT USAGE ON SCHEMA platform TO %I', grantee);
+    EXECUTE format('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA platform TO %I', grantee);
+    EXECUTE format('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA platform TO %I', grantee);
+    EXECUTE format(
+      'ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON TABLES TO %I',
+      grantee
+    );
+    EXECUTE format(
+      'ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON SEQUENCES TO %I',
+      grantee
+    );
+  END LOOP;
+END
+$$;

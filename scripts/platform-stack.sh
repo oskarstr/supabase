@@ -149,6 +149,14 @@ run_compose() {
   "${cmd[@]}"
 }
 
+compose_up() {
+  local args=(up -d)
+  if [[ ${#COMPOSE_FLAGS[@]} -gt 0 ]]; then
+    args+=("${COMPOSE_FLAGS[@]}")
+  fi
+  run_compose "${args[@]}"
+}
+
 wait_for_postgres() {
   if [[ "$DRY_RUN" == true ]]; then
     return 0
@@ -164,13 +172,19 @@ wait_for_postgres() {
 }
 
 apply_platform_grants() {
+  local container_sql_path="/docker-entrypoint-initdb.d/migrations/20250421084702_platform_grants.sql"
   if [[ "$DRY_RUN" == true ]]; then
+    echo "Would apply platform grants via ${container_sql_path}"
     return 0
   fi
-  local psql_cmd=(docker compose "${COMPOSE_FILES[@]}" exec -T db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1)
-  "${psql_cmd[@]}" -c "grant usage on schema platform to postgres;" >/dev/null
-  "${psql_cmd[@]}" -c "grant all privileges on all tables in schema platform to postgres;" >/dev/null
-  "${psql_cmd[@]}" -c "grant all privileges on all sequences in schema platform to postgres;" >/dev/null
+
+  if ! docker compose "${COMPOSE_FILES[@]}" exec -T db sh -c "test -f '${container_sql_path}'" >/dev/null 2>&1; then
+    echo "Platform grants SQL not found inside db container at ${container_sql_path}" >&2
+    return 1
+  fi
+
+  docker compose "${COMPOSE_FILES[@]}" exec -T db \
+    psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f "${container_sql_path}" >/dev/null
 }
 
 case "$ACTION" in
@@ -178,7 +192,7 @@ case "$ACTION" in
     validate_env
     sync_env
     ensure_runtime_dirs
-    run_compose up -d "${COMPOSE_FLAGS[@]}"
+    compose_up
     wait_for_postgres
     apply_platform_grants
     ;;
@@ -191,7 +205,7 @@ case "$ACTION" in
     validate_env
     sync_env
     ensure_runtime_dirs
-    run_compose up -d "${COMPOSE_FLAGS[@]}"
+    compose_up
     wait_for_postgres
     apply_platform_grants
     ;;

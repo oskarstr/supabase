@@ -30,8 +30,9 @@ import {
   nowIso,
 } from '../config/defaults.js'
 import { PROJECTS_ROOT } from '../store/state.js'
-import { getPlatformDb } from './client.js'
 import { sql } from 'kysely'
+import { applyPlatformSchemaGrants } from './grants.js'
+import { getPlatformDb } from './client.js'
 
 const OWNER_ROLE = {
   base_role_id: 1,
@@ -76,6 +77,8 @@ const normalizeBillingPartner = (
 
 export const seedDefaults = async () => {
   const db = getPlatformDb()
+
+  await applyPlatformSchemaGrants()
 
   await db.transaction().execute(async (trx) => {
     const existingProfile = await trx
@@ -378,22 +381,6 @@ export const seedDefaults = async () => {
       }
     }
   })
-
-  // Ensure superuser access to the platform schema so admin accounts retain
-  // visibility after resets.
-  // Upstream migrations may revoke postgres/supabase_admin privileges; reapply just in case.
-  await sql`
-    grant usage on schema platform to postgres;
-    grant all privileges on all tables in schema platform to postgres;
-    grant all privileges on all sequences in schema platform to postgres;
-    alter default privileges in schema platform grant all on tables to postgres;
-    alter default privileges in schema platform grant all on sequences to postgres;
-    grant usage on schema platform to supabase_admin;
-    grant all privileges on all tables in schema platform to supabase_admin;
-    grant all privileges on all sequences in schema platform to supabase_admin;
-    alter default privileges in schema platform grant all on tables to supabase_admin;
-    alter default privileges in schema platform grant all on sequences to supabase_admin;
-  `.execute(db)
 
   await ensureAdminAuthUser(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD)
 
