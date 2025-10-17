@@ -9,7 +9,7 @@
 - Kept the plan/handoff docs current so Phase 2/4 are marked complete and remaining work is scoped to matrix governance + client matching.
 
 ## What’s Next
-1. Publish a reusable permission matrix artifact (package/JSON) so Studio and other clients can import it, then update Studio to consume it when you tackle that repo. Backend already tolerates the regex matcher, so no immediate regression risk.
+1. Publish a reusable permission matrix artifact (package/JSON) so Studio and other clients can import it. We are not planning to edit Studio ourselves, but documenting the artifact keeps future Studio work straightforward while the backend continues to tolerate the existing regex matcher.
 2. Finish the Phase 6 doc pass (bootstrap flow, membership metadata contract, test strategy) and clean up any TODOs.
 
 ## Repo Hygiene & Tests
@@ -35,7 +35,7 @@
 - **Duplicate reconciliation timing** – invitations now migrate, but audit logs/project runtimes still need review.
 - **Role metadata hygiene** – prune stale `role_scoped_projects` entries when invitations or roles are removed.
 - **Retry defaults for tests** – consider exposing retry toggles via the new test helpers for pg-mem scenarios.
-- **Permission matrix governance** – publish the shared artifact and adopt it in Studio when ready.
+- **Permission matrix governance** – publish the shared artifact; Studio adoption can happen later by whoever maintains that repo.
 - **Permission matching** – backend accepts both regex and matrix lookups, so Studio can switch independently.
 
 Ping the user if you notice anything “hacky” or unfinished before moving on. They prefer blunt honesty over politeness.

@@ -118,9 +118,11 @@ Each test should prepare fixtures via the seed helper, use the auth middleware w
 
 1. Keep `/platform/profile/permissions` aligned with the authenticated member’s roles.
    - ✅ API derives permissions from `PERMISSION_MATRIX`; alignment with the public docs is enforced by `apps/platform-api/tests/permissions.docs.test.ts`.
+   - ✅ Permissions store relies on `@supabase/shared-types` `PermissionAction` constants and guards read-only roles from write-level actions.
+   - ✅ Restored a clean TypeScript build by aligning schema typings, validators, and route reply unions with the new invitation/matrix work.
 2. Provide a shared matrix artifact for Studio/reference clients.
-   - ☐ Publish a reusable matrix definition (package/JSON) so Studio and other consumers can import it.
-   - ☐ Update the Studio repo to consume the shared artifact when it exists; backend already tolerates the existing regex matcher, so there’s no regression risk today.
+   - ☐ Publish a reusable matrix definition (package/JSON) so Studio—or any other consumer—can import it when they choose.
+   - ☐ Document the artifact for Studio maintainers; we are not updating Studio ourselves, but the backend must continue to tolerate the existing regex matcher.
 
 Tests:
 - `apps/platform-api/tests/permissions.test.ts` (owner wildcard, non-member denial, scoped developer/read-only, multi-org union, admin coverage).
