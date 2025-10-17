@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "prebuild": "pnpm --filter shared-data... run build",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "test": "vitest --run"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
+    "@supabase/supabase-js": "catalog:",
     "@supabase/shared-types": "0.1.80",
     "shared-data": "workspace:*",
     "crypto-js": "^4.2.0",

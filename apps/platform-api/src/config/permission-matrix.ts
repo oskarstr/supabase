@@ -2,6 +2,7 @@ import { constants } from '@supabase/shared-types'
 import {
   PERMISSION_MATRIX_DEFINITION,
   type PermissionActionKey,
+  type PermissionMatrixDefinitionEntry,
   type PermissionRoleKey as SharedPermissionRoleKey,
   type PermissionScope as SharedPermissionScope,
 } from 'shared-data'
@@ -29,7 +30,7 @@ const toPermissionAction = (key: PermissionActionKey): PermissionActionValue => 
 }
 
 export const PERMISSION_MATRIX: PermissionMatrixEntry[] = PERMISSION_MATRIX_DEFINITION.map(
-  (entry) => ({
+  (entry: PermissionMatrixDefinitionEntry) => ({
     scope: entry.scope,
     resource: entry.resource,
     roles: entry.roles,

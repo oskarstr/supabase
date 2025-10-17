@@ -246,7 +246,7 @@ type AuthClientContext = {
   serviceKey: string
 }
 
-class GoTrueRequestError extends Error {
+export class GoTrueRequestError extends Error {
   constructor(
     message: string,
     readonly status: number,
@@ -258,7 +258,7 @@ class GoTrueRequestError extends Error {
   }
 }
 
-const resolveAuthClientContext = async (ref: string): Promise<AuthClientContext> => {
+export const resolveAuthClientContext = async (ref: string): Promise<AuthClientContext> => {
   const project = await db
     .selectFrom('projects')
     .select(['ref', 'rest_url', 'service_key', 'status'])
@@ -292,18 +292,31 @@ const resolveAuthClientContext = async (ref: string): Promise<AuthClientContext>
 }
 
 type GoTrueRequestOptions = {
-  method: 'GET' | 'PATCH'
+  method: 'GET' | 'PATCH' | 'POST' | 'DELETE' | 'PUT'
   path: string
   body?: unknown
+  query?: Record<string, string | number | boolean | Array<string | number | boolean> | null | undefined>
 }
 
-const performGoTrueRequest = async <T>(
+export const performGoTrueRequest = async <T>(
   ref: string,
-  { method, path, body }: GoTrueRequestOptions
+  { method, path, body, query }: GoTrueRequestOptions
 ): Promise<T> => {
   const { authBaseUrl, serviceKey } = await resolveAuthClientContext(ref)
 
   const url = new URL(path.replace(/^\/+/, ''), `${authBaseUrl.replace(/\/+$/, '')}/`)
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined || value === null) continue
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          url.searchParams.append(key, String(entry))
+        }
+        continue
+      }
+      url.searchParams.set(key, String(value))
+    }
+  }
   const headers: Record<string, string> = {
     Accept: 'application/json',
     apikey: serviceKey,
@@ -355,15 +368,16 @@ const performGoTrueRequest = async <T>(
 
 const requestGoTrueWithFallback = async <T>(
   ref: string,
-  method: 'GET' | 'PATCH',
+  method: 'GET' | 'PATCH' | 'POST' | 'DELETE' | 'PUT',
   paths: string[],
-  body?: unknown
+  body?: unknown,
+  query?: GoTrueRequestOptions['query']
 ): Promise<T> => {
   let lastError: GoTrueRequestError | undefined
 
   for (const path of paths) {
     try {
-      return await performGoTrueRequest<T>(ref, { method, path, body })
+      return await performGoTrueRequest<T>(ref, { method, path, body, query })
     } catch (error) {
       if (error instanceof GoTrueRequestError && error.status === 404) {
         lastError = error

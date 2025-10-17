@@ -336,6 +336,13 @@ export interface NotificationV2 {
 export type AuthConfig = components['schemas']['GoTrueConfigResponse']
 export type AuthConfigUpdate = components['schemas']['UpdateGoTrueConfigBody']
 export type AuthHooksUpdate = components['schemas']['UpdateGoTrueConfigHooksBody']
+export type AuthCreateUserBody = components['schemas']['CreateUserBody']
+export type AuthCreateUserResponse = components['schemas']['CreateUserReponse']
+export type AuthUpdateUserBody = components['schemas']['UpdateUserBody']
+export type AuthUpdateUserResponse = components['schemas']['UpdateUserReponse']
+export type AuthUserBody = components['schemas']['UserBody']
+export type AuthValidateSpamBody = components['schemas']['ValidateSpamBody']
+export type AuthValidateSpamResponse = components['schemas']['ValidateSpamResponse']
 
 export interface ProjectContentItem {
   id: string

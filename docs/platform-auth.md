@@ -8,6 +8,7 @@ This document captures the current request pipeline, core route guarantees, seed
 - **Profile reconciliation** – The shared `requireProfile` helper (used by profile/org routes) invokes `ensureProfile(auth.userId, auth.email)` to upsert `platform.profiles` before continuing. Calls short-circuit with `401` when `request.auth` is missing and `404` when the profile cannot be found.
 - **Organization scope checks** – `organizationsRoutes` registers its own `preHandler` that looks up the `:slug` membership (unless the route is `/members/invitations`) and caches it on the request. Missing memberships return `404 { message: 'Organization not found' }`, while unauthorized actors receive `403` on mutating endpoints (e.g., member management).
 - **Permissions lookup** – `GET /api/platform/profile/permissions` uses `listPermissionsForProfile` to materialize permissions from the shared matrix. Responses always succeed with an array (empty when no memberships are found).
+- **Auth admin permission gating** – Project-scoped auth operations call `checkProjectAuthPermission` before reaching GoTrue. The helper verifies that the caller’s matrix-derived permissions include the required action/resource pair (e.g., `PermissionAction.AUTH_EXECUTE` + `create_user`) for the target project, falling back to 404 when the project is unknown or 403 when the caller lacks access.
 
 ## Route Contracts
 
@@ -16,6 +17,15 @@ This document captures the current request pipeline, core route guarantees, seed
 - `GET /api/platform/profile/permissions` – Returns `AccessControlPermission[]` derived from the shared matrix. Owners receive wildcard `actions/resources` while developer/read-only members are scoped by `role_scoped_projects`.
 - `GET /api/platform/organizations/:slug/*` – Requires membership (owner/admin/developer) established in the `preHandler`. Invitations endpoints (`/members/invitations`) allow organization managers to invite or accept members with project scoping.
 - `POST /api/platform/organizations/:slug/members/invitations` – Guards via `canManageMembers`, allowing only owners or admins to manage invitations.
+- `POST /api/platform/auth/:ref/users` – Proxies to GoTrue `admin/users`; requires the matrix `create_user` resource with `PermissionAction.AUTH_EXECUTE` and returns the created admin payload (`201`).
+- `PATCH /api/platform/auth/:ref/users/:id` – Sends GoTrue `PATCH admin/users/:id`; requires `auth.users` + `PermissionAction.TENANT_SQL_DELETE` and returns the updated payload (`200`).
+- `DELETE /api/platform/auth/:ref/users/:id` – Calls `DELETE admin/users/:id`, forwarding the optional `soft_delete` query flag; requires `auth.users` + `PermissionAction.TENANT_SQL_DELETE` and responds `204`.
+- `DELETE /api/platform/auth/:ref/users/:id/factors` – Forwards to `DELETE admin/users/:id/factors`; requires `auth.mfa_factors` + `PermissionAction.TENANT_SQL_DELETE` and responds `204`.
+- `POST /api/platform/auth/:ref/invite` – Targets GoTrue `POST invite`; requires `invite_user` + `PermissionAction.AUTH_EXECUTE` and responds `201`.
+- `POST /api/platform/auth/:ref/magiclink` – Targets `POST magiclink`; requires `send_magic_link` + `PermissionAction.AUTH_EXECUTE` and responds `201`.
+- `POST /api/platform/auth/:ref/otp` – Targets `POST otp`; requires `send_otp` + `PermissionAction.AUTH_EXECUTE` and responds `201`.
+- `POST /api/platform/auth/:ref/recover` – Targets `POST recover`; requires `send_recovery` + `PermissionAction.AUTH_EXECUTE` and responds `201`.
+- `POST /api/platform/auth/:ref/validate/spam` – Targets `POST validate/spam` (with a legacy fallback to `POST validate`); requires `send_magic_link` + `PermissionAction.AUTH_EXECUTE` and returns `ValidateSpamResponse` (`200`).
 
 All routes expect `request.auth` to be hydrated by the shared pre-handler. Any route called without authentication returns a `401 { message: 'Unauthorized' }`.
 
@@ -36,6 +46,8 @@ All routes expect `request.auth` to be hydrated by the shared pre-handler. Any r
 - `tests/permissions.test.ts` – Covers owner/admin wildcards, project-scoped developer permissions, read-only safeguards, multi-organization union behaviour, and billing access alignment. Uses the JWT pre-handler with fixtures from `tests/utils/auth.ts`.
 - `tests/permissions.docs.test.ts` – Ensures the shared permission matrix matches the public documentation parsed from `.agent/docs/supabase/accesscontrol.md`.
 - `tests/organization.members.test.ts` – Validates invitation acceptance, metadata merging (`role_scoped_projects`), and role upserts.
+- `tests/auth.admin.store.test.ts` – Exercises the GoTrue proxy helpers (success paths, error normalization, soft delete propagation, and legacy spam validation fallback).
+- `tests/auth.admin.routes.test.ts` – Covers the new platform auth admin routes, asserting permission enforcement, query validation, GoTrue request wiring, and fallback behaviour.
 - Additional coverage: `tests/auth.bootstrap.test.ts` (seed behaviour) and `tests/utils/env.ts` (fixture management) keep pg-mem parity.
 
 Every auth change should re-run:

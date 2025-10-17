@@ -12,6 +12,20 @@ export {
 } from './profile.js'
 
 export { getAuthConfig, updateAuthConfig, updateAuthHooks } from './auth-config.js'
+export { GoTrueRequestError } from './auth-config.js'
+
+export {
+  checkProjectAuthPermission,
+  createAuthUser,
+  deleteAuthUser,
+  deleteAuthUserFactors,
+  sendAuthInvite,
+  sendAuthMagicLink,
+  sendAuthOtp,
+  sendAuthRecovery,
+  updateAuthUser,
+  validateAuthSpam,
+} from './auth-admin.js'
 
 export {
   createOrganization,

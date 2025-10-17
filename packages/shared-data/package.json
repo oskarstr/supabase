@@ -2,12 +2,28 @@
   "name": "shared-data",
   "version": "0.0.0",
   "description": "Data shared between Supabase apps",
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./permission-matrix": {
+      "types": "./dist/permission-matrix.d.ts",
+      "default": "./dist/permission-matrix.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "clean": "rimraf node_modules"
+    "clean": "rm -rf dist node_modules",
+    "build": "tsc -p tsconfig.json"
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {}
 }

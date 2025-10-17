@@ -28,6 +28,7 @@ ARG TARGETARCH
 # Copy workspace manifests for installing production dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/platform-api/package.json apps/platform-api/package.json
+COPY --from=builder /app/packages/shared-data packages/shared-data
 
 # Install runtime dependencies
 RUN apk add --no-cache \

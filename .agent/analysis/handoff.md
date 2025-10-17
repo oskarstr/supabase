@@ -8,10 +8,12 @@
 - Normalised member role handling: `upsertOrganizationMemberRole` and invitation acceptance now merge roles/metadata instead of overwriting them; new tests cover multi-role assignments and canonical `role_scoped_projects`.
 - Kept the plan/handoff docs current so Phase 2/4 are marked complete and remaining work is scoped to matrix governance + client matching.
 - Published a shared `shared-data/permission-matrix` artifact and updated platform-api to hydrate its matrix from that single source, clearing the path for Studio consumption.
+- Added `scripts/platform-api/smoke-auth.mts` to hit the live `/api/platform/auth/{ref}/…` surface (create/update/delete user, invite/send flows, spam validation) with service-role credentials.
+- Matched Studio’s MFA factor removal route by iterating through `auth.admin.mfa.deleteFactor` when GoTrue rejects the bulk endpoint; smoke test now authenticates with the seeded admin session to surface real permission issues.
 
 ## What’s Next
-1. Implement the missing `/platform/auth/{ref}/…` endpoints (user CRUD, invites, send flows, spam validation) that Studio calls—each proxies to the matching GoTrue admin path with matrix-backed guards.
-2. Reconcile `scripts/platform-api/list-expected-routes.mjs` with the Fastify surface as those endpoints land; update tests/docs alongside.
+1. Reconcile `scripts/platform-api/list-expected-routes.mjs` with the Fastify surface now that the `/platform/auth/{ref}/…` proxies exist; call out any lingering gaps (e.g., analytics log-drain routes).
+2. Finish the Phase 6 cleanup sweep: retire TODOs/hacks introduced during auth hardening and refresh the docs/plan once the route inventory matches reality.
 
 ## Repo Hygiene & Tests
 - Quick checks: `pnpm --filter platform-api exec vitest run tests/permissions.test.ts` and `pnpm --filter platform-api exec vitest run tests/organization.members.test.ts`.
