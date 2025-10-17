@@ -295,14 +295,13 @@ const composeMemberMetadata = (
   current: Record<string, unknown>,
   roleId: number,
   scopedProjects?: string[] | null
-) =>
-  updateRoleScopedMetadata(
-    Array.isArray(current.role_scoped_projects)
-      ? { ...current, role_scoped_projects: {} as Record<string, string[]> }
-      : { ...current },
-    roleId,
-    scopedProjects ?? undefined
-  )
+) => {
+  const base = Array.isArray(current.role_scoped_projects)
+    ? { ...current, role_scoped_projects: {} as Record<string, string[]> }
+    : { ...current }
+
+  return updateRoleScopedMetadata(base, roleId, scopedProjects ?? undefined)
+}
 
 const extractRoleScopedProjects = (
   metadata: Record<string, unknown>,
@@ -601,6 +600,7 @@ export const acceptInvitationByToken = async (
   invitationId: number
   roleId: number
   profileId: number
+  roleScopedProjects: string[] | null
 }> => {
   const organization = await db
     .selectFrom('organizations')
@@ -612,7 +612,7 @@ export const acceptInvitationByToken = async (
     throw new InvitationError('Organization not found')
   }
 
-  const invitation = await loadInvitationByToken(organization.id, token)
+    const invitation = await loadInvitationByToken(organization.id, token)
   if (!invitation || invitation.accepted_at) {
     throw new InvitationError('Invitation is no longer valid')
   }
@@ -635,11 +635,15 @@ export const acceptInvitationByToken = async (
       .executeTakeFirst()
 
     const invitationMetadata = (invitation.metadata as Record<string, unknown>) ?? {}
-    const scopedProjects = extractRoleScopedProjects(invitationMetadata, invitation.role_id as number)
+    const scopedProjects = extractRoleScopedProjects(invitationMetadata, invitation.role_id as number) ?? null
 
     if (existingMember) {
       const existingMetadata = (existingMember.metadata as Record<string, unknown>) ?? {}
-      const mergedMetadata = composeMemberMetadata({ ...existingMetadata }, invitation.role_id as number, scopedProjects)
+      const mergedMetadata = composeMemberMetadata(
+        existingMetadata,
+        invitation.role_id as number,
+        scopedProjects
+      )
 
       await trx
         .updateTable('organization_members')
@@ -651,7 +655,11 @@ export const acceptInvitationByToken = async (
         .where('id', '=', existingMember.id)
         .execute()
     } else {
-      const newMetadata = composeMemberMetadata({ ...invitationMetadata }, invitation.role_id as number, scopedProjects)
+      const newMetadata = composeMemberMetadata(
+        invitationMetadata,
+        invitation.role_id as number,
+        scopedProjects
+      )
 
       const values: Record<string, unknown> = {
         organization_id: organization.id,
@@ -680,12 +688,13 @@ export const acceptInvitationByToken = async (
       })
       .where('id', '=', invitation.id)
       .execute()
-  
+
     return {
       organizationId: organization.id,
       invitationId: invitation.id,
       roleId: invitation.role_id as number,
       profileId: profile.id,
+      roleScopedProjects: scopedProjects,
     }
   })
 }

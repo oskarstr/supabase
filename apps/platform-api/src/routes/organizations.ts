@@ -252,13 +252,21 @@ const organizationsRoutes: FastifyPluginAsync = async (app) => {
       if (!profile) return
 
       try {
-        await acceptInvitationByToken(request.params.slug, request.params.token, profile)
+        const result = await acceptInvitationByToken(
+          request.params.slug,
+          request.params.token,
+          profile
+        )
         await appendAuditLog({
           created_at: new Date().toISOString(),
           event_message: 'Accepted organization invitation',
           ip_address: request.ip ?? null,
           payload: {
+            organization_id: result.organizationId,
             organization_slug: request.params.slug,
+            profile_id: result.profileId,
+            role_id: result.roleId,
+            role_scoped_projects: result.roleScopedProjects ?? null,
             invited_email: profile.primary_email,
             invitation_token: request.params.token,
           },
