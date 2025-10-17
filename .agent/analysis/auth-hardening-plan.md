@@ -147,6 +147,10 @@ Tests:
 2. Remove any dangling TODOs or commented-out hacks.
 3. Validate the `scripts/platform-api/list-expected-routes.ts` output matches implemented handlers; if not, create issues or follow-ups.
 
+> Progress (2025-10-17):
+> - ✅ Auth & membership overview captured in `docs/platform-auth.md` (request flow, route contracts, seeding, and test coverage).
+> - ☐ Sweep the codebase for lingering TODOs/hacks and align the route inventory script with actual handlers.
+
 ---
 
 ### Execution Checklist
@@ -156,7 +160,7 @@ Tests:
 - [x] Phase 2
 - [x] Phase 3
 - [x] Phase 4
-- [ ] Phase 5 *(matrix reconciliation + shared source pending)*
+- [x] Phase 5
 - [ ] Phase 6
 
 Update the checkboxes and add short notes under each phase as work completes.

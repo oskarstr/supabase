@@ -1,7 +1,7 @@
 # Handoff Summary · 2025-10-17 · codex
 
 ## Current Focus
-- Finish the shared permission matrix deliverable (publishable artifact + backend docs) so Studio can consume it when ready, and keep the hardened bootstrap flow documented for future changes.
+- Wrap Phase 6: finish the documentation/cleanup sweep (TODO removal, route inventory validation) now that the auth overview and matrix notes are in place.
 
 ## What’s Done
 - Hardened admin bootstrap: `seedDefaults` now retries GoTrue provisioning, reconciles duplicate profiles/memberships back to id 1, and ships with regression coverage (`tests/auth.bootstrap.test.ts`).
@@ -10,8 +10,8 @@
 - Published a shared `shared-data/permission-matrix` artifact and updated platform-api to hydrate its matrix from that single source, clearing the path for Studio consumption.
 
 ## What’s Next
-1. Socialise the new `.agent/docs/supabase/permission-matrix-artifact.md` note with Studio maintainers and plan the client-side adoption while the backend keeps the regex fallback in place.
-2. Finish the Phase 6 doc pass (bootstrap flow, membership metadata contract, test strategy) and clean up any TODOs.
+1. Validate `scripts/platform-api/list-expected-routes.ts` against the current handlers and log discrepancies.
+2. Sweep for lingering TODOs/commented hacks introduced during auth hardening and resolve or track them.
 
 ## Repo Hygiene & Tests
 - Quick checks: `pnpm --filter platform-api exec vitest run tests/permissions.test.ts` and `pnpm --filter platform-api exec vitest run tests/organization.members.test.ts`.
