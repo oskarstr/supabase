@@ -125,6 +125,12 @@ Each test should prepare fixtures via the seed helper, use the auth middleware w
 
 Test file: `apps/platform-api/tests/permissions.test.ts`
 
+> Progress (2025-10-17):
+> - ✅ `/platform/profile/permissions` now resolves memberships per profile, mapping base role templates (owner/admin wildcard, developer/read-only scoped projects) and unioning results across organizations.
+> - ✅ Project scoped metadata (`role_scoped_projects`) drives the returned `project_refs`/`project_ids`, preventing non-members from inheriting wildcard access.
+> - ✅ Added `tests/permissions.test.ts` covering owner wildcard, non-member denial, scoped developer access, and multi-organization union behaviour.
+> - ☐ Remaining cleanup: move to shared permission constants (currently hard-coded), tighten the template so read-only members never receive write actions, remove debug logging, and re-run the suite until it passes.
+
 ---
 
 ## Phase 6 – Documentation & Cleanup
