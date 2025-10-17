@@ -1,5 +1,5 @@
 import { getPlatformDb } from '../db/client.js'
-import { baseProfile, DEFAULT_PRIMARY_EMAIL, DEFAULT_USERNAME } from '../config/defaults.js'
+import { DEFAULT_PRIMARY_EMAIL, DEFAULT_USERNAME } from '../config/defaults.js'
 import type {
   OrganizationInvitationsResponse,
   OrganizationMember,
@@ -33,20 +33,6 @@ export const listOrganizationMembers = async (slug: string): Promise<Organizatio
     ])
     .where('organization_members.organization_id', '=', organization.id)
     .execute()
-
-  if (rows.length === 0) {
-    return [
-      {
-        gotrue_id: baseProfile.gotrue_id,
-        is_sso_user: baseProfile.is_sso_user,
-        metadata: {},
-        mfa_enabled: false,
-        primary_email: baseProfile.primary_email ?? DEFAULT_PRIMARY_EMAIL,
-        role_ids: [1],
-        username: baseProfile.username ?? DEFAULT_USERNAME,
-      },
-    ]
-  }
 
   return rows.map((row) => ({
     gotrue_id: row.gotrue_id,

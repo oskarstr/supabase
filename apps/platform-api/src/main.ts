@@ -4,6 +4,7 @@ import Fastify from 'fastify'
 import { destroyDb } from './db/client.js'
 import { applyMigrations } from './db/migrate.js'
 import { seedDefaults } from './db/seed.js'
+import { authenticateRequest } from './plugins/authenticate.js'
 import platformRoutes from './routes/platform.js'
 import apiV1Routes from './routes/api-v1.js'
 
@@ -37,8 +38,16 @@ async function start() {
       origin: true,
       credentials: true,
     })
-    await server.register(apiV1Routes, { prefix: '/api/v1' })
-    await server.register(platformRoutes, { prefix: '/api/platform' })
+
+    await server.register(async (instance) => {
+      instance.addHook('preHandler', authenticateRequest)
+      await instance.register(apiV1Routes)
+    }, { prefix: '/api/v1' })
+
+    await server.register(async (instance) => {
+      instance.addHook('preHandler', authenticateRequest)
+      await instance.register(platformRoutes)
+    }, { prefix: '/api/platform' })
     await server.listen({ port, host })
     server.log.info(`Platform API listening on http://${host}:${port}`)
   } catch (err) {

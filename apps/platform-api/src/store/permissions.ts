@@ -1,4 +1,3 @@
-import { baseOrganizations } from '../config/defaults.js'
 import { getPlatformDb } from '../db/client.js'
 import type { AccessControlPermission } from './types.js'
 
@@ -18,18 +17,25 @@ const basePermission = (
   restrictive: false,
 })
 
-export const listPermissions = async (): Promise<AccessControlPermission[]> => {
-  try {
-    const organizations = await db.selectFrom('organizations').select(['id', 'slug']).execute()
-    if (organizations.length > 0) {
-      return organizations.map((organization) => basePermission(organization.slug, organization.id))
-    }
-    console.warn(
-      '[platform-api] no organizations found when computing permissions, falling back to defaults'
-    )
-  } catch (error) {
-    console.warn('[platform-api] failed to load permissions from database, using defaults', error)
+export const listPermissionsForProfile = async (
+  profileId: number
+): Promise<AccessControlPermission[]> => {
+  if (!profileId) {
+    return []
   }
 
-  return baseOrganizations.map((organization) => basePermission(organization.slug, organization.id))
+  const memberships = await db
+    .selectFrom('organization_members')
+    .innerJoin('organizations', 'organizations.id', 'organization_members.organization_id')
+    .select(['organizations.id as org_id', 'organizations.slug as org_slug'])
+    .where('organization_members.profile_id', '=', profileId)
+    .execute()
+
+  if (memberships.length === 0) {
+    return []
+  }
+
+  return memberships.map((membership) =>
+    basePermission(membership.org_slug, Number(membership.org_id))
+  )
 }

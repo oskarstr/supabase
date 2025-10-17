@@ -31,7 +31,6 @@ import {
 } from '../config/defaults.js'
 import { PROJECTS_ROOT } from '../store/state.js'
 import { sql } from 'kysely'
-import { applyPlatformSchemaGrants } from './grants.js'
 import { getPlatformDb } from './client.js'
 
 const OWNER_ROLE = {
@@ -76,9 +75,16 @@ const normalizeBillingPartner = (
 }
 
 export const seedDefaults = async () => {
-  const db = getPlatformDb()
+  const runtimeAdminEmail =
+    process.env.PLATFORM_ADMIN_EMAIL?.trim() || DEFAULT_ADMIN_EMAIL
+  const runtimeAdminPassword =
+    process.env.PLATFORM_ADMIN_PASSWORD?.trim() || DEFAULT_ADMIN_PASSWORD
 
-  await applyPlatformSchemaGrants()
+  const adminIdentity = await ensureAdminAuthUser(runtimeAdminEmail, runtimeAdminPassword)
+  const adminUserId = adminIdentity?.userId ?? null
+  const adminEmail = adminIdentity?.email ?? runtimeAdminEmail
+
+  const db = getPlatformDb()
 
   await db.transaction().execute(async (trx) => {
     const existingProfile = await trx
@@ -382,19 +388,36 @@ export const seedDefaults = async () => {
     }
   })
 
-  await ensureAdminAuthUser(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD)
+  if (adminUserId) {
+    await db
+      .updateTable('profiles')
+      .set({
+        gotrue_id: adminUserId,
+        primary_email: adminEmail,
+      })
+      .where('id', '=', baseProfile.id)
+      .execute()
+  }
 
   console.log('[platform-db] default seed complete')
 }
 
-const ensureAdminAuthUser = async (email: string, password: string) => {
+type AdminUserIdentity = {
+  userId: string
+  email: string
+}
+
+const ensureAdminAuthUser = async (
+  email: string,
+  password: string
+): Promise<AdminUserIdentity | null> => {
   const gotrueUrl = process.env.SUPABASE_GOTRUE_URL?.trim() || process.env.GOTRUE_URL?.trim()
   const serviceKey =
     process.env.SUPABASE_SERVICE_KEY?.trim() || process.env.SERVICE_ROLE_KEY?.trim()
   const apiKey = process.env.SUPABASE_ANON_KEY?.trim() || process.env.ANON_KEY?.trim() || serviceKey
 
   if (!gotrueUrl || !serviceKey || !email || !password) {
-    return
+    return null
   }
 
   const adminEndpoint = `${gotrueUrl.replace(/\/?$/, '')}/admin/users`
@@ -415,8 +438,7 @@ const ensureAdminAuthUser = async (email: string, password: string) => {
     })
 
     if (response.status === 409) {
-      await updateAdminPassword(gotrueUrl, serviceKey, apiKey, email, password)
-      return
+      return await updateAdminPassword(gotrueUrl, serviceKey, apiKey, email, password)
     }
 
     if (!response.ok) {
@@ -425,9 +447,21 @@ const ensureAdminAuthUser = async (email: string, password: string) => {
         status: response.status,
         body: text,
       })
+      return null
     }
+
+    const body = (await response.json().catch(() => null)) as
+      | { id?: string; user?: { id?: string } }
+      | null
+
+    const id = body?.user?.id ?? body?.id
+    if (id) {
+      return { userId: id, email }
+    }
+    return null
   } catch (error) {
     console.warn('[platform-db] error ensuring admin user', error)
+    return null
   }
 }
 
@@ -437,7 +471,7 @@ const updateAdminPassword = async (
   apiKey: string | undefined,
   email: string,
   password: string
-) => {
+): Promise<AdminUserIdentity | null> => {
   const baseUrl = gotrueUrl.replace(/\/?$/, '')
   const headers = {
     'Content-Type': 'application/json',
@@ -451,13 +485,13 @@ const updateAdminPassword = async (
     })
 
     if (!lookup.ok) {
-      return
+      return null
     }
 
     const users = (await lookup.json().catch(() => [])) as Array<{ id: string }> | undefined
     const userId = users?.[0]?.id
     if (!userId) {
-      return
+      return null
     }
 
     const update = await fetch(`${baseUrl}/admin/users/${userId}`, {
@@ -475,8 +509,12 @@ const updateAdminPassword = async (
         status: update.status,
         body: text,
       })
+      return null
     }
+
+    return { userId, email }
   } catch (error) {
     console.warn('[platform-db] error updating admin password', error)
+    return null
   }
 }

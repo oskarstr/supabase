@@ -11,15 +11,7 @@ BEGIN
     RETURN;
   END IF;
 
-  EXECUTE 'GRANT USAGE ON SCHEMA platform TO postgres';
-  EXECUTE 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA platform TO postgres';
-  EXECUTE 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA platform TO postgres';
-  EXECUTE '' ||
-    'ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON TABLES TO postgres';
-  EXECUTE '' ||
-    'ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT ALL ON SEQUENCES TO postgres';
-
-  FOREACH grantee IN ARRAY ARRAY['supabase_admin', 'service_role'] LOOP
+  FOREACH grantee IN ARRAY ARRAY['postgres', 'supabase_admin'] LOOP
     EXECUTE format('GRANT USAGE ON SCHEMA platform TO %I', grantee);
     EXECUTE format('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA platform TO %I', grantee);
     EXECUTE format('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA platform TO %I', grantee);

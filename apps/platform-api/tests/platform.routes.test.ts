@@ -7,12 +7,27 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { DataType, newDb } from 'pg-mem'
 import { randomUUID } from 'node:crypto'
 
+import { authenticateRequest } from '../src/plugins/authenticate.js'
+import { authHeaders, TEST_JWT_SECRET } from './utils/auth.js'
+
 async function buildApp() {
   const platformRoutes = (await import('../src/routes/platform.js')).default
   const apiV1Routes = (await import('../src/routes/api-v1.js')).default
   const app = Fastify({ logger: false })
-  await app.register(platformRoutes, { prefix: '/api/platform' })
-  await app.register(apiV1Routes, { prefix: '/api/v1' })
+  await app.register(
+    async (instance) => {
+      instance.addHook('preHandler', authenticateRequest)
+      await instance.register(platformRoutes)
+    },
+    { prefix: '/api/platform' }
+  )
+  await app.register(
+    async (instance) => {
+      instance.addHook('preHandler', authenticateRequest)
+      await instance.register(apiV1Routes)
+    },
+    { prefix: '/api/v1' }
+  )
   await app.ready()
   return app
 }
@@ -37,6 +52,8 @@ const sanitizeMigrationSql = (sql: string) =>
     .replace(/COMMENT ON SCHEMA platform IS 'Supabase platform control-plane schema.';\s*/g, '')
 
 const MIGRATIONS_DIR = resolve(process.cwd(), 'migrations')
+const TEST_USER_ID = 'test-user'
+const TEST_USER_EMAIL = 'test-user@example.com'
 
 describe('platform routes', () => {
   let app: FastifyInstance
@@ -47,6 +64,17 @@ describe('platform routes', () => {
   let platformDb: PlatformDb
   let originalProjectStatus = 'ACTIVE_HEALTHY'
   let originalProjectServiceKey = ''
+
+  const withAuth = (headers: Record<string, string> = {}) => ({
+    ...authHeaders(),
+    ...headers,
+  })
+
+  const injectWithAuth = (options: Parameters<FastifyInstance['inject']>[0]) =>
+    app.inject({
+      ...options,
+      headers: withAuth(options.headers ?? {}),
+    })
 
   const loadDefaultProject = async () => {
     if (!platformDb) {
@@ -130,6 +158,32 @@ describe('platform routes', () => {
 
     const { getPlatformDb } = await import('../src/db/client.js')
     platformDb = getPlatformDb()
+
+    const { ensureProfile } = await import('../src/store/profile.js')
+    const profile = await ensureProfile(TEST_USER_ID, TEST_USER_EMAIL)
+    const defaultOrg = await platformDb
+      .selectFrom('organizations')
+      .select(['id'])
+      .where('slug', '=', defaultOrganizationSlug)
+      .executeTakeFirst()
+    if (defaultOrg) {
+      await platformDb
+        .deleteFrom('organization_members')
+        .where('organization_id', '=', defaultOrg.id)
+        .where('profile_id', '=', profile.id)
+        .execute()
+      await platformDb
+        .insertInto('organization_members')
+        .values({
+          organization_id: defaultOrg.id,
+          profile_id: profile.id,
+          role_ids: [1],
+          metadata: {},
+          mfa_enabled: false,
+          is_owner: true,
+        })
+        .execute()
+    }
     const project = await loadDefaultProject()
     originalProjectStatus = project.status
     originalProjectServiceKey = project.service_key
@@ -142,6 +196,7 @@ describe('platform routes', () => {
   })
 
   beforeEach(async () => {
+    process.env.JWT_SECRET = TEST_JWT_SECRET
     process.env.PLATFORM_API_REPO_ROOT = process.cwd()
     if (defaultProjectRef) {
       await updateDefaultProject({
@@ -164,7 +219,7 @@ describe('platform routes', () => {
   })
 
   it('returns platform status', async () => {
-    const response = await app.inject({
+    const response = await injectWithAuth({
       method: 'GET',
       url: '/api/platform/status',
     })
@@ -174,7 +229,7 @@ describe('platform routes', () => {
   })
 
   it('provides notification summary and feed', async () => {
-    const summaryResponse = await app.inject({
+    const summaryResponse = await injectWithAuth({
       method: 'GET',
       url: '/api/platform/notifications/summary',
     })
@@ -185,7 +240,7 @@ describe('platform routes', () => {
       unread_count: 0,
     })
 
-    const feedResponse = await app.inject({
+    const feedResponse = await injectWithAuth({
       method: 'GET',
       url: '/api/platform/notifications',
     })
@@ -204,7 +259,7 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const response = await app.inject({
+    const response = await injectWithAuth({
       method: 'POST',
       url: `/api/platform/pg-meta/${projectRef}/query?key=schemas`,
       payload: {
@@ -221,7 +276,7 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const postgrest = await app.inject({
+    const postgrest = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/config/postgrest`,
     })
@@ -231,7 +286,7 @@ describe('platform routes', () => {
       role_claim_key: '.role',
     })
 
-    const realtime = await app.inject({
+    const realtime = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/config/realtime`,
     })
@@ -241,7 +296,7 @@ describe('platform routes', () => {
       max_concurrent_users: expect.any(Number),
     })
 
-    const pgbouncer = await app.inject({
+    const pgbouncer = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/config/pgbouncer`,
     })
@@ -251,14 +306,14 @@ describe('platform routes', () => {
       pool_mode: 'transaction',
     })
 
-    const pgbouncerStatus = await app.inject({
+    const pgbouncerStatus = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/config/pgbouncer/status`,
     })
     expect(pgbouncerStatus.statusCode).toBe(200)
     expect(pgbouncerStatus.json()).toEqual({ active: true })
 
-    const storage = await app.inject({
+    const storage = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/config/storage`,
     })
@@ -268,7 +323,7 @@ describe('platform routes', () => {
       fileSizeLimit: expect.any(Number),
     })
 
-    const supavisor = await app.inject({
+    const supavisor = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/config/supavisor`,
     })
@@ -282,7 +337,7 @@ describe('platform routes', () => {
     expect(platformProjectRef).toBeTruthy()
     expect(platformProjectSchema).toBeTruthy()
 
-    const listResponse = await app.inject({
+    const listResponse = await injectWithAuth({
       method: 'GET',
       url: '/api/platform/projects',
     })
@@ -293,7 +348,7 @@ describe('platform routes', () => {
     const availableRefs = listPayload.projects.map((project) => project.ref)
     expect(availableRefs).toContain(platformProjectRef)
 
-    const postgrest = await app.inject({
+    const postgrest = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${platformProjectRef}/config/postgrest`,
     })
@@ -375,7 +430,7 @@ describe('platform routes', () => {
     })
 
     try {
-      const buckets = await app.inject({
+      const buckets = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/storage/${projectRef}/buckets`,
       })
@@ -387,7 +442,7 @@ describe('platform routes', () => {
         public: true,
       })
 
-      const credentials = await app.inject({
+      const credentials = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/storage/${projectRef}/credentials`,
       })
@@ -399,7 +454,7 @@ describe('platform routes', () => {
         description: expect.stringContaining('Supabase'),
       })
 
-      const objectsResponse = await app.inject({
+      const objectsResponse = await injectWithAuth({
         method: 'POST',
         url: `/api/platform/storage/${projectRef}/buckets/bucket-default/objects/list`,
         payload: { path: '', options: { limit: 10 } },
@@ -407,7 +462,7 @@ describe('platform routes', () => {
       expect(objectsResponse.statusCode).toBe(200)
       expect(Array.isArray(objectsResponse.json())).toBe(true)
 
-      const publicUrl = await app.inject({
+      const publicUrl = await injectWithAuth({
         method: 'POST',
         url: `/api/platform/storage/${projectRef}/buckets/bucket-default/objects/public-url`,
         payload: { path: 'hello.sql' },
@@ -423,7 +478,7 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const response = await app.inject({
+    const response = await injectWithAuth({
       method: 'POST',
       url: `/api/platform/pg-meta/${projectRef}/query`,
       payload: {
@@ -439,21 +494,21 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const content = await app.inject({
+    const content = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/content?type=sql`,
     })
     expect(content.statusCode).toBe(200)
     expect(Array.isArray(content.json().data)).toBe(true)
 
-    const count = await app.inject({
+    const count = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/content/count`,
     })
     expect(count.statusCode).toBe(200)
     expect(count.json()).toMatchObject({ private: expect.any(Number) })
 
-    const folders = await app.inject({
+    const folders = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/content/folders`,
     })
@@ -465,20 +520,20 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const rest = await app.inject({
+    const rest = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/api/rest`,
     })
     expect(rest.statusCode).toBe(200)
     expect(rest.json()).toMatchObject({ swagger: '2.0' })
 
-    const restHead = await app.inject({
+    const restHead = await injectWithAuth({
       method: 'HEAD',
       url: `/api/platform/projects/${projectRef}/api/rest`,
     })
     expect(restHead.statusCode).toBe(200)
 
-    const tempKey = await app.inject({
+    const tempKey = await injectWithAuth({
       method: 'POST',
       url: `/api/platform/projects/${projectRef}/api-keys/temporary`,
     })
@@ -490,28 +545,28 @@ describe('platform routes', () => {
     const organizationSlug = defaultOrganizationSlug
     expect(organizationSlug).toBeTruthy()
 
-    const members = await app.inject({
+    const members = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/organizations/${organizationSlug}/members`,
     })
     expect(members.statusCode).toBe(200)
     expect(Array.isArray(members.json())).toBe(true)
 
-    const roles = await app.inject({
+    const roles = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/organizations/${organizationSlug}/roles`,
     })
     expect(roles.statusCode).toBe(200)
     expect(Array.isArray(roles.json().org_scoped_roles)).toBe(true)
 
-    const invitations = await app.inject({
+    const invitations = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/organizations/${organizationSlug}/members/invitations`,
     })
     expect(invitations.statusCode).toBe(200)
     expect(Array.isArray(invitations.json().invitations)).toBe(true)
 
-    const usage = await app.inject({
+    const usage = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/organizations/${organizationSlug}/usage/daily`,
     })
@@ -520,7 +575,7 @@ describe('platform routes', () => {
   })
 
   it('creates a new organization', async () => {
-    const response = await app.inject({
+    const response = await injectWithAuth({
       method: 'POST',
       url: '/api/platform/organizations',
       payload: {
@@ -542,7 +597,7 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const replication = await app.inject({
+    const replication = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/replication/${projectRef}/sources`,
     })
@@ -594,47 +649,47 @@ describe('platform routes', () => {
       throw new Error(`Unexpected auth fetch: ${method} ${url.toString()}`)
     })
 
-    const disk = await app.inject({
+    const disk = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/disk`,
     })
     expect(disk.statusCode).toBe(200)
     expect(disk.json()).toMatchObject({ size_gb: expect.any(Number) })
 
-    const diskConfig = await app.inject({
+    const diskConfig = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/disk/custom-config`,
     })
     expect(diskConfig.statusCode).toBe(200)
 
-    const diskUtil = await app.inject({
+    const diskUtil = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/disk/util`,
     })
     expect(diskUtil.statusCode).toBe(200)
 
-    const loadBalancers = await app.inject({
+    const loadBalancers = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/load-balancers`,
     })
     expect(loadBalancers.statusCode).toBe(200)
     expect(Array.isArray(loadBalancers.json())).toBe(true)
 
-    const logDrains = await app.inject({
+    const logDrains = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/analytics/log-drains`,
     })
     expect(logDrains.statusCode).toBe(200)
     expect(Array.isArray(logDrains.json())).toBe(true)
 
-    const logsGet = await app.inject({
+    const logsGet = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/analytics/endpoints/logs.all`,
     })
     expect(logsGet.statusCode).toBe(200)
     expect(logsGet.json()).toMatchObject({ result: expect.any(Array) })
 
-    const logsPost = await app.inject({
+    const logsPost = await injectWithAuth({
       method: 'POST',
       url: `/api/platform/projects/${projectRef}/analytics/endpoints/logs.all`,
       payload: {
@@ -645,19 +700,19 @@ describe('platform routes', () => {
     })
     expect(logsPost.statusCode).toBe(200)
 
-    const usageCounts = await app.inject({
+    const usageCounts = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/analytics/endpoints/usage.api-counts?interval=1hr`,
     })
     expect(usageCounts.statusCode).toBe(200)
 
-    const usageRequests = await app.inject({
+    const usageRequests = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/analytics/endpoints/usage.api-requests-count`,
     })
     expect(usageRequests.statusCode).toBe(200)
 
-    const authConfig = await app.inject({
+    const authConfig = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/auth/${projectRef}/config`,
     })
@@ -668,7 +723,7 @@ describe('platform routes', () => {
     expect(typeof authConfigPayload.MAILER_SUBJECTS_INVITE).toBe('string')
     expect(typeof authConfigPayload.EXTERNAL_EMAIL_ENABLED).toBe('boolean')
 
-    const authPatch = await app.inject({
+    const authPatch = await injectWithAuth({
       method: 'PATCH',
       url: `/api/platform/auth/${projectRef}/config`,
       payload: { DISABLE_SIGNUP: false },
@@ -676,7 +731,7 @@ describe('platform routes', () => {
     expect(authPatch.statusCode).toBe(200)
     expect(authPatch.json().DISABLE_SIGNUP).toBe(false)
 
-    const authHooks = await app.inject({
+    const authHooks = await injectWithAuth({
       method: 'PATCH',
       url: `/api/platform/auth/${projectRef}/config/hooks`,
       payload: {},
@@ -684,7 +739,7 @@ describe('platform routes', () => {
     expect(authHooks.statusCode).toBe(200)
     fetchMock.mockRestore()
 
-    const combinedStats = await app.inject({
+    const combinedStats = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/analytics/endpoints/functions.combined-stats?function_id=edge-fn&interval=1hr`,
     })
@@ -698,7 +753,7 @@ describe('platform routes', () => {
       avg_cpu_time_used: expect.any(Number),
     })
 
-    const reqStats = await app.inject({
+    const reqStats = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/analytics/endpoints/functions.req-stats?function_id=edge-fn&interval=1hr`,
     })
@@ -711,7 +766,7 @@ describe('platform routes', () => {
       client_err_count: expect.any(Number),
     })
 
-    const resourceUsage = await app.inject({
+    const resourceUsage = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/projects/${projectRef}/analytics/endpoints/functions.resource-usage?function_id=edge-fn&interval=1hr`,
     })
@@ -725,13 +780,13 @@ describe('platform routes', () => {
       max_cpu_time_used: expect.any(Number),
     })
 
-    const backups = await app.inject({
+    const backups = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/database/${projectRef}/backups`,
     })
     expect(backups.statusCode).toBe(200)
 
-    const repos = await app.inject({
+    const repos = await injectWithAuth({
       method: 'GET',
       url: '/api/platform/integrations/github/repositories',
     })
@@ -742,7 +797,7 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const branches = await app.inject({
+    const branches = await injectWithAuth({
       method: 'GET',
       url: `/api/v1/projects/${projectRef}/branches`,
     })
@@ -755,7 +810,7 @@ describe('platform routes', () => {
       status: expect.any(String),
     })
 
-    const apiKeys = await app.inject({
+    const apiKeys = await injectWithAuth({
       method: 'GET',
       url: `/api/v1/projects/${projectRef}/api-keys?reveal=false`,
     })
@@ -768,7 +823,7 @@ describe('platform routes', () => {
       type: expect.any(String),
     })
 
-    const functions = await app.inject({
+    const functions = await injectWithAuth({
       method: 'GET',
       url: `/api/v1/projects/${projectRef}/functions`,
     })
@@ -780,7 +835,7 @@ describe('platform routes', () => {
       status: 'ACTIVE',
     })
 
-    const upgradeStatus = await app.inject({
+    const upgradeStatus = await injectWithAuth({
       method: 'GET',
       url: `/api/v1/projects/${projectRef}/upgrade/status`,
     })
@@ -792,7 +847,7 @@ describe('platform routes', () => {
       }),
     })
 
-    const health = await app.inject({
+    const health = await injectWithAuth({
       method: 'GET',
       url: `/api/v1/projects/${projectRef}/health?services=auth,realtime`,
     })
@@ -809,7 +864,7 @@ describe('platform routes', () => {
     const projectRef = defaultProjectRef
     expect(projectRef).toBeTruthy()
 
-    const schemas = await app.inject({
+    const schemas = await injectWithAuth({
       method: 'POST',
       url: `/api/platform/pg-meta/${projectRef}/query?key=schemas`,
       payload: {
@@ -836,7 +891,7 @@ describe('platform routes', () => {
 
       await updateDefaultProject({ status: 'COMING_UP' })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/auth/${projectRef}/config`,
       })
@@ -861,7 +916,7 @@ describe('platform routes', () => {
         service_key: '',
       })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/auth/${projectRef}/config`,
       })
@@ -906,7 +961,7 @@ describe('platform routes', () => {
         )
       })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/auth/${projectRef}/config`,
       })
@@ -944,7 +999,7 @@ describe('platform routes', () => {
         })
       })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/auth/${projectRef}/config`,
       })
@@ -982,7 +1037,7 @@ describe('platform routes', () => {
         })
       })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'PATCH',
         url: `/api/platform/auth/${projectRef}/config`,
         payload,
@@ -1006,7 +1061,7 @@ describe('platform routes', () => {
 
       await updateDefaultProject({ status: 'PAUSING' })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/storage/${projectRef}/buckets`,
       })
@@ -1031,7 +1086,7 @@ describe('platform routes', () => {
         service_key: '',
       })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/storage/${projectRef}/buckets`,
       })
@@ -1070,7 +1125,7 @@ describe('platform routes', () => {
         )
       })
 
-    const response = await app.inject({
+    const response = await injectWithAuth({
       method: 'GET',
       url: `/api/platform/storage/${projectRef}/buckets`,
     })
@@ -1107,7 +1162,7 @@ describe('platform routes', () => {
         })
       })
 
-    const response = await app.inject({
+    const response = await injectWithAuth({
       method: 'POST',
       url: `/api/platform/storage/${projectRef}/buckets/my-bucket/objects/list`,
       payload: {
@@ -1142,7 +1197,7 @@ describe('platform routes', () => {
         })
       })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'GET',
         url: `/api/platform/storage/${projectRef}/buckets`,
       })
@@ -1177,7 +1232,7 @@ describe('platform routes', () => {
         )
       })
 
-      const response = await app.inject({
+      const response = await injectWithAuth({
         method: 'POST',
         url: '/api/platform/auth/signup',
         payload: {

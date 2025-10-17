@@ -171,22 +171,6 @@ wait_for_postgres() {
   return 1
 }
 
-apply_platform_grants() {
-  local container_sql_path="/docker-entrypoint-initdb.d/migrations/20250421084702_platform_grants.sql"
-  if [[ "$DRY_RUN" == true ]]; then
-    echo "Would apply platform grants via ${container_sql_path}"
-    return 0
-  fi
-
-  if ! docker compose "${COMPOSE_FILES[@]}" exec -T db sh -c "test -f '${container_sql_path}'" >/dev/null 2>&1; then
-    echo "Platform grants SQL not found inside db container at ${container_sql_path}" >&2
-    return 1
-  fi
-
-  docker compose "${COMPOSE_FILES[@]}" exec -T db \
-    psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f "${container_sql_path}" >/dev/null
-}
-
 case "$ACTION" in
   up)
     validate_env
@@ -194,7 +178,6 @@ case "$ACTION" in
     ensure_runtime_dirs
     compose_up
     wait_for_postgres
-    apply_platform_grants
     ;;
   down)
     run_compose down --remove-orphans
@@ -207,6 +190,5 @@ case "$ACTION" in
     ensure_runtime_dirs
     compose_up
     wait_for_postgres
-    apply_platform_grants
     ;;
 esac

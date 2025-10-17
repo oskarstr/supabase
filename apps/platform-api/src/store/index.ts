@@ -1,6 +1,15 @@
 export * from './types.js'
 
-export { auditAccountLogin, getProfile } from './profile.js'
+export {
+  auditAccountLogin,
+  createProfile,
+  ensureProfile,
+  getProfileByGotrueId,
+  getProfile,
+  updateProfile,
+  ProfileAlreadyExistsError,
+  ProfileNotFoundError,
+} from './profile.js'
 
 export { getAuthConfig, updateAuthConfig, updateAuthHooks } from './auth-config.js'
 
@@ -8,6 +17,7 @@ export {
   createOrganization,
   getOrganizationDetail,
   getSubscriptionForOrg,
+  getOrganizationMembership,
   listOrganizationProjects,
   listOrganizations,
 } from './organizations.js'
@@ -34,7 +44,7 @@ export { listOAuthApps } from './oauth.js'
 
 export { getAvailableRegions, listAvailableVersionsForOrganization } from './regions.js'
 
-export { listPermissions } from './permissions.js'
+export { listPermissionsForProfile } from './permissions.js'
 
 export { listProjectResourceWarnings } from './resource-warnings.js'
 

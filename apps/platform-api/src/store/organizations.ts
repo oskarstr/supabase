@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 
 import { slugify } from './env.js'
 import {
-  baseProfile,
   DEFAULT_BILLING_EMAIL,
   DEFAULT_ORG_REQUIRES_MFA,
   DEFAULT_STRIPE_CUSTOMER_ID,
@@ -13,17 +12,41 @@ import {
 } from '../config/defaults.js'
 import { getPlatformDb } from '../db/client.js'
 import { toOrganization } from '../db/mappers.js'
-import { getProfile } from './profile.js'
 import type {
   CreateOrganizationBody,
   GetSubscriptionResponse,
   Organization,
   OrganizationDetailResponse,
   OrganizationProjectsResponse,
+  Profile,
 } from './types.js'
 
 const db = getPlatformDb()
-const CURRENT_PROFILE_ID = baseProfile.id
+const memberSelection = [
+  'organization_members.id as member_id',
+  'organization_members.role_ids as member_role_ids',
+  'organization_members.metadata as member_metadata',
+  'organization_members.mfa_enabled as member_mfa_enabled',
+  'organization_members.is_owner as member_is_owner',
+  'organization_members.inserted_at as member_inserted_at',
+  'organization_members.updated_at as member_updated_at',
+] as const
+
+const mapOrganization = (row: any, profileId: number): Organization =>
+  toOrganization({
+    organization: row,
+    membership: {
+      id: row.member_id ?? 0,
+      organization_id: row.id,
+      profile_id: profileId,
+      role_ids: (row.member_role_ids as number[]) ?? [],
+      metadata: (row.member_metadata as Record<string, unknown>) ?? {},
+      mfa_enabled: row.member_mfa_enabled ?? false,
+      is_owner: Boolean(row.member_is_owner),
+      inserted_at: row.member_inserted_at ?? new Date(),
+      updated_at: row.member_updated_at ?? new Date(),
+    },
+  })
 
 const toStringRecord = (value: unknown): Record<string, string> | null => {
   if (!value || typeof value !== 'object') return null
@@ -61,47 +84,36 @@ const generateUniqueOrgSlug = async (name: string) => {
   throw new Error('Failed to generate unique organization slug')
 }
 
-const fetchCurrentProfileId = async (): Promise<number> => {
-  const profile = await getProfile()
-  return profile.id
+export const getOrganizationMembership = async (profileId: number, slug: string) => {
+  if (!profileId) return null
+
+  return db
+    .selectFrom('organization_members')
+    .innerJoin('organizations', 'organizations.id', 'organization_members.organization_id')
+    .select([
+      'organizations.id as organization_id',
+      'organizations.slug as organization_slug',
+      'organization_members.is_owner as is_owner',
+      'organization_members.role_ids as role_ids',
+    ])
+    .where('organization_members.profile_id', '=', profileId)
+    .where('organizations.slug', '=', slug)
+    .executeTakeFirst()
 }
 
-export const listOrganizations = async (): Promise<Organization[]> => {
-  const profileId = await fetchCurrentProfileId()
+export const listOrganizations = async (profileId: number): Promise<Organization[]> => {
+  if (!profileId) return []
 
   const rows = await db
-    .selectFrom('organizations')
-    .leftJoin('organization_members', (join) =>
-      join
-        .onRef('organization_members.organization_id', '=', 'organizations.id')
-        .on('organization_members.profile_id', '=', profileId)
-    )
-    .selectAll('organizations')
-    .select(['organization_members.is_owner'])
-    .orderBy('organizations.inserted_at', 'asc')
+    .selectFrom('organizations as org')
+    .innerJoin('organization_members as om', 'om.organization_id', 'org.id')
+    .selectAll('org')
+    .select(memberSelection)
+    .where('om.profile_id', '=', profileId)
+    .orderBy('org.inserted_at', 'asc')
     .execute()
 
-  return rows.map((row) => {
-    const membership =
-      row.is_owner === null || row.is_owner === undefined
-        ? undefined
-        : {
-            id: 0,
-            organization_id: row.id,
-            profile_id: profileId,
-            role_ids: [],
-            metadata: {},
-            mfa_enabled: false,
-            is_owner: row.is_owner ?? false,
-            inserted_at: row.inserted_at,
-            updated_at: row.updated_at,
-          }
-
-    return toOrganization({
-      organization: row,
-      membership,
-    })
-  })
+  return rows.map((row) => mapOrganization(row, profileId))
 }
 
 export const getSubscriptionForOrg = (org: Organization): GetSubscriptionResponse => ({
@@ -169,17 +181,18 @@ export const listOrganizationProjects = async (
   }
 }
 
-export const createOrganization = async (body: CreateOrganizationBody): Promise<Organization> => {
+export const createOrganization = async (
+  profile: Profile,
+  body: CreateOrganizationBody
+): Promise<Organization> => {
   const name = body.name?.trim()
   if (!name) {
     throw new Error('Organization name is required')
   }
 
-  const profileId = await fetchCurrentProfileId()
+  const profileId = profile.id
   const slug = await generateUniqueOrgSlug(name)
   const planId = TIER_TO_PLAN[body.tier] ?? 'free'
-
-  const profile = await getProfile()
 
   let explicitId: number | undefined
   if (process.env.PLATFORM_DB_URL === 'pg-mem') {
@@ -271,20 +284,19 @@ export const createOrganization = async (body: CreateOrganizationBody): Promise<
       .execute()
   }
 
-  return toOrganization({
-    organization: insertedOrg,
-    membership: {
-      id: 0,
-      organization_id: insertedOrg.id,
-      profile_id: profileId,
-      role_ids: [1],
-      metadata: {},
-      mfa_enabled: false,
-      is_owner: true,
-      inserted_at: new Date(),
-      updated_at: new Date(),
+  return mapOrganization(
+    {
+      ...insertedOrg,
+      member_id: 0,
+      member_role_ids: [1],
+      member_metadata: {},
+      member_mfa_enabled: false,
+      member_is_owner: true,
+      member_inserted_at: new Date(),
+      member_updated_at: new Date(),
     },
-  })
+    profileId
+  )
 }
 
 export const getOrganizationDetail = async (
