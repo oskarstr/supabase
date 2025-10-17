@@ -5,6 +5,7 @@ import (
         "context"
         "net/http"
         "net/http/httptest"
+        "strings"
         "testing"
         "time"
 )
@@ -94,5 +95,28 @@ func TestHealthzDoesNotRequireAuth(t *testing.T) {
 
         if res.Code != http.StatusOK {
                 t.Fatalf("expected status %d, got %d", http.StatusOK, res.Code)
+        }
+}
+
+func TestProvisionRejectsLargeBody(t *testing.T) {
+        executor := &stubExecutor{}
+        srv := &Server{
+                cfg: Config{CommandTimeout: time.Minute},
+                executor: executor,
+        }
+        srv.router = srv.routes()
+
+        large := strings.Repeat("a", int(maxRequestBodyBytes)+1)
+        payload := `{"project_id":1,"project_ref":"ref","project_name":"name","organization_slug":"org","project_root":"/tmp","cloud_provider":"aws","region":"region","database_password":"pass","excluded_services":[],"network_id":"net","ignore_health_check":true,"padding":"` + large + `"}`
+        req := httptest.NewRequest(http.MethodPost, "/v1/projects/provision", bytes.NewBufferString(payload))
+        res := httptest.NewRecorder()
+
+        srv.router.ServeHTTP(res, req)
+
+        if res.Code != http.StatusRequestEntityTooLarge {
+                t.Fatalf("expected status %d, got %d", http.StatusRequestEntityTooLarge, res.Code)
+        }
+        if executor.provisionCalls != 0 {
+                t.Fatalf("expected executor not to be invoked, got %d", executor.provisionCalls)
         }
 }

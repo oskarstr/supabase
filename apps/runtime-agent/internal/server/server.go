@@ -14,17 +14,19 @@ import (
 )
 
 type Server struct {
-	cfg      Config
-	server   *http.Server
-	router   http.Handler
-	executor executor
+        cfg      Config
+        server   *http.Server
+        router   http.Handler
+        executor executor
 }
 
 type operationResult struct {
-	Stdout     string `json:"stdout,omitempty"`
-	Stderr     string `json:"stderr,omitempty"`
-	DurationMs int64  `json:"duration_ms"`
+        Stdout     string `json:"stdout,omitempty"`
+        Stderr     string `json:"stderr,omitempty"`
+        DurationMs int64  `json:"duration_ms"`
 }
+
+const maxRequestBodyBytes int64 = 1 << 20
 
 func New(cfg Config) *Server {
 	s := &Server{
@@ -86,11 +88,19 @@ type destroyRequest struct {
 }
 
 func (s *Server) handleProvision(w http.ResponseWriter, r *http.Request) {
-	var req provisionRequest
-	if err := decodeJSON(r, &req); err != nil {
-		httpError(w, http.StatusBadRequest, "invalid json payload")
-		return
-	}
+        r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+        defer r.Body.Close()
+
+        var req provisionRequest
+        if err := decodeJSON(r, &req); err != nil {
+                var maxErr *http.MaxBytesError
+                if errors.As(err, &maxErr) {
+                        httpError(w, http.StatusRequestEntityTooLarge, "request body too large")
+                } else {
+                        httpError(w, http.StatusBadRequest, "invalid json payload")
+                }
+                return
+        }
 
 	if err := validateProvisionRequest(req); err != nil {
 		httpError(w, http.StatusBadRequest, err.Error())
@@ -122,11 +132,19 @@ func (s *Server) handleProvision(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
-	var req stopRequest
-	if err := decodeJSON(r, &req); err != nil {
-		httpError(w, http.StatusBadRequest, "invalid json payload")
-		return
-	}
+        r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+        defer r.Body.Close()
+
+        var req stopRequest
+        if err := decodeJSON(r, &req); err != nil {
+                var maxErr *http.MaxBytesError
+                if errors.As(err, &maxErr) {
+                        httpError(w, http.StatusRequestEntityTooLarge, "request body too large")
+                } else {
+                        httpError(w, http.StatusBadRequest, "invalid json payload")
+                }
+                return
+        }
 	if strings.TrimSpace(req.ProjectRef) == "" {
 		httpError(w, http.StatusBadRequest, "project_ref is required")
 		return
@@ -160,9 +178,17 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
+        r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+        defer r.Body.Close()
+
         var req destroyRequest
         if err := decodeJSON(r, &req); err != nil {
-                httpError(w, http.StatusBadRequest, "invalid json payload")
+                var maxErr *http.MaxBytesError
+                if errors.As(err, &maxErr) {
+                        httpError(w, http.StatusRequestEntityTooLarge, "request body too large")
+                } else {
+                        httpError(w, http.StatusBadRequest, "invalid json payload")
+                }
                 return
         }
 	if strings.TrimSpace(req.ProjectRef) == "" {

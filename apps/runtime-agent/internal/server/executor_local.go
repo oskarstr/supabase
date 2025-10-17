@@ -49,32 +49,32 @@ func newLocalExecutorWithRunner(r supabaseRunner) *localExecutor {
 }
 
 func (e *localExecutor) Provision(ctx context.Context, req provisionRequest) (operationResult, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+        e.mu.Lock()
+        defer e.mu.Unlock()
 
-	return e.runWithLogs(func() error {
-		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, req.NetworkID, func(fsys afero.Fs) error {
-			const backupVolumes = false
-			if err := e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys); err != nil && !isNotRunningError(err) {
-				return err
-			}
+        return e.runWithLogs(func() error {
+                return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, req.NetworkID, func(fsys afero.Fs) error {
+                        const backupVolumes = true
+                        if err := e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys); err != nil && !isNotRunningError(err) {
+                                return err
+                        }
 
-			excluded := append([]string(nil), req.ExcludedServices...)
+                        excluded := append([]string(nil), req.ExcludedServices...)
 			return e.runner.Start(ctx, fsys, excluded, req.IgnoreHealthCheck)
 		})
 	})
 }
 
 func (e *localExecutor) Stop(ctx context.Context, req stopRequest) (operationResult, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+        e.mu.Lock()
+        defer e.mu.Unlock()
 
-	return e.runWithLogs(func() error {
-		return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
-			const backupVolumes = false
-			return e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys)
-		})
-	})
+        return e.runWithLogs(func() error {
+                return e.withProjectEnvironment(req.ProjectRoot, req.ProjectRef, "", func(fsys afero.Fs) error {
+                        const backupVolumes = true
+                        return e.runner.Stop(ctx, backupVolumes, req.ProjectRef, false, fsys)
+                })
+        })
 }
 
 func (e *localExecutor) Destroy(ctx context.Context, req destroyRequest) (operationResult, error) {

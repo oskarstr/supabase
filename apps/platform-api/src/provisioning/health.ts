@@ -9,7 +9,7 @@ const DEFAULT_TIMEOUT_MS =
 const DEFAULT_INTERVAL_MS = 2_000
 
 interface WaitForHealthOptions {
-  projectId: number
+  portBase: number
   excludedServices: string[]
   timeoutMs?: number
   intervalMs?: number
@@ -33,12 +33,12 @@ const checkEdgeFunctions = async (port: number, abortSignal: AbortSignal) => {
 }
 
 export const waitForRuntimeHealth = async ({
-  projectId,
+  portBase,
   excludedServices,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   intervalMs = DEFAULT_INTERVAL_MS,
 }: WaitForHealthOptions): Promise<void> => {
-  const ports = allocateProjectPorts(projectId)
+  const ports = allocateProjectPorts(portBase)
   const deadline = Date.now() + timeoutMs
   const shouldCheckFunctions = !excludedServices.includes('edge-runtime')
   const shouldCheckRest =

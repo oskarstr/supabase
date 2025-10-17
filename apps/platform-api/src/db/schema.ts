@@ -137,6 +137,7 @@ export interface ProjectRuntimesTable {
   project_id: number
   root_dir: string
   excluded_services: StringArray
+  port_base: number | null
   created_at: Timestamp
   updated_at: Timestamp
 }

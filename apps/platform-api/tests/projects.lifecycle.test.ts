@@ -54,6 +54,7 @@ const MIGRATIONS_DIR = fileURLToPath(new URL('../migrations', import.meta.url))
 describe('project lifecycle integration', () => {
   let tempRoot: string
   let defaults: typeof import('../src/config/defaults.js')
+  let portConfig: typeof import('../src/provisioning/ports.js')
 
   const originalEnv = { ...process.env }
   type PlatformDb = Kysely<PlatformDatabase>
@@ -75,7 +76,7 @@ describe('project lifecycle integration', () => {
   const fetchRuntimeRow = async (db: PlatformDb, projectId: number) =>
     db
       .selectFrom('project_runtimes')
-      .select(['project_id', 'root_dir', 'excluded_services'])
+      .select(['project_id', 'root_dir', 'excluded_services', 'port_base'])
       .where('project_id', '=', projectId)
       .executeTakeFirst()
 
@@ -123,6 +124,7 @@ describe('project lifecycle integration', () => {
     globalThis.__PLATFORM_TEST_POOL__ = new MemPool()
 
     defaults = await import('../src/config/defaults.js')
+    portConfig = await import('../src/provisioning/ports.js')
     const { seedDefaults } = await import('../src/db/seed.js')
     await seedDefaults()
   })
@@ -201,6 +203,11 @@ describe('project lifecycle integration', () => {
       root_dir: expectedRoot,
       excluded_services: ['logflare', 'vector'],
     })
+    expect(runtimeRow?.port_base).toBeDefined()
+    expect(runtimeRow?.port_base).toBeGreaterThanOrEqual(portConfig.PROJECT_PORT_BASE)
+    expect(
+      ((runtimeRow?.port_base ?? 0) - portConfig.PROJECT_PORT_BASE) % portConfig.PROJECT_PORT_STEP
+    ).toBe(0)
 
     const provisionPayload = mocks.provisionProjectStack.mock.calls[0]?.[0]
     expect(provisionPayload).toMatchObject({
@@ -212,12 +219,13 @@ describe('project lifecycle integration', () => {
       databasePassword: 'postgres',
       projectRoot: expectedRoot,
       excludedServices: ['logflare', 'vector'],
+      portBase: runtimeRow?.port_base,
     })
     expect(typeof provisionPayload.projectId).toBe('number')
 
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledTimes(1)
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: projectRow?.id,
+      portBase: runtimeRow?.port_base,
       excludedServices: ['logflare', 'vector'],
     })
     expect(mocks.destroyProjectStack).not.toHaveBeenCalled()
@@ -301,6 +309,13 @@ describe('project lifecycle integration', () => {
       ref: projectRef,
       projectRoot: join(tempRoot, projectRef),
     })
+
+    expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        portBase: expect.any(Number),
+        excludedServices: ['logflare', 'vector'],
+      })
+    )
   })
 
   it('normalizes runtime excluded services before provisioning and health checks', async () => {
@@ -335,11 +350,14 @@ describe('project lifecycle integration', () => {
     expect(mocks.provisionProjectStack).toHaveBeenCalledTimes(1)
     const provisionPayload = mocks.provisionProjectStack.mock.calls[0]?.[0]
     expect(provisionPayload?.excludedServices).toEqual(['realtime', 'vector', 'logflare'])
+    expect(provisionPayload?.portBase).toBe(runtimeRow?.port_base)
 
-    expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: projectRow?.id,
-      excludedServices: ['realtime', 'vector', 'logflare'],
-    })
+    expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        portBase: runtimeRow?.port_base,
+        excludedServices: ['realtime', 'vector', 'logflare'],
+      })
+    )
   })
 
   it('removes project data and runtime directory on delete', async () => {
@@ -376,10 +394,12 @@ describe('project lifecycle integration', () => {
     await waitForProjectStatus(db, projectRef, 'ACTIVE_HEALTHY')
     const runtimeRoot = join(tempRoot, projectRef)
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledTimes(1)
-    expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: expect.any(Number),
-      excludedServices: ['logflare', 'vector'],
-    })
+    expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        portBase: expect.any(Number),
+        excludedServices: ['logflare', 'vector'],
+      })
+    )
 
     const deleteResponse = await deleteProject(projectRef)
     expect(deleteResponse).toMatchObject({ ref: projectRef })
