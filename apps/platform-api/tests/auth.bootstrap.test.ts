@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
+import { sql } from 'kysely'
 
 import { baseProfile, DEFAULT_ORG_ID } from '../src/config/defaults.js'
 import { initTestDatabase } from './utils/db.js'
@@ -384,6 +385,77 @@ describe('bootstrap admin reconciliation', () => {
       .where('id', '=', duplicateProfileId)
       .execute()
     expect(duplicateProfiles).toHaveLength(0)
+  })
+
+  it('realigns foreign key references when consolidating duplicate admin profiles', async () => {
+    await initMemDatabase()
+
+    const adminUserId = 'eeeeeeee-ffff-0000-1111-222222222222'
+
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url.endsWith('/admin/users')) {
+        return new Response(JSON.stringify({ user: { id: adminUserId } }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    const { seedDefaults } = await import('../src/db/seed.js')
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+
+    setEnv({ PLATFORM_ADMIN_EMAIL: 'admin@example.com' })
+    await seedDefaults()
+
+    const duplicateProfileId = 997
+    const duplicateGotrueId = randomUUID()
+
+    await db
+      .insertInto('profiles')
+      .values({
+        id: duplicateProfileId,
+        gotrue_id: duplicateGotrueId,
+        auth0_id: 'duplicate|auth0',
+        username: 'admin-duplicate-fk',
+        first_name: 'Dupe',
+        last_name: 'Reference',
+        primary_email: baseProfile.primary_email,
+        mobile: baseProfile.mobile ?? '',
+        free_project_limit: baseProfile.free_project_limit,
+        is_alpha_user: baseProfile.is_alpha_user,
+        is_sso_user: baseProfile.is_sso_user,
+        disabled_features: [],
+      })
+      .execute()
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS ${sql.raw('platform.audit_actor_profiles')} (
+        id BIGSERIAL PRIMARY KEY,
+        actor_profile_id BIGINT NOT NULL REFERENCES ${sql.raw('platform.profiles')} (id)
+      )
+    `.execute(db)
+
+    await sql`
+      INSERT INTO ${sql.raw('platform.audit_actor_profiles')} (actor_profile_id)
+      VALUES (${duplicateProfileId})
+    `.execute(db)
+
+    await seedDefaults()
+
+    const updated = await sql<{ actor_profile_id: number }>`
+      SELECT actor_profile_id
+      FROM ${sql.raw('platform.audit_actor_profiles')}
+      ORDER BY id DESC
+      LIMIT 1
+    `.execute(db)
+
+    expect(updated.rows?.[0]?.actor_profile_id).toBe(baseProfile.id)
+
+    await sql`DROP TABLE IF EXISTS ${sql.raw('platform.audit_actor_profiles')}`.execute(db)
+    expect(fetchSpy).toHaveBeenCalled()
   })
 
   it('preserves owner metadata when reasserting ownership', async () => {
