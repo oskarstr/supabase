@@ -23,7 +23,7 @@ import type { ProjectsTable } from '../db/schema.js'
 import { destroyProjectStack, provisionProjectStack, stopProjectStack } from '../provisioner.js'
 import { waitForRuntimeHealth } from '../provisioning/health.js'
 import { normalizeExcludedServices } from '../provisioning/services.js'
-import { buildRestUrl } from './env.js'
+import { buildRestUrl, runtimePublicHost } from './env.js'
 import {
   ensureProjectRuntime,
   getProjectRuntime,
@@ -97,6 +97,16 @@ const readProvisionedEnv = (runtimeRoot: string) => {
   return null
 }
 
+const rewriteUrlHost = (value: string, host: string): string | null => {
+  try {
+    const url = new URL(value)
+    url.hostname = host
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
 const scheduleProvisioning = async (
   project: ProjectDetail,
   org: Organization,
@@ -112,6 +122,7 @@ const scheduleProvisioning = async (
     options.dbPassword && options.dbPassword.length > 0
       ? options.dbPassword
       : existingEnv?.SUPABASE_DB_PASSWORD ?? existingEnv?.POSTGRES_PASSWORD ?? randomUUID()
+  const dbVersion = project.dbVersion ?? DEFAULT_DB_VERSION
   try {
     await provisionProjectStack({
       projectId: project.id,
@@ -123,6 +134,7 @@ const scheduleProvisioning = async (
       databasePassword,
       projectRoot: runtimeRoot,
       excludedServices,
+      dbVersion,
     })
 
     const parsedEnv = readProvisionedEnv(runtimeRoot)
@@ -135,19 +147,30 @@ const scheduleProvisioning = async (
       updates.service_key = parsedEnv.SUPABASE_SERVICE_KEY
     }
 
-    const supabaseUrl = parsedEnv?.SUPABASE_URL ?? parsedEnv?.SUPABASE_PUBLIC_URL
-    if (supabaseUrl) {
-      updates.rest_url = buildRestUrl(supabaseUrl)
+    const publicHost = runtimePublicHost
+    const supabaseUrlRaw = parsedEnv?.SUPABASE_URL ?? parsedEnv?.SUPABASE_PUBLIC_URL
+    if (supabaseUrlRaw) {
+      const restBase =
+        publicHost?.length
+          ? rewriteUrlHost(supabaseUrlRaw, publicHost) ?? supabaseUrlRaw
+          : supabaseUrlRaw
+      updates.rest_url = buildRestUrl(restBase)
     }
 
-    const dbUrl = parsedEnv?.DATABASE_URL ?? parsedEnv?.SUPABASE_DB_URL
-    if (dbUrl) {
-      updates.connection_string = dbUrl
+    const dbUrlRaw = parsedEnv?.DATABASE_URL ?? parsedEnv?.SUPABASE_DB_URL
+    if (dbUrlRaw) {
+      const publicDbUrl =
+        publicHost?.length ? rewriteUrlHost(dbUrlRaw, publicHost) ?? dbUrlRaw : dbUrlRaw
+      updates.connection_string = publicDbUrl
       try {
-        updates.db_host = new URL(dbUrl).hostname
+        updates.db_host = new URL(publicDbUrl).hostname
       } catch {
         /* noop */
       }
+    }
+
+    if (!updates.db_host && publicHost?.length) {
+      updates.db_host = publicHost
     }
 
     if (parsedEnv?.POSTGRES_VERSION) {
