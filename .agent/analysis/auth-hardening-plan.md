@@ -174,7 +174,7 @@ Update the checkboxes and add short notes under each phase as work completes.
 ## Follow-up Hardening Items (2025-10-17)
 
 - **Admin bootstrap skip path**: when GoTrue credentials are missing we keep existing profile data. Surface a stronger warning and plan a reconciliation hook for environments that later enable Auth.
-- **Duplicate reconciliation timing**: audit other tables (audit logs, runtimes, etc.) for profile-id references so we can migrate them alongside the duplicate cleanup if needed.
+- ✅ **Duplicate reconciliation timing**: the bootstrap seed now introspects every foreign key pointing at `platform.profiles` (beyond `organization_members`) and rewrites those references to profile 1 before removing duplicates, with tests covering the dynamic discovery path.
 - **Role metadata hygiene**: consider pruning `role_scoped_projects` entries for roles/projects that no longer exist (stale invitations, role removals).
 - **Retry defaults for tests**: expose helper constants/env overrides so pg-mem suites can opt into retry scenarios without manual env juggling.
 - **Permission matrix governance**: generate both API and Studio data from a shared definition (or published package) and document the derivation so releases stay aligned.

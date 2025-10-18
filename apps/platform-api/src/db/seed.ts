@@ -157,6 +157,56 @@ const mergeMemberMetadata = (
   return merged
 }
 
+const PLATFORM_SCHEMA = process.env.PLATFORM_DB_SCHEMA?.trim() || 'platform'
+
+type ProfileReferenceColumn = {
+  table_name: string | null
+  column_name: string | null
+}
+
+const PROFILE_REFERENCE_SKIP_TABLES = new Set(['profiles', 'organization_members'])
+
+const migrateProfileForeignKeyReferences = async (
+  db: ReturnType<typeof getPlatformDb>,
+  duplicateIds: number[],
+  targetProfileId: number
+) => {
+  if (duplicateIds.length === 0) return
+
+  const { rows } = await sql<ProfileReferenceColumn>`
+    SELECT DISTINCT
+      kcu.table_name,
+      kcu.column_name
+    FROM information_schema.table_constraints AS tc
+    INNER JOIN information_schema.key_column_usage AS kcu
+      ON tc.constraint_name = kcu.constraint_name
+     AND tc.table_schema = kcu.table_schema
+    INNER JOIN information_schema.constraint_column_usage AS ccu
+      ON ccu.constraint_name = tc.constraint_name
+     AND ccu.table_schema = tc.table_schema
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND ccu.table_schema = ${PLATFORM_SCHEMA}
+      AND ccu.table_name = 'profiles'
+      AND kcu.table_schema = ${PLATFORM_SCHEMA}
+  `.execute(db)
+
+  if (!rows?.length) return
+
+  for (const ref of rows) {
+    const tableName = ref.table_name ?? ''
+    const columnName = ref.column_name ?? ''
+
+    if (!tableName || !columnName) continue
+    if (PROFILE_REFERENCE_SKIP_TABLES.has(tableName)) continue
+
+    await db
+      .updateTable(tableName as never)
+      .set({ [columnName]: targetProfileId } as Record<string, unknown>)
+      .where(columnName as never, 'in', duplicateIds)
+      .execute()
+  }
+}
+
 const normalizeBillingPartner = (
   value: string | null | undefined
 ): 'fly' | 'aws_marketplace' | 'vercel_marketplace' | null => {
@@ -755,13 +805,7 @@ const migrateDuplicateAdminProfiles = async (
     }
   }
 
-  if (duplicateIds.length > 0) {
-    await db
-      .updateTable('organization_invitations')
-      .set({ invited_by_profile_id: baseProfile.id })
-      .where('invited_by_profile_id', 'in', duplicateIds)
-      .execute()
-  }
+  await migrateProfileForeignKeyReferences(db, duplicateIds, baseProfile.id)
 
   await db.deleteFrom('profiles').where('id', 'in', duplicateIds).execute()
 }
