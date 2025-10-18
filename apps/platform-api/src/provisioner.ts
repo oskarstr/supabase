@@ -24,6 +24,7 @@ export interface ProvisionContext {
   databasePassword: string
   projectRoot: string
   excludedServices: string[]
+  portSlot: number
 }
 
 export interface DestroyContext {
@@ -42,6 +43,7 @@ const PROVISION_DELAY_MS = parseDelay(process.env.PROVISIONING_DELAY_MS, 1_000)
 const DESTRUCTION_DELAY_MS = parseDelay(process.env.DESTRUCTION_DELAY_MS, 1_000)
 const ORCHESTRATOR_URL = process.env.PLATFORM_ORCHESTRATOR_URL?.trim() || ''
 const ORCHESTRATOR_TOKEN = process.env.PLATFORM_ORCHESTRATOR_TOKEN?.trim()
+const ORCHESTRATOR_TIMEOUT_MS = parseDelay(process.env.PLATFORM_ORCHESTRATOR_TIMEOUT_MS, 15 * 60_000)
 
 const renderTemplate = (template: string, context: Record<string, string>) =>
   template.replace(/\{(\w+)\}/g, (_match, key: string) => context[key] ?? '')
@@ -88,23 +90,42 @@ const useOrchestrator = () => {
       headers['authorization'] = `Bearer ${ORCHESTRATOR_TOKEN}`
     }
 
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers,
-    } as any)
+    const controller = ORCHESTRATOR_TIMEOUT_MS > 0 ? new AbortController() : null
+    const timeoutId = controller
+      ? setTimeout(() => controller.abort(), ORCHESTRATOR_TIMEOUT_MS)
+      : null
 
-    if (!response.ok) {
-      const message = await response.text()
-      throw new Error(
-        `orchestrator request failed (${response.status} ${response.statusText}): ${message}`
-      )
+    try {
+      const response = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        headers,
+        signal: controller?.signal,
+      } as RequestInit)
+
+      if (!response.ok) {
+        const message = await response.text()
+        throw new Error(
+          `orchestrator request failed (${response.status} ${response.statusText}): ${message}`
+        )
+      }
+
+      if (response.headers.get('content-type')?.includes('application/json')) {
+        return response.json()
+      }
+
+      return null
+    } catch (error) {
+      if (controller && error instanceof Error && error.name === 'AbortError') {
+        throw new Error(
+          `orchestrator request timed out after ${ORCHESTRATOR_TIMEOUT_MS}ms (${path})`
+        )
+      }
+      throw error
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
     }
-
-    if (response.headers.get('content-type')?.includes('application/json')) {
-      return response.json()
-    }
-
-    return null
   }
 
   return {
@@ -133,11 +154,11 @@ export async function provisionProjectStack(context: ProvisionContext) {
   }
 
   await prepareSupabaseRuntime({
-    projectId: context.projectId,
     projectRef: context.ref,
     projectName: context.name,
     projectRoot: context.projectRoot,
     databasePassword: context.databasePassword,
+    portSlot: context.portSlot,
   })
 
   if (process.env.FAIL_PROVISIONING === 'true') {

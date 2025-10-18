@@ -123,9 +123,40 @@ const scheduleProvisioning = async (
       databasePassword,
       projectRoot: runtimeRoot,
       excludedServices,
+      portSlot: options.runtime.port_slot,
     })
 
     const parsedEnv = readProvisionedEnv(runtimeRoot)
+    if (!parsedEnv) {
+      throw new Error(
+        `Supabase runtime .env not found under ${runtimeRoot}. Provisioning cannot continue without generated credentials.`
+      )
+    }
+
+    const missingKeys: string[] = []
+    if (!parsedEnv.SUPABASE_SERVICE_KEY) {
+      missingKeys.push('SUPABASE_SERVICE_KEY')
+    }
+    if (!parsedEnv.SUPABASE_ANON_KEY) {
+      missingKeys.push('SUPABASE_ANON_KEY')
+    }
+    if (!parsedEnv.SUPABASE_DB_URL && !parsedEnv.DATABASE_URL) {
+      missingKeys.push('SUPABASE_DB_URL')
+    }
+    const expectsRest =
+      !excludedServices.includes('postgrest') && !excludedServices.includes('kong')
+    if (expectsRest && !parsedEnv.SUPABASE_URL && !parsedEnv.SUPABASE_PUBLIC_URL) {
+      missingKeys.push('SUPABASE_URL')
+    }
+
+    if (missingKeys.length > 0) {
+      throw new Error(
+        `Supabase runtime .env missing required keys: ${missingKeys
+          .map((key) => key.toLowerCase())
+          .join(', ')}`
+      )
+    }
+
     const updates: ProjectUpdate = {}
 
     if (parsedEnv?.SUPABASE_ANON_KEY) {
@@ -155,7 +186,7 @@ const scheduleProvisioning = async (
     }
 
     await waitForRuntimeHealth({
-      projectId: project.id,
+      portSlot: options.runtime.port_slot,
       excludedServices,
     })
 

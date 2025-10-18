@@ -75,7 +75,7 @@ describe('project lifecycle integration', () => {
   const fetchRuntimeRow = async (db: PlatformDb, projectId: number) =>
     db
       .selectFrom('project_runtimes')
-      .select(['project_id', 'root_dir', 'excluded_services'])
+      .select(['project_id', 'root_dir', 'excluded_services', 'port_slot'])
       .where('project_id', '=', projectId)
       .executeTakeFirst()
 
@@ -201,6 +201,9 @@ describe('project lifecycle integration', () => {
       root_dir: expectedRoot,
       excluded_services: ['logflare', 'vector'],
     })
+    expect(typeof runtimeRow?.port_slot).toBe('number')
+
+    const expectedPortSlot = runtimeRow?.port_slot
 
     const provisionPayload = mocks.provisionProjectStack.mock.calls[0]?.[0]
     expect(provisionPayload).toMatchObject({
@@ -212,12 +215,13 @@ describe('project lifecycle integration', () => {
       databasePassword: 'postgres',
       projectRoot: expectedRoot,
       excludedServices: ['logflare', 'vector'],
+      portSlot: expectedPortSlot,
     })
     expect(typeof provisionPayload.projectId).toBe('number')
 
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledTimes(1)
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: projectRow?.id,
+      portSlot: expectedPortSlot,
       excludedServices: ['logflare', 'vector'],
     })
     expect(mocks.destroyProjectStack).not.toHaveBeenCalled()
@@ -331,13 +335,17 @@ describe('project lifecycle integration', () => {
 
     const runtimeRow = projectRow && (await fetchRuntimeRow(db, projectRow.id))
     expect(runtimeRow?.excluded_services).toEqual(['realtime', 'vector', 'logflare'])
+    expect(typeof runtimeRow?.port_slot).toBe('number')
 
     expect(mocks.provisionProjectStack).toHaveBeenCalledTimes(1)
     const provisionPayload = mocks.provisionProjectStack.mock.calls[0]?.[0]
-    expect(provisionPayload?.excludedServices).toEqual(['realtime', 'vector', 'logflare'])
+    expect(provisionPayload).toMatchObject({
+      excludedServices: ['realtime', 'vector', 'logflare'],
+      portSlot: runtimeRow?.port_slot,
+    })
 
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: projectRow?.id,
+      portSlot: runtimeRow?.port_slot,
       excludedServices: ['realtime', 'vector', 'logflare'],
     })
   })
@@ -377,7 +385,7 @@ describe('project lifecycle integration', () => {
     const runtimeRoot = join(tempRoot, projectRef)
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledTimes(1)
     expect(mocks.waitForRuntimeHealth).toHaveBeenCalledWith({
-      projectId: expect.any(Number),
+      portSlot: expect.any(Number),
       excludedServices: ['logflare', 'vector'],
     })
 
