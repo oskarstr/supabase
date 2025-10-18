@@ -43,7 +43,7 @@ const sanitizeProjectList = (projects: unknown): string[] => {
       set.add(trimmed)
     }
   }
-  return Array.from(set)
+  return Array.from(set).sort()
 }
 
 const toRoleScopedRecord = (value: unknown): Record<string, string[]> => {
@@ -67,6 +67,235 @@ const toRoleScopedRecord = (value: unknown): Record<string, string[]> => {
   return {}
 }
 
+type RoleMetadataContext = {
+  roleIds: Set<number>
+  projectRefs: Set<string>
+}
+
+const loadRoleMetadataContext = async (
+  organizationId: number
+): Promise<RoleMetadataContext> => {
+  const [roles, projects] = await Promise.all([
+    db
+      .selectFrom('organization_roles')
+      .select(['id'])
+      .where('organization_id', '=', organizationId)
+      .execute(),
+    db
+      .selectFrom('projects')
+      .select(['ref'])
+      .where('organization_id', '=', organizationId)
+      .execute(),
+  ])
+
+  const roleIds = new Set<number>()
+  roles.forEach((role) => {
+    const parsed = Number(role.id)
+    if (Number.isFinite(parsed)) {
+      roleIds.add(parsed)
+    }
+  })
+
+  const projectRefs = new Set<string>()
+  projects.forEach((project) => {
+    if (typeof project.ref === 'string' && project.ref.trim().length > 0) {
+      projectRefs.add(project.ref)
+    }
+  })
+
+  return { roleIds, projectRefs }
+}
+
+const toMetadataRecord = (value: unknown): Record<string, unknown> => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>) }
+  }
+  return {}
+}
+
+const hasRoleScopedProjects = (metadata: unknown): boolean => {
+  if (!metadata || typeof metadata !== 'object') return false
+  const scoped = (metadata as Record<string, unknown>).role_scoped_projects
+  if (!scoped) return false
+  if (Array.isArray(scoped)) {
+    return scoped.length > 0
+  }
+  if (typeof scoped === 'object') {
+    return Object.keys(scoped as Record<string, unknown>).length > 0
+  }
+  return false
+}
+
+const roleScopedRecordsEqual = (
+  a: Record<string, string[]>,
+  b: Record<string, string[]>
+) => {
+  const keysA = Object.keys(a).sort()
+  const keysB = Object.keys(b).sort()
+  if (keysA.length !== keysB.length) return false
+  for (let i = 0; i < keysA.length; i += 1) {
+    if (keysA[i] !== keysB[i]) return false
+    const valuesA = [...a[keysA[i]]].sort()
+    const valuesB = [...b[keysA[i]]].sort()
+    if (valuesA.length !== valuesB.length) return false
+    for (let j = 0; j < valuesA.length; j += 1) {
+      if (valuesA[j] !== valuesB[j]) return false
+    }
+  }
+  return true
+}
+
+const pruneRoleScopedProjectsMetadata = (
+  metadata: Record<string, unknown>,
+  allowedRoleIds: Set<number>,
+  context: RoleMetadataContext
+): { metadata: Record<string, unknown>; changed: boolean } => {
+  const base = { ...metadata }
+  const scopedValue = base.role_scoped_projects
+  if (!scopedValue) {
+    return { metadata: base, changed: false }
+  }
+
+  const normalized = toRoleScopedRecord(scopedValue)
+  const sanitized: Record<string, string[]> = {}
+
+  for (const [roleKey, refs] of Object.entries(normalized)) {
+    const parsedRoleId = Number.parseInt(roleKey, 10)
+    if (!Number.isFinite(parsedRoleId)) continue
+    if (!allowedRoleIds.has(parsedRoleId)) continue
+
+    const filtered = refs.filter((ref) => context.projectRefs.has(ref))
+    if (filtered.length > 0) {
+      sanitized[String(parsedRoleId)] = [...filtered].sort()
+    }
+  }
+
+  if (Object.keys(sanitized).length === 0) {
+    if (Object.prototype.hasOwnProperty.call(base, 'role_scoped_projects')) {
+      delete base.role_scoped_projects
+      return { metadata: base, changed: true }
+    }
+    return { metadata: base, changed: false }
+  }
+
+  const changed =
+    !roleScopedRecordsEqual(normalized, sanitized) ||
+    !(
+      scopedValue &&
+      typeof scopedValue === 'object' &&
+      !Array.isArray(scopedValue)
+    )
+
+  base.role_scoped_projects = sanitized
+  return { metadata: base, changed }
+}
+
+type MemberRowWithMetadata<T> = T & {
+  id: number
+  role_ids: unknown
+  metadata: unknown
+}
+
+const applyMemberMetadataHygiene = async <T extends { id: number; role_ids: unknown; metadata: unknown }>(
+  organizationId: number,
+  rows: T[]
+): Promise<Array<MemberRowWithMetadata<T>>> => {
+  if (!rows.length) return rows as Array<MemberRowWithMetadata<T>>
+
+  const needsPrune = rows.some((row) => hasRoleScopedProjects(row.metadata))
+  if (!needsPrune) {
+    return rows.map((row) => ({
+      ...row,
+      metadata: toMetadataRecord(row.metadata),
+    })) as Array<MemberRowWithMetadata<T>>
+  }
+
+  const context = await loadRoleMetadataContext(organizationId)
+  const sanitized: Array<MemberRowWithMetadata<T>> = []
+
+  for (const row of rows) {
+    const metadataRecord = toMetadataRecord(row.metadata)
+    const allowedRoleIds = new Set<number>()
+    if (Array.isArray(row.role_ids)) {
+      for (const entry of row.role_ids) {
+        const parsed = Number(entry)
+        if (Number.isFinite(parsed) && context.roleIds.has(parsed)) {
+          allowedRoleIds.add(parsed)
+        }
+      }
+    }
+
+    const { metadata: pruned, changed } = pruneRoleScopedProjectsMetadata(
+      metadataRecord,
+      allowedRoleIds,
+      context
+    )
+
+    if (changed) {
+      await db
+        .updateTable('organization_members')
+        .set({ metadata: pruned, updated_at: nowIso() })
+        .where('id', '=', row.id)
+        .execute()
+    }
+
+    sanitized.push({ ...row, metadata: pruned })
+  }
+
+  return sanitized
+}
+
+type InvitationRowWithMetadata<T> = T & {
+  id: number
+  role_id: number | null
+  metadata: unknown
+}
+
+const applyInvitationMetadataHygiene = async <T extends { id: number; role_id: number | null; metadata: unknown }>(
+  organizationId: number,
+  rows: T[]
+): Promise<Array<InvitationRowWithMetadata<T>>> => {
+  if (!rows.length) return rows as Array<InvitationRowWithMetadata<T>>
+
+  const needsPrune = rows.some((row) => hasRoleScopedProjects(row.metadata))
+  if (!needsPrune) {
+    return rows.map((row) => ({
+      ...row,
+      metadata: toMetadataRecord(row.metadata),
+    })) as Array<InvitationRowWithMetadata<T>>
+  }
+
+  const context = await loadRoleMetadataContext(organizationId)
+  const sanitized: Array<InvitationRowWithMetadata<T>> = []
+
+  for (const row of rows) {
+    const metadataRecord = toMetadataRecord(row.metadata)
+    const allowedRoleIds = new Set<number>()
+    const parsedRoleId = Number(row.role_id ?? 0)
+    if (Number.isFinite(parsedRoleId) && context.roleIds.has(parsedRoleId)) {
+      allowedRoleIds.add(parsedRoleId)
+    }
+
+    const { metadata: pruned, changed } = pruneRoleScopedProjectsMetadata(
+      metadataRecord,
+      allowedRoleIds,
+      context
+    )
+
+    if (changed) {
+      await db
+        .updateTable('organization_invitations')
+        .set({ metadata: pruned })
+        .where('id', '=', row.id)
+        .execute()
+    }
+
+    sanitized.push({ ...row, metadata: pruned })
+  }
+
+  return sanitized
+}
+
 export const listOrganizationMembers = async (slug: string): Promise<OrganizationMember[]> => {
   const organization = await db
     .selectFrom('organizations')
@@ -79,6 +308,7 @@ export const listOrganizationMembers = async (slug: string): Promise<Organizatio
     .selectFrom('organization_members')
     .innerJoin('profiles', 'profiles.id', 'organization_members.profile_id')
     .select([
+      'organization_members.id as id',
       'organization_members.role_ids',
       'organization_members.metadata',
       'organization_members.mfa_enabled',
@@ -90,13 +320,15 @@ export const listOrganizationMembers = async (slug: string): Promise<Organizatio
     .where('organization_members.organization_id', '=', organization.id)
     .execute()
 
-  return rows.map((row) => ({
+  const sanitized = await applyMemberMetadataHygiene(organization.id, rows)
+
+  return sanitized.map((row) => ({
     gotrue_id: row.gotrue_id,
     is_sso_user: row.is_sso_user,
     metadata: (row.metadata as Record<string, unknown>) ?? {},
     mfa_enabled: row.mfa_enabled,
     primary_email: row.primary_email ?? DEFAULT_PRIMARY_EMAIL,
-    role_ids: row.role_ids ?? [],
+    role_ids: (row.role_ids as number[] | null) ?? [],
     username: row.username ?? DEFAULT_USERNAME,
   }))
 }
@@ -143,11 +375,13 @@ export const listOrganizationInvitations = async (
 
   const invitations = await db
     .selectFrom('organization_invitations')
-    .select(['id', 'invited_email', 'role_id', 'invited_at'])
+    .select(['id', 'invited_email', 'role_id', 'invited_at', 'metadata'])
     .where('organization_id', '=', organization.id)
     .execute()
 
-  const filtered = invitations.filter((invitation) => invitation.role_id !== null)
+  const sanitized = await applyInvitationMetadataHygiene(organization.id, invitations)
+
+  const filtered = sanitized.filter((invitation) => invitation.role_id !== null)
 
   return {
     invitations: filtered.map((invitation) => ({
@@ -271,13 +505,19 @@ const loadOrganizationId = async (slug: string) => {
   return organization?.id ?? null
 }
 
-const loadMemberRow = async (organizationId: number, profileId: number) =>
-  db
+const loadMemberRow = async (organizationId: number, profileId: number) => {
+  const row = await db
     .selectFrom('organization_members')
     .selectAll()
     .where('organization_id', '=', organizationId)
     .where('profile_id', '=', profileId)
     .executeTakeFirst()
+
+  if (!row) return undefined
+
+  const [sanitized] = await applyMemberMetadataHygiene(organizationId, [row])
+  return sanitized
+}
 
 const loadMemberByGotrueId = async (organizationId: number, gotrueId: string) =>
   db
@@ -519,15 +759,18 @@ export const createOrganizationInvitation = async (
     throw new InvitationError('A member with this email already exists in the organization')
   }
 
-  const existingInvitation = await db
+  const existingInvitationRaw = await db
     .selectFrom('organization_invitations')
     .select(invitationSelectFields)
     .where('organization_id', '=', organizationId)
     .where('invited_email', '=', normalizedEmail)
     .executeTakeFirst()
 
-  const baseMetadata =
-    (existingInvitation?.metadata as Record<string, unknown> | null | undefined) ?? {}
+  const existingInvitation = existingInvitationRaw
+    ? (await applyInvitationMetadataHygiene(organizationId, [existingInvitationRaw]))[0]
+    : undefined
+
+  const baseMetadata = existingInvitation?.metadata ?? {}
 
   let metadata = updateRoleScopedMetadata(
     { ...baseMetadata },
@@ -540,7 +783,7 @@ export const createOrganizationInvitation = async (
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
   if (existingInvitation) {
-    const updated = await db
+    const updatedRaw = await db
       .updateTable('organization_invitations')
       .set({
         role_id: roleId,
@@ -555,6 +798,7 @@ export const createOrganizationInvitation = async (
       .returning(invitationSelectFields)
       .executeTakeFirstOrThrow()
 
+    const [updated] = await applyInvitationMetadataHygiene(organizationId, [updatedRaw])
     return mapInvitationRow(updated)
   }
 
@@ -574,12 +818,13 @@ export const createOrganizationInvitation = async (
     values = { ...values, id: await nextInvitationId() }
   }
 
-  const inserted = await db
+  const insertedRaw = await db
     .insertInto('organization_invitations')
     .values(values)
     .returning(invitationSelectFields)
     .executeTakeFirstOrThrow()
 
+  const [inserted] = await applyInvitationMetadataHygiene(organizationId, [insertedRaw])
   return mapInvitationRow(inserted)
 }
 
@@ -601,13 +846,19 @@ export const deleteOrganizationInvitationById = async (
   return Boolean(deleted?.numDeletedRows)
 }
 
-const loadInvitationByToken = async (organizationId: number, token: string) =>
-  db
+const loadInvitationByToken = async (organizationId: number, token: string) => {
+  const row = await db
     .selectFrom('organization_invitations')
     .select(invitationSelectFields)
     .where('organization_id', '=', organizationId)
     .where('token', '=', token)
     .executeTakeFirst()
+
+  if (!row) return undefined
+
+  const [sanitized] = await applyInvitationMetadataHygiene(organizationId, [row])
+  return sanitized
+}
 
 export type InvitationTokenLookup = {
   authorized_user: boolean
