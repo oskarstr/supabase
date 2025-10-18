@@ -64,6 +64,7 @@ Document here: decisions about upsert strategy and any edge cases.
 > - ✅ Added `tests/auth.bootstrap.test.ts` harness to prove the profile’s `gotrue_id` matches the GoTrue result (uses pg-mem + mocked fetch).
 > - ✅ Added regression coverage ensuring a second seed with a different `PLATFORM_ADMIN_EMAIL` updates `profiles.primary_email` and `gotrue_id` accordingly.
 > - ✅ Added retry/backoff + duplicate-profile reconciliation so the env-defined admin (profile id 1) keeps ownership even when GoTrue is slow or prior runs created stray profiles.
+> - ✅ Admin bootstrap skip path preserves existing profile data, emits a pending audit log when Auth is disabled, and records reconciliation once GoTrue credentials are configured.
 
 ---
 

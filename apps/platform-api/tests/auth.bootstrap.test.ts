@@ -39,7 +39,7 @@ describe('bootstrap admin reconciliation', () => {
     PLATFORM_ADMIN_PASSWORD: 'supabase',
   }
 
-  const setEnv = (overrides: Record<string, string>) => {
+  const setEnv = (overrides: Record<string, string | undefined>) => {
     patchEnv(baseEnv, overrides)
   }
 
@@ -60,7 +60,12 @@ describe('bootstrap admin reconciliation', () => {
 
     setEnv({ PLATFORM_ADMIN_EMAIL: 'admin@example.com' })
 
-    const { seedDefaults } = await import('../src/db/seed.js')
+    const {
+      seedDefaults,
+      ADMIN_BOOTSTRAP_EVENT,
+      ADMIN_BOOTSTRAP_REASONS,
+      ADMIN_BOOTSTRAP_STATUS,
+    } = await import('../src/db/seed.js')
     await seedDefaults()
 
     const { getPlatformDb } = await import('../src/db/client.js')
@@ -72,6 +77,170 @@ describe('bootstrap admin reconciliation', () => {
       .executeTakeFirst()
 
     expect(row?.gotrue_id).toBe(expectedUserId)
+  })
+
+  it('warns and schedules reconciliation when GoTrue config is missing', async () => {
+    await initMemDatabase()
+
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+
+    const existingUserId = '12345678-90ab-cdef-1234-567890abcdef'
+    const existingEmail = 'seeded-admin@example.com'
+
+    await db
+      .insertInto('profiles')
+      .values({
+        id: baseProfile.id,
+        gotrue_id: existingUserId,
+        auth0_id: baseProfile.auth0_id,
+        username: baseProfile.username,
+        first_name: baseProfile.first_name,
+        last_name: baseProfile.last_name,
+        primary_email: existingEmail,
+        mobile: baseProfile.mobile ?? '',
+        free_project_limit: baseProfile.free_project_limit,
+        is_alpha_user: baseProfile.is_alpha_user,
+        is_sso_user: baseProfile.is_sso_user,
+        disabled_features: baseProfile.disabled_features,
+      })
+      .execute()
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    setEnv({
+      PLATFORM_ADMIN_EMAIL: 'new-admin@example.com',
+      SUPABASE_GOTRUE_URL: undefined,
+      GOTRUE_URL: undefined,
+      SUPABASE_SERVICE_KEY: undefined,
+      SERVICE_ROLE_KEY: undefined,
+      SUPABASE_ANON_KEY: undefined,
+      ANON_KEY: undefined,
+    })
+
+    const { seedDefaults } = await import('../src/db/seed.js')
+    await seedDefaults()
+
+    expect(
+      warnSpy.mock.calls.some(([message]) => {
+        return (
+          typeof message === 'string' &&
+          message.includes('admin bootstrap skipped') &&
+          message.includes('GoTrue credentials are not configured')
+        )
+      })
+    ).toBe(true)
+
+    const profile = await db
+      .selectFrom('profiles')
+      .select(['gotrue_id', 'primary_email'])
+      .where('id', '=', baseProfile.id)
+      .executeTakeFirst()
+
+    expect(profile?.gotrue_id).toBe(existingUserId)
+    expect(profile?.primary_email).toBe(existingEmail)
+
+    const auditLogs = await db
+      .selectFrom('audit_logs')
+      .select(['event_message', 'payload'])
+      .orderBy('id', 'asc')
+      .execute()
+
+    expect(auditLogs).toEqual([
+      expect.objectContaining({
+        event_message: ADMIN_BOOTSTRAP_EVENT,
+        payload: expect.objectContaining({
+          status: ADMIN_BOOTSTRAP_STATUS.pending,
+          admin_email: existingEmail,
+          reason: ADMIN_BOOTSTRAP_REASONS.missingGoTrueCredentials,
+        }),
+      }),
+    ])
+  })
+
+  it('records reconciliation when Auth configuration becomes available', async () => {
+    await initMemDatabase()
+
+    setEnv({
+      PLATFORM_ADMIN_EMAIL: 'admin@example.com',
+      SUPABASE_GOTRUE_URL: undefined,
+      GOTRUE_URL: undefined,
+      SUPABASE_SERVICE_KEY: undefined,
+      SERVICE_ROLE_KEY: undefined,
+      SUPABASE_ANON_KEY: undefined,
+      ANON_KEY: undefined,
+    })
+
+    const {
+      seedDefaults,
+      ADMIN_BOOTSTRAP_EVENT,
+      ADMIN_BOOTSTRAP_STATUS,
+    } = await import('../src/db/seed.js')
+    await seedDefaults()
+
+    const { getPlatformDb } = await import('../src/db/client.js')
+    const db = getPlatformDb()
+
+    let auditLogs = await db
+      .selectFrom('audit_logs')
+      .select(['event_message', 'payload'])
+      .orderBy('id', 'asc')
+      .execute()
+
+    expect(auditLogs).toHaveLength(1)
+    expect(auditLogs[0]?.payload).toEqual(
+      expect.objectContaining({ status: ADMIN_BOOTSTRAP_STATUS.pending })
+    )
+
+    const reconciledUserId = 'fedcba98-7654-3210-fedc-ba9876543210'
+
+    const fetchSpy = createFetchStub(async (input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url.endsWith('/admin/users')) {
+        return new Response(JSON.stringify({ user: { id: reconciledUserId } }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    setEnv({
+      SUPABASE_GOTRUE_URL: 'http://localhost:9999/auth/v1',
+      SUPABASE_SERVICE_KEY: 'service-key',
+      SUPABASE_ANON_KEY: 'anon-key',
+      SERVICE_ROLE_KEY: undefined,
+      ANON_KEY: undefined,
+    })
+
+    await seedDefaults()
+
+    const profile = await db
+      .selectFrom('profiles')
+      .select(['gotrue_id'])
+      .where('id', '=', baseProfile.id)
+      .executeTakeFirst()
+
+    expect(profile?.gotrue_id).toBe(reconciledUserId)
+
+    auditLogs = await db
+      .selectFrom('audit_logs')
+      .select(['event_message', 'payload'])
+      .orderBy('id', 'asc')
+      .execute()
+
+    expect(auditLogs).toHaveLength(2)
+    expect(auditLogs[1]).toEqual(
+      expect.objectContaining({
+        event_message: ADMIN_BOOTSTRAP_EVENT,
+        payload: expect.objectContaining({
+          status: ADMIN_BOOTSTRAP_STATUS.reconciled,
+          admin_user_id: reconciledUserId,
+        }),
+      })
+    )
+
+    expect(fetchSpy).toHaveBeenCalled()
   })
 
   it('updates profile identity when the admin email changes', async () => {
