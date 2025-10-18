@@ -203,6 +203,25 @@ const adminSeedMaxDelayMs = () => {
   return parsePositiveIntEnv(process.env.PLATFORM_ADMIN_SEED_MAX_DELAY_MS, 10000, 100, 60000)
 }
 
+export const ADMIN_BOOTSTRAP_EVENT = 'platform.admin-bootstrap' as const
+
+export const ADMIN_BOOTSTRAP_STATUS = {
+  pending: 'pending',
+  reconciled: 'reconciled',
+} as const
+
+export const ADMIN_BOOTSTRAP_REASONS = {
+  missingGoTrueCredentials: 'missing_gotrue_credentials',
+} as const
+
+export const ADMIN_BOOTSTRAP_RECOMMENDED_ACTIONS = {
+  missingGoTrueCredentials:
+    'Configure GoTrue credentials and rerun the platform bootstrap to reconcile the admin account.',
+} as const
+
+type AdminBootstrapStatus =
+  (typeof ADMIN_BOOTSTRAP_STATUS)[keyof typeof ADMIN_BOOTSTRAP_STATUS]
+
 const hasAdminBootstrapConfiguration = (email: string, password: string) => {
   const gotrueUrl =
     process.env.SUPABASE_GOTRUE_URL?.trim() || process.env.GOTRUE_URL?.trim()
@@ -554,9 +573,21 @@ export const seedDefaults = async () => {
     }
   })
 
-  await reconcileAdminState(db, adminUserId, adminEmail)
+  if (adminIdentity.status === 'skipped') {
+    await ensureAdminOwnerMembership(db)
+    await planAdminBootstrapReconciliation(db, adminUserId, adminEmail)
+  } else {
+    await reconcileAdminState(db, adminUserId, adminEmail)
+    await recordAdminBootstrapReconciliation(db, adminUserId, adminEmail)
+  }
 
   console.log('[platform-db] default seed complete')
+}
+
+type AdminIdentityResult = {
+  userId: string
+  email: string
+  status: AdminBootstrapStatus | 'skipped'
 }
 
 type AdminUserIdentity = {
@@ -567,17 +598,25 @@ type AdminUserIdentity = {
 const ensureAdminIdentityWithRetry = async (
   email: string,
   password: string
-): Promise<AdminUserIdentity> => {
+): Promise<AdminIdentityResult> => {
   if (!hasAdminBootstrapConfiguration(email, password)) {
     console.warn(
-      '[platform-db] admin bootstrap skipped: SUPABASE_GOTRUE_URL or service key not configured'
+      [
+        '[platform-db] admin bootstrap skipped: GoTrue credentials are not configured.',
+        'The existing platform admin profile will be left unchanged until Auth is enabled.',
+        'Provide SUPABASE_GOTRUE_URL and SUPABASE_SERVICE_KEY (or GOTRUE_URL and SERVICE_ROLE_KEY) then rerun the platform bootstrap.',
+      ].join('\n')
     )
     const fallback = await getPlatformDb()
       .selectFrom('profiles')
-      .select(['gotrue_id'])
+      .select(['gotrue_id', 'primary_email'])
       .where('id', '=', baseProfile.id)
       .executeTakeFirst()
-    return { userId: fallback?.gotrue_id ?? baseProfile.gotrue_id, email }
+    return {
+      userId: fallback?.gotrue_id ?? baseProfile.gotrue_id,
+      email: fallback?.primary_email ?? baseProfile.primary_email,
+      status: 'skipped',
+    }
   }
 
   const attempts = adminSeedRetryAttempts()
@@ -589,7 +628,7 @@ const ensureAdminIdentityWithRetry = async (
   while (attempt < attempts) {
     const identity = await ensureAdminAuthUser(email, password)
     if (identity) {
-      return identity
+      return { ...identity, status: ADMIN_BOOTSTRAP_STATUS.reconciled }
     }
 
     attempt += 1
@@ -612,6 +651,87 @@ const ensureAdminIdentityWithRetry = async (
     `Failed to ensure platform admin account after ${attempts} attempt${attempts === 1 ? '' : 's'}. ` +
       'Confirm GoTrue is reachable and the PLATFORM_ADMIN_* credentials are correct.'
   )
+}
+
+const planAdminBootstrapReconciliation = async (
+  db: ReturnType<typeof getPlatformDb>,
+  adminUserId: string,
+  adminEmail: string
+) => {
+  const latest = await db
+    .selectFrom('audit_logs')
+    .select(['payload'])
+    .where('event_message', '=', ADMIN_BOOTSTRAP_EVENT)
+    .orderBy('created_at', 'desc')
+    .executeTakeFirst()
+
+  const latestPayload = (latest?.payload as Record<string, unknown> | null) ?? null
+  if (
+    latestPayload?.status === ADMIN_BOOTSTRAP_STATUS.pending &&
+    typeof latestPayload.admin_email === 'string' &&
+    latestPayload.admin_email === adminEmail
+  ) {
+    return
+  }
+
+  await db
+    .insertInto('audit_logs')
+    .values({
+      organization_id: null,
+      project_id: null,
+      event_message: ADMIN_BOOTSTRAP_EVENT,
+      payload: {
+        status: ADMIN_BOOTSTRAP_STATUS.pending,
+        admin_user_id: adminUserId,
+        admin_email: adminEmail,
+        reason: ADMIN_BOOTSTRAP_REASONS.missingGoTrueCredentials,
+        recommended_action:
+          ADMIN_BOOTSTRAP_RECOMMENDED_ACTIONS.missingGoTrueCredentials,
+      },
+      ip_address: null,
+      created_at: new Date(),
+    })
+    .execute()
+}
+
+const recordAdminBootstrapReconciliation = async (
+  db: ReturnType<typeof getPlatformDb>,
+  adminUserId: string,
+  adminEmail: string
+) => {
+  const latest = await db
+    .selectFrom('audit_logs')
+    .select(['payload'])
+    .where('event_message', '=', ADMIN_BOOTSTRAP_EVENT)
+    .orderBy('created_at', 'desc')
+    .executeTakeFirst()
+
+  const latestPayload = (latest?.payload as Record<string, unknown> | null) ?? null
+  if (
+    latestPayload?.status === ADMIN_BOOTSTRAP_STATUS.reconciled &&
+    typeof latestPayload.admin_user_id === 'string' &&
+    latestPayload.admin_user_id === adminUserId &&
+    typeof latestPayload.admin_email === 'string' &&
+    latestPayload.admin_email === adminEmail
+  ) {
+    return
+  }
+
+  await db
+    .insertInto('audit_logs')
+    .values({
+      organization_id: null,
+      project_id: null,
+      event_message: ADMIN_BOOTSTRAP_EVENT,
+      payload: {
+        status: ADMIN_BOOTSTRAP_STATUS.reconciled,
+        admin_user_id: adminUserId,
+        admin_email: adminEmail,
+      },
+      ip_address: null,
+      created_at: new Date(),
+    })
+    .execute()
 }
 
 const reconcileAdminState = async (
