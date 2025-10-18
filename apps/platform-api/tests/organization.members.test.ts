@@ -153,7 +153,7 @@ describe('organization member routes', () => {
       headers: ownerHeaders(),
       payload: {
         role_id: roleId,
-        role_scoped_projects: ['project-1'],
+        role_scoped_projects: ['local-project'],
       },
     })
 
@@ -187,7 +187,7 @@ describe('organization member routes', () => {
       headers: ownerHeaders(),
       payload: {
         role_id: devRoleId,
-        role_scoped_projects: ['project-1'],
+        role_scoped_projects: ['local-project'],
       },
     })
 
@@ -219,7 +219,7 @@ describe('organization member routes', () => {
     const scoped = (
       metadata as { role_scoped_projects?: Record<string, string[]> }
     ).role_scoped_projects
-    expect(scoped?.[String(devRoleId)]).toEqual(['project-1'])
+    expect(scoped?.[String(devRoleId)]).toEqual(['local-project'])
     expect(scoped?.[String(adminRoleIdValue)]).toBeUndefined()
   })
 
@@ -309,7 +309,7 @@ describe('organization member routes', () => {
       payload: {
         email: 'invitee@example.com',
         role_id: roleId,
-        role_scoped_projects: ['project-one', 'project-two'],
+        role_scoped_projects: ['local-project', 'platform'],
       },
     })
 
@@ -324,7 +324,7 @@ describe('organization member routes', () => {
     const invitationMetadata = (
       created.metadata as { role_scoped_projects?: Record<string, string[]> }
     )?.role_scoped_projects
-    expect(invitationMetadata?.[String(roleId)]).toEqual(['project-one', 'project-two'])
+    expect(invitationMetadata?.[String(roleId)]).toEqual(['local-project', 'platform'])
 
     const invitations = await invitationList()
     expect(invitations.invitations.some((invite) => invite.invited_email === 'invitee@example.com')).toBe(true)
@@ -459,7 +459,7 @@ describe('organization member routes', () => {
       payload: {
         email: inviteEmail,
         role_id: roleId,
-        role_scoped_projects: ['alpha'],
+        role_scoped_projects: ['platform'],
       },
     })
     expect(create.statusCode).toBe(201)
@@ -485,7 +485,7 @@ describe('organization member routes', () => {
     expect(member?.role_ids).toEqual([roleId])
     const metadata = (member?.metadata as Record<string, unknown>) ?? {}
     expect(metadata.role_scoped_projects).toEqual(
-      roleScopedProjectsMetadata([{ roleId, projects: ['alpha'] }]).role_scoped_projects
+      roleScopedProjectsMetadata([{ roleId, projects: ['platform'] }]).role_scoped_projects
     )
 
     const invitationRow = await platformDb
@@ -571,5 +571,134 @@ describe('organization member routes', () => {
       headers: headersForSubject(targetUserId, inviteEmail),
     })
     expect(accept.statusCode).toBe(400)
+  })
+
+  it('prunes stale role_scoped_projects metadata for members', async () => {
+    const devRoleId = await developerRoleId()
+    const targetUserId = randomUUID()
+    const targetEmail = 'metadata-hygiene@example.com'
+
+    const { ensureProfile } = await import('../src/store/profile.js')
+    const profile = await ensureProfile(targetUserId, targetEmail)
+
+    const assign = await app.inject({
+      method: 'PATCH',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/${targetUserId}`,
+      headers: ownerHeaders(),
+      payload: {
+        role_id: devRoleId,
+        role_scoped_projects: ['local-project'],
+      },
+    })
+
+    expect(assign.statusCode).toBe(200)
+
+    const memberRow = await platformDb
+      .selectFrom('organization_members')
+      .select(['id'])
+      .where('organization_id', '=', defaultOrganizationId)
+      .where('profile_id', '=', profile.id)
+      .executeTakeFirst()
+
+    expect(memberRow?.id).toBeTruthy()
+
+    await platformDb
+      .updateTable('organization_members')
+      .set({
+        metadata: {
+          extra: 'preserve-me',
+          role_scoped_projects: {
+            [String(devRoleId)]: ['local-project', 'ghost-project'],
+            '9999': ['platform'],
+            legacy: ['platform'],
+          },
+        },
+      })
+      .where('id', '=', memberRow!.id)
+      .execute()
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members`,
+      headers: ownerHeaders(),
+    })
+
+    expect(list.statusCode).toBe(200)
+
+    const refreshed = await platformDb
+      .selectFrom('organization_members')
+      .select(['metadata'])
+      .where('id', '=', memberRow!.id)
+      .executeTakeFirst()
+
+    const metadata = (refreshed?.metadata as Record<string, unknown>) ?? {}
+    expect(metadata.extra).toBe('preserve-me')
+
+    const scoped = (metadata.role_scoped_projects as Record<string, string[]>) ?? {}
+    expect(scoped[String(devRoleId)]).toEqual(['local-project'])
+    expect(scoped['9999']).toBeUndefined()
+    expect(scoped.legacy).toBeUndefined()
+
+    const payload = list.json() as Array<{
+      gotrue_id: string
+      metadata?: { role_scoped_projects?: Record<string, string[]> }
+    }>
+    const entry = payload.find((member) => member.gotrue_id === targetUserId)
+    expect(entry?.metadata?.role_scoped_projects?.[String(devRoleId)]).toEqual([
+      'local-project',
+    ])
+  })
+
+  it('prunes stale role_scoped_projects metadata for invitations', async () => {
+    const roleId = await developerRoleId()
+
+    const create = await app.inject({
+      method: 'POST',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+      payload: {
+        email: 'stale-meta@example.com',
+        role_id: roleId,
+        role_scoped_projects: ['platform'],
+      },
+    })
+
+    expect(create.statusCode).toBe(201)
+    const invitation = create.json() as { id: number }
+
+    await platformDb
+      .updateTable('organization_invitations')
+      .set({
+        metadata: {
+          role_scoped_projects: {
+            [String(roleId)]: ['platform', 'unknown-project'],
+            legacy: ['platform'],
+          },
+        },
+      })
+      .where('id', '=', invitation.id)
+      .execute()
+
+    await platformDb
+      .deleteFrom('organization_roles')
+      .where('id', '=', roleId)
+      .execute()
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/platform/organizations/${defaultOrganizationSlug}/members/invitations`,
+      headers: ownerHeaders(),
+    })
+
+    expect(response.statusCode).toBe(200)
+
+    const refreshed = await platformDb
+      .selectFrom('organization_invitations')
+      .select(['metadata'])
+      .where('id', '=', invitation.id)
+      .executeTakeFirst()
+
+    const metadata = (refreshed?.metadata as Record<string, unknown>) ?? {}
+    expect(metadata.role_scoped_projects).toBeUndefined()
   })
 })
